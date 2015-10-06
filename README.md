@@ -1,9 +1,10 @@
 
- # PHPNODE
+ ## PHPNODE
  
  A bitcoin node, written in PHP. See Design.md for design overview. 
   
  ## Presently supports:
+ 
   Headers first syncing
  
  ## Requirements 
