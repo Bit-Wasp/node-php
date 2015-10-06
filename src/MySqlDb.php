@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Block\BlockHeader;
+use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Buffertools\Buffer;
 use Packaged\Config\ConfigProviderInterface;
 
@@ -66,6 +67,10 @@ class MySqlDb
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
 
+    public function stop()
+    {
+        $this->dbh = null;
+    }
     /**
      * @param string $hash
      * @return bool
@@ -178,6 +183,72 @@ class MySqlDb
         }
 
         throw new \RuntimeException('Failed to update insert Genesis block!');
+    }
+
+    /**
+     * @param string $hash
+     * @return array
+     */
+    public function fetchNextHeaders($hash)
+    {
+        $stmt = $this->dbh->prepare("
+            SELECT child.hash
+            FROM headerIndex AS child, headerIndex AS parent
+            WHERE child.rgt < parent.rgt
+            AND parent.hash = :hash
+            ORDER BY parent.rgt
+            LIMIT 2000
+        ");
+
+        $stmt->bindParam(':hash', $hash);
+        if ($stmt->execute()) {
+            $results = $stmt->fetchAll();
+            for ($i = 0, $end = count($results); $i < $end; $i++) {
+                $results[$i] = new BlockHeader(
+                    $results[$i]['version'],
+                    $results[$i]['prevBlock'],
+                    $results[$i]['merkleRoot'],
+                    $results[$i]['nTimestamp'],
+                    Buffer::int($results[$i]['nBits'], 4),
+                    $results[$i]['nNonce']
+                );
+            }
+            $stmt->closeCursor();
+            return $results;
+        }
+    }
+
+    /**
+     * @param Chain $activeChain
+     * @param BlockLocator $locator
+     * @return false|string
+     */
+    public function findFork(Chain $activeChain, BlockLocator $locator)
+    {
+        echo "The locator has " . count($locator->getHashes()) . " elements\n";
+        $hashes = [$activeChain->getIndex()->getHash()];
+        foreach ($locator->getHashes() as $hash) {
+            $hashes[] = $hash->getHex();
+        }
+
+        $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
+
+        $stmt = $this->dbh->prepare("
+            SELECT node.hash
+            FROM headerIndex AS node,
+                 headerIndex AS parent
+            WHERE parent.hash = ? AND node.hash in ($placeholders)
+            ORDER BY node.rgt LIMIT 1
+        ");
+
+        if ($stmt->execute($hashes)) {
+            $column = $stmt->fetch();
+            $stmt->closeCursor();
+            return $column['hash'];
+        }
+
+
+        throw new \RuntimeException('Failed to execute findFork');
     }
 
     /**

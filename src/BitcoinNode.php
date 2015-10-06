@@ -94,6 +94,7 @@ class BitcoinNode extends EventEmitter
      */
     public function stop()
     {
+        $this->db->stop();
         $this->loop->stop();
     }
 
@@ -177,18 +178,16 @@ class BitcoinNode extends EventEmitter
             });
 
             $peer->on('getheaders', function (Peer $peer, GetHeaders $getHeaders ) {
-                if (!$this->isSyncing()) {
-                    $locator = $getHeaders->getLocator();
-                    if (count($locator->getHashes()) == 0) {
-                        /*$find = $this->blocks->fetchByHash($locator->getHashStop()->getHex());
-                        if ($find) {
-                            $startAtIndex = $find;
-                        }*/
-                    } else {
-
-                    }
-
+                $locator = $getHeaders->getLocator();
+                if (count($locator->getHashes()) == 0) {
+                    $start = $locator->getHashStop()->getHex();
+                } else {
+                    $start = $this->db->findFork($this->headers->getActiveChain(), $locator);
                 }
+
+                var_dump($start);
+                //$headers = $this->db->fetchNextHeaders($start);
+                //$peer->headers($headers);
             });
 
             // Process headers
@@ -199,25 +198,23 @@ class BitcoinNode extends EventEmitter
                 $vHeaders = $headers->getHeaders();
                 $c = count($vHeaders);
 
-                try {
-                    $tx = microtime(true);
+                $tx = microtime(true);
+                if ($c > 0) {
                     $this->headers->acceptBatch($vHeaders);
-                    echo "tx took " . (microtime(true) - $tx) . "\n";
-
-                    $this->headers->checkActiveTip();
-                    echo "\nHeaders ($c) went from $startHeight to " . $this->headers->getChainHeight() . "\n";
-
-                    if (count($vHeaders) == 2000) {
-                        echo " ... continue syncing (current height = " . $this->headers->getChainHeight() . " ... \n";
-                        $peer->getheaders($this->headers->getLocatorCurrent());
-                    } else {
-                        $this->emit('headers.synced');
-                    }
-                } catch (\Exception $e) {
-                    echo "ACCEPT EXCEPTION\n";
-                    echo $e->getMessage() . "\n";
-                    return;
                 }
+
+                $this->headers->checkActiveTip();
+
+                echo "tx took " . (microtime(true) - $tx) . "\n";
+                echo "\nHeaders ($c) went from $startHeight to " . $this->headers->getChainHeight() . "\n";
+
+                if (count($vHeaders) == 2000) {
+                    echo " ... continue syncing (current height = " . $this->headers->getChainHeight() . " ... \n";
+                    $peer->getheaders($this->headers->getLocatorCurrent());
+                } else {
+                    $this->emit('headers.synced');
+                }
+
             });
         });
 
