@@ -1,0 +1,38 @@
+{
+  "name": "bitwasp/bitcoin-node",
+  "description": "A bitcoin node",
+  "type": "library",
+  "homepage": "https://github.com/bit-wasp/bitcoin-php",
+  "license": "Unlicence",
+  "authors": [
+    {
+      "name": "Thomas Kerin",
+      "homepage": "https://thomaskerin.io",
+      "role": "Author"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "BitWasp\\Bitcoin\\Node\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "BitWasp\\Bitcoin\\Tests\\Node\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">=5.4.0",
+    "ext-gmp": "*",
+    "ext-json": "*",
+    "bitwasp/bitcoin-p2p": "~0.0.5",
+    "symfony/console": "~2.7",
+    "packaged/config": "~1.2",
+    "doctrine/orm": "2.4.*",
+    "react/zmq": "0.3",
+    "symfony/yaml": "2.*"
+  },
+  "require-dev": {
+    "bitwasp/testing-php": "~0.0"
+  }
+}
