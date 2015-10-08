@@ -5,14 +5,18 @@ namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Factory as NetworkingFactory;
+use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
+use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\NetworkMessage;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
+use BitWasp\Bitcoin\Node\State\PeerState;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
+use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 
@@ -66,6 +70,7 @@ class BitcoinNode extends EventEmitter
     {
         echo " [App] start \n";
         $start = microtime(true);
+
         $this->loadConfig();
         $this->loop = $loop;
         $this->params = $params;
@@ -74,9 +79,19 @@ class BitcoinNode extends EventEmitter
         $this->netFactory = new NetworkingFactory($loop);
         $this->peerState = new PeerStateCollection();
         $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
+        $this->inventory = new KnownInventory();
+        $this->db = new MySqlDb($this->config, false);
+        $this->chains = new Chains($this->adapter);
+        echo "Headers \n";
+        $this->headers = new Index\Headers($this->db, $this->adapter, $this->params, $this->chains);
+        echo "Blocks  \n";
+        $this->blocks = new Index\Blocks($this->db, $this->adapter, $this->params, $this->chains);
+        $this->loadChainState();
 
-        $this->db = new MySqlDb($this->config, true);
-        $this->headers = new Index\Headers($this->db, $this->adapter, $this->params);
+        $this->on('blocks.syncing', function () {
+            echo " [App] ... BLOCKS: syncing\n";
+        });
+
 
         $this->on('headers.syncing', function () {
             echo " [App] ... HEADERS: syncing\n";
@@ -89,9 +104,6 @@ class BitcoinNode extends EventEmitter
         echo " [App] Startup took: " . (microtime(true) - $start) . " seconds \n";
     }
 
-    /**
-     *
-     */
     public function stop()
     {
         $this->db->stop();
@@ -101,7 +113,7 @@ class BitcoinNode extends EventEmitter
     /**
      * @return \Packaged\Config\Provider\Ini\IniConfigProvider
      */
-    public function loadConfig()
+    private function loadConfig()
     {
         if (is_null($this->config)) {
             $file = getenv("HOME") . "/.bitcoinphp/bitcoin.ini";
@@ -112,33 +124,85 @@ class BitcoinNode extends EventEmitter
         return $this->config;
     }
 
-    /**
-     *
-     */
-    /*public function downloadBlocks()
+    private function loadChainState()
     {
-        $peerState = $this->peerState->storage();
+        $states = $this->db->fetchChainState($this->headers);
+        foreach ($states as $state) {
+            $this->chains->trackChain($state);
+        }
+        $this->chains->checkTips();
+    }
 
-        foreach ($peerState as $peer => $state) {
-            if (count($state["downloadingBlocks"]) < 16) {
+    /**
+     * @param Peer $peer
+     */
+    public function startHeaderSync(Peer $peer)
+    {
+        if (!$this->isSyncing()) {
+            $this->syncing = true;
+            $state = $this->peerState->fetch($peer);
+            $state->useForDownload();
+            $this->emit('headers.syncing');
 
-            }
+            $peer->getheaders($this->chains->best()->getHeadersLocator());
         }
     }
 
-    public function findFirstCommonBlock(BlockLocator $locator)
+    /**
+     * @param ChainState $best
+     * @param Peer $peer
+     */
+    private function doDownloadBlocks(ChainState $best, Peer $peer, PeerState $state)
     {
-        $hashes = $locator->getHashes();
-        foreach ($hashes as $hash) {
-            // todo: should really be Chain
-            $find = $this->blocks->lookupByHash($hash->getHex());
-            if (!is_null($find)) {
-                return $find;
-            }
+        $headerHeight = $best->getChain()->getIndex()->getHeight();
+        $blockHeight = $best->getLastBlock()->getHeight();
+
+        $stopHeight = min($headerHeight, $blockHeight + 16);
+        $hashStop = Buffer::hex($best->getChain()->getHashFromHeight($stopHeight), 32, $this->adapter->getMath());
+        $locator = $best->getLocator($blockHeight, $hashStop);
+        $peer->getblocks($locator);
+
+        $state['hashstop'] = $hashStop;
+        $state->useForBlockDownload(true);
+        $state->addDownloadBlocks($stopHeight - $blockHeight - 1);
+    }
+
+    /**
+     * @param Peer $peer
+     */
+    public function startBlockSync(Peer $peer)
+    {
+        $this->emit('blocks.syncing');
+
+        $peerState = $this->peerState->fetch($peer);
+        $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
+
+    }
+
+    /**
+     * @param Inventory $inventory
+     * @return bool
+     */
+    public function checkInventory(Inventory $inventory)
+    {
+        if ($inventory->isBlock()) {
+            //return isset($this->blocks->hashIndex[$inventory->getHash()->getHex()]);
         }
 
-        return $this->blocks->genesis();
-    }*/
+        if ($inventory->isTx()) {
+            return $this->db->transactions->fetch($inventory->getHash()->getHex()) !== null;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSyncing()
+    {
+        return $this->syncing;
+    }
 
     /**
      *
@@ -177,22 +241,70 @@ class BitcoinNode extends EventEmitter
                 echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - " . $msg->getCommand(). "\n";
             });
 
+            $peer->on('block', function (Peer $peer, Block $blockMsg) {
+                $block = $blockMsg->getBlock();
+                $best = $this->chains->best();
+                $index = $this->blocks->accept($block, $this->headers);
+                $best->updateLastBlock($index);
+                $this->chains->checkTips();
+                $peerState = $this->peerState->fetch($peer);
+                if ($peerState->isBlockDownload()) {
+                    $peerState->unsetDownloadBlock();
+                    if (!$peerState->hasDownloadBlocks()) {
+                        echo "do download blocks!\n";
+                        $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
+                    }
+                }
+            });
+
+            $peer->on('inv', function (Peer $peer, Inv $inv) {
+                echo "INV size: " . count($inv->getItems()) . "\n";
+                $best = $this->chains->best();
+                $bestHeaderIndex = $best->getChainIndex();
+                $vFetch = [];
+                $lastBlock = false;
+                foreach ($inv->getItems() as $item) {
+                    echo $item->getHash()->getHex() . "\n";
+                    if ($item->isBlock() && !$this->inventory->check($item)) {
+                        $this->inventory->save($item);
+                        $vFetch[] = $item;
+                        $lastBlock = $item->getHash();
+                    }
+                }
+
+                if ($lastBlock) {
+                    if (!$best->getChain()->containsHash($lastBlock->getHex())) {
+                        echo "weird, we dont have this: " . $lastBlock->getHex() . "\n";
+                        $peer->getheaders($this->headers->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
+                    }
+                }
+
+
+                if (!empty($vFetch)) {
+                    $peer->getdata($vFetch);
+                }
+            });
+
             $peer->on('getheaders', function (Peer $peer, GetHeaders $getHeaders ) {
+                $state = $this->chains->best();
+                $chain = $state->getChain();
                 $locator = $getHeaders->getLocator();
                 if (count($locator->getHashes()) == 0) {
                     $start = $locator->getHashStop()->getHex();
                 } else {
-                    $start = $this->db->findFork($this->headers->getActiveChain(), $locator);
+                    $start = $this->db->findFork($chain, $locator);
                 }
 
-                var_dump($start);
-                //$headers = $this->db->fetchNextHeaders($start);
-                //$peer->headers($headers);
+                $headers = $this->db->fetchNextHeaders($start);
+                echo "Sending " . count($headers) . " headers \n";
+                $peer->headers($headers);
             });
 
             // Process headers
             $peer->on('headers', function (Peer $peer, Headers $headers) {
-                $startHeight = $this->headers->getChainHeight();
+                $state = $this->chains->best();
+                $chain = $state->getChain();
+                $startHeight = $chain->getIndex()->getHeight();
 
                 $last = null;
                 $vHeaders = $headers->getHeaders();
@@ -203,18 +315,18 @@ class BitcoinNode extends EventEmitter
                     $this->headers->acceptBatch($vHeaders);
                 }
 
-                $this->headers->checkActiveTip();
-
                 echo "tx took " . (microtime(true) - $tx) . "\n";
-                echo "\nHeaders ($c) went from $startHeight to " . $this->headers->getChainHeight() . "\n";
+                $newHeight = $state->getChainIndex()->getHeight();
+                echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . "\n";
 
                 if (count($vHeaders) == 2000) {
-                    echo " ... continue syncing (current height = " . $this->headers->getChainHeight() . " ... \n";
-                    $peer->getheaders($this->headers->getLocatorCurrent());
+                    echo " ... continue syncing (current height = " . $newHeight . " ... \n";
+                    $peer->getheaders($this->chains->best()->getHeadersLocator());
                 } else {
                     $this->emit('headers.synced');
                 }
 
+                $this->startBlockSync($peer);
             });
         });
 
@@ -225,7 +337,6 @@ class BitcoinNode extends EventEmitter
                     $manager
                         ->connectNextPeer($locator)
                         ->then(function ($peer) {
-                            echo "Start sync\n";
                             $this->startHeaderSync($peer);
                         }, function ($e) {
                             echo "connection wtf?\n";
@@ -236,43 +347,4 @@ class BitcoinNode extends EventEmitter
             });
     }
 
-    /**
-     * @param Peer $peer
-     */
-    public function startHeaderSync(Peer $peer)
-    {
-        if (!$this->isSyncing()) {
-            $this->syncing = true;
-            $state = $this->peerState->fetch($peer);
-            $state->useForDownload();
-            $this->emit('headers.syncing');
-            $locator = $this->headers->getLocatorCurrent();
-            $peer->getheaders($locator);
-        }
-    }
-
-    /**
-     * @param Inventory $inventory
-     * @return bool
-     */
-    public function checkInventory(Inventory $inventory)
-    {
-        if ($inventory->isBlock()) {
-            //return isset($this->blocks->hashIndex[$inventory->getHash()->getHex()]);
-        }
-
-        if ($inventory->isTx()) {
-            return $this->db->transactions->fetch($inventory->getHash()->getHex()) !== null;
-        }
-
-        return true;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isSyncing()
-    {
-        return $this->syncing;
-    }
 }

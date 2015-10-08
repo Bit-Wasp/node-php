@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain;
+use BitWasp\Bitcoin\Node\Chains;
 use BitWasp\Bitcoin\Node\MySqlDb;
 use BitWasp\Bitcoin\Node\Params;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
@@ -42,22 +43,20 @@ class Headers
     private $genesisHash;
 
     /**
-     * @var Chain[]
+     * @var Chains
      */
-    private $tips = [];
-
-    /**
-     * @var Chain
-     */
-    private $activeTip;
+    private $chains;
 
     /**
      * @param MySqlDb $db
      * @param EcAdapterInterface $ecAdapter
      * @param Params $params
+     * @param Chains $chains
+     * @throws \Exception
      */
-    public function __construct(MySqlDb $db, EcAdapterInterface $ecAdapter, Params $params)
+    public function __construct(MySqlDb $db, EcAdapterInterface $ecAdapter, Params $params, Chains $chains)
     {
+        $this->chains = $chains;
         $this->db = $db;
         $this->adapter = $ecAdapter;
         $this->params = $params;
@@ -79,15 +78,6 @@ class Headers
             $idx = new BlockIndex($this->genesisHash, 0, 0, $this->genesis);
             $this->db->insertIndexGenesis($idx);
         }
-
-        try {
-            $this->tips = $this->db->fetchTips($this);
-        } catch (\Exception $e) {
-            // This should not occur after inserting the first BlockIndex
-            throw $e;
-        }
-
-        $this->checkActiveTip();
     }
 
     /**
@@ -107,42 +97,19 @@ class Headers
     }
 
     /**
-     * @return Chain
-     */
-    public function getActiveChain()
-    {
-        return $this->activeTip;
-    }
-
-    /**
-     * @return \BitWasp\Bitcoin\Node\Chain[]
-     */
-    public function getChainTips()
-    {
-        return $this->tips;
-    }
-
-    /**
-     * @return int
-     */
-    public function getChainHeight()
-    {
-        return $this->activeTip->getIndex()->getHeight();
-    }
-
-    /**
      * Produce a block locator for a given block height.
      * @param int $height
-     * @param bool|true $all
+     * @param Buffer|null $final
      * @return BlockLocator
      */
-    public function getLocator($height, $all = true)
+    public function getLocator($height, Buffer $final = null)
     {
-        echo "Produce block locator ($height) \n";
+        echo "Produce GETHEADERS locator ($height) \n";
         $step = 1;
         $hashes = [];
         $math = $this->adapter->getMath();
-        $headerHash = $this->activeTip->getHashFromHeight($height);
+        $tip = $this->chains->best()->getChain();
+        $headerHash = $tip->getHashFromHeight($height);
 
         $h = [];
         while (true) {
@@ -153,16 +120,16 @@ class Headers
             }
 
             $height = max($height - $step, 0);
-            $headerHash = $this->activeTip->getHashFromHeight($height);
+            $headerHash = $tip->getHashFromHeight($height);
             if (count($hashes) >= 10) {
                 $step *= 2;
             }
         }
 
-        if ($all || count($hashes) == 1) {
+        if (is_null($final)) {
             $hashStop = new Buffer('', 32, $math);
         } else {
-            $hashStop = array_pop($hashes);
+            $hashStop = $final;
         }
 
         return new BlockLocator(
@@ -177,7 +144,7 @@ class Headers
      */
     public function getLocatorCurrent()
     {
-        return $this->getLocator($this->getChainHeight());
+        return $this->getLocator($this->chains->best()->getChainIndex()->getHeight());
     }
 
     /**
@@ -207,38 +174,21 @@ class Headers
     }
 
     /**
-     * @param string $hash
-     * @return bool
-     */
-    public function isTip($hash)
-    {
-        return isset($this->tips[$hash]);
-    }
-
-    /**
-     * @param array $map
-     * @param BlockIndex $index
-     * @return Chain
-     */
-    public function newTip(array $map, BlockIndex $index)
-    {
-        $this->tips[$index->getHash()] = $tip = new Chain($map, $index, $this, $this->adapter->getMath());
-        return $tip;
-    }
-
-    /**
      * Adds a header to the index. Will update the current tip,
      * otherwise creates a new tip for others to follow.
+     *
      * @param BlockIndex $ancestor
      * @param BlockHeaderInterface $header
-     *
-    public function addToIndex(BlockIndex $ancestor, BlockHeaderInterface $header)
+     * @return BlockIndex
+     * @throws \Exception
+     */
+    public function addToIndex(BlockHeaderInterface $header)
     {
         $hash = $header->getBlockHash();
 
         try {
-            // Must have the prevBlock
-            $hashPrevBlock = $ancestor->getHash();
+            $tip = $this->chains->findTipForNext($header);
+            $ancestor = $tip->getIndex();
 
             // We create a BlockIndex
             $math = $this->adapter->getMath();
@@ -246,86 +196,42 @@ class Headers
             $newWork = $math->add($this->difficulty->getWork($header->getBits()), $ancestor->getWork());
             $newIndex = new BlockIndex($hash, $newHeight, $newWork, $header);
 
-            $this->db->insertIndex($newIndex);
+            $this->db->insertIndexBatch($ancestor, [$newIndex]);
 
-            if ($this->isTip($hashPrevBlock)) {
+            $tip->updateTip($newIndex);
+            return $newIndex;
 
-                $oldTip = $this->tips[$hashPrevBlock];
-                $map = $oldTip->getMap();
-                $map[] = $hash;
-                $newTip = new Chain($newIndex->getHeight(), $newIndex->getWork(), $map, $header, $this, $math);
-                //$this->db->updateTip($hashPrevBlock, $oldTip, $hash, $newTip);
-                $this->tips[$hash] = $newTip;
-                unset($this->tips[$hashPrevBlock]);
-
-            } else {
-                echo "ERRRRRRRRR INSERT NEW TIP\n";
-                // Create one from an INDEX
-                die();
-                //$this->tips[] = $tip = new Chain($newIndex->getHeight(), $newIndex->getWork(), $header, $this, $math);
-                //$this->db->insertTip($tip);
-            }
         } catch (\Exception $e) {
-            echo $e->getMessage() . "\n";
-            return;
+            if ($e instanceof \PDOException) {
+                throw $e;
+            }
+
+            throw new \RuntimeException('New header did not elongate tip - new fork - have not implemented this yet');
         }
     }/**/
 
     /**
-     *
-     */
-    public function checkActiveTip()
-    {
-        $tips = $this->tips;
-        $sort = function (Chain $a, Chain $b) {
-            return $this->adapter->getMath()->cmp($a->getIndex()->getWork(), $b->getIndex()->getWork());
-        };
-
-        usort($tips, $sort);
-
-        $greatestWork = end($tips);
-        $this->activeTip = $greatestWork;
-        echo "Setting this one: \n";
-        echo " :::: " . $greatestWork->getIndex()->getHash() . " (work: " . $greatestWork->getIndex()->getWork() . ") height - " . $this->activeTip->getIndex()->getHeight() . "\n\n";
-    }
-
-    /**
      * @param BlockHeaderInterface $header
-     * @return bool
-     *
+     * @return false|BlockIndex
+     */
     public function accept(BlockHeaderInterface $header)
     {
-        if ($header == $this->genesis) {
-            return true;
-        }
-
         $hash = $header->getBlockHash();
-        try {
-            if ($this->db->haveHeader($hash)) {
-                // todo: check for rejected block
-                return true;
-            }
-        } catch (\Exception $e) {
-            echo $e->getMessage() . "\n";
-            die();
+        echo "Headers: accept($hash)\n";
+        if ($header == $this->genesis || $this->db->haveHeader($hash)) {
+            // todo: check for rejected block
+            echo "Headers: return as already in chain()\n";
+            return $this->db->fetchIndex($hash);
         }
 
         if (!$this->check($header)) {
             echo "failed to check\n";
-            return false;
+            throw new \RuntimeException('Header invalid');
         }
 
-        try {
-            $prev = $this->db->fetchIndex($header->getPrevBlock());
-            $this->addToIndex($prev, $header);
-            // todo: check if this block was rejected
-        } catch (\Exception $e) {
-            echo $e->getMessage() . "\n";
-            echo "previous index not found\n";
-            return false;
-        }
+        echo "Headers: addToIndex()\n";
+        return $this->addToIndex($header);
 
-        return true;
     }/**/
 
     /**
@@ -335,17 +241,9 @@ class Headers
     public function acceptBatch(array $headers)
     {
         $first = $headers[0];
-        foreach ($this->tips as $tTip) {
-            $tipHash = $tTip->getIndex()->getHash();
-            if ($first->getPrevBlock() == $tipHash) {
-                $tip = $tTip;
-                break;
-            }
-        }
-
-        if (!isset($tip)) {
-            echo "previous: " . $first->getPrevBlock() . "\n";
-            echo "The previous was not a tip\n";
+        try {
+            $tip = $this->chains->findTipForNext($first);
+        } catch (\Exception $e) {
             return false;
         }
 
@@ -367,7 +265,6 @@ class Headers
             }
 
             if (!$this->check($header)) {
-                echo "check fail! bail!\n";
                 return false;
             }
 
@@ -380,15 +277,12 @@ class Headers
 
             $batch[] = $tip->getIndex();
         }
-        echo "\n";
 
-        $this->db->insertIndexBatch($startIndex, $batch);
-
-        unset($this->tips[$startIndex->getHash()]);
-        $this->tips[$tip->getIndex()->getHash()] = $tip;
-
-        unset($batch);
         // Starting at $startIndex, do a batch update of the chain
+        $this->db->insertIndexBatch($startIndex, $batch);
+        unset($batch);
+
+        $this->chains->checkTips();
 
         return true;
     }
