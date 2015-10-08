@@ -243,6 +243,7 @@ class BitcoinNode extends EventEmitter
 
             $peer->on('block', function (Peer $peer, Block $blockMsg) {
                 $block = $blockMsg->getBlock();
+                echo "Received block: " . $block->getHeader()->getBlockHash() . "\n";
                 $best = $this->chains->best();
                 $index = $this->blocks->accept($block, $this->headers);
                 $best->updateLastBlock($index);
@@ -264,7 +265,6 @@ class BitcoinNode extends EventEmitter
                 $vFetch = [];
                 $lastBlock = false;
                 foreach ($inv->getItems() as $item) {
-                    echo $item->getHash()->getHex() . "\n";
                     if ($item->isBlock() && !$this->inventory->check($item)) {
                         $this->inventory->save($item);
                         $vFetch[] = $item;

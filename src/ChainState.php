@@ -154,4 +154,32 @@ class ChainState
         echo $this->lastBlock->getHeight(). "\n";
         return $this->getLocator($this->lastBlock->getHeight(), $hashStop);
     }
+
+    /**
+     * @param string $hash
+     * @return bool
+     */
+    public function checkForHeaders($hash)
+    {
+        return $this->chain->containsHash($hash);
+    }
+
+    /**
+     * @param string $hash
+     * @return bool
+     */
+    public function checkForBlock($hash)
+    {
+        if (!$this->chain->containsHash($hash)) {
+            return false;
+        }
+
+        $bestBlockHeight = $this->lastBlock->getHeight();
+        $blockHeight = $this->chain->getHeightFromHash($hash);
+        if ($blockHeight > $bestBlockHeight) {
+            return false;
+        }
+
+        return true;
+    }
 }

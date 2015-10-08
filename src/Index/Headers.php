@@ -217,10 +217,8 @@ class Headers
     public function accept(BlockHeaderInterface $header)
     {
         $hash = $header->getBlockHash();
-        echo "Headers: accept($hash)\n";
         if ($header == $this->genesis || $this->db->haveHeader($hash)) {
             // todo: check for rejected block
-            echo "Headers: return as already in chain()\n";
             return $this->db->fetchIndex($hash);
         }
 

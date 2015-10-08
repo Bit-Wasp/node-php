@@ -360,7 +360,6 @@ class Blocks
             throw new \RuntimeException('We cannot yet deal with out of sequence blocks');
         }
 
-        echo "inserting block\n";
         $this->db->insertBlock($index->getHeight(), $block);
 
         return $index;

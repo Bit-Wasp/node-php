@@ -42,8 +42,8 @@ class Chains
 
         $greatestWork = end($tips);
         $this->best = $greatestWork;
-        echo "Setting chain with best headers to:: " . $greatestWork->getChainIndex()->getHash() . " (work: " . $greatestWork->getChainIndex()->getWork() . ") \n\n";
-        echo "                   best block     :: " . $greatestWork->getLastBlock()->getHash() . "\n";
+        //echo "Setting chain with best headers to:: " . $greatestWork->getChainIndex()->getHash() . " (work: " . $greatestWork->getChainIndex()->getWork() . ") \n\n";
+        //echo "                   best block     :: " . $greatestWork->getLastBlock()->getHash() . "\n";
     }
 
     /**
