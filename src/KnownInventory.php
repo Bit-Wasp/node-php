@@ -9,17 +9,26 @@
 namespace BitWasp\Bitcoin\Node;
 
 
+use BitWasp\Bitcoin\Networking\Structure\Inventory;
+
 class KnownInventory
 {
-    private $storage;
+    private $storage = [];
 
-    public function __construct()
+    /**
+     * @param Inventory $inventory
+     */
+    public function save(Inventory $inventory)
     {
-        $this->storage = new \SplObjectStorage();
+        $this->storage[$inventory->getHash()->getBinary()] = $inventory->getType();
     }
 
-    public function save()
+    /**
+     * @param Inventory $inventory
+     * @return bool
+     */
+    public function check(Inventory $inventory)
     {
-
+        return isset($this->storage[$inventory->getHash()->getBinary()]);
     }
 }
