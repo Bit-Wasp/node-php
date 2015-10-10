@@ -4,6 +4,8 @@ namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Bitcoin;
+use BitWasp\Bitcoin\Chain\ParamsInterface;
+use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Networking\Factory as NetworkingFactory;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
@@ -18,6 +20,7 @@ use BitWasp\Bitcoin\Node\State\PeerState;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
+use Packaged\Config\Provider\Ini\IniConfigProvider;
 use React\EventLoop\LoopInterface;
 
 class BitcoinNode extends EventEmitter
@@ -58,12 +61,12 @@ class BitcoinNode extends EventEmitter
     public $db;
 
     /**
-     * @var Params
+     * @var ParamsInterface
      */
     public $params;
 
     /**
-     * @param Params $params
+     * @param ParamsInterface $params
      * @param LoopInterface $loop
      */
     public function __construct(Params $params, LoopInterface $loop)
@@ -82,10 +85,11 @@ class BitcoinNode extends EventEmitter
         $this->inventory = new KnownInventory();
         $this->db = new MySqlDb($this->config, false);
         $this->chains = new Chains($this->adapter);
+        $this->pow = new ProofOfWork($this->adapter->getMath(), $params);
         echo "Headers \n";
-        $this->headers = new Index\Headers($this->db, $this->adapter, $this->params, $this->chains);
+        $this->headers = new Index\Headers($this->db, $this->adapter, $this->params, $this->pow, $this->chains);
         echo "Blocks  \n";
-        $this->blocks = new Index\Blocks($this->db, $this->adapter, $this->params, $this->chains);
+        $this->blocks = new Index\Blocks($this->db, $this->adapter, $this->params, $this->pow, $this->chains);
         $this->loadChainState();
 
         $this->on('blocks.syncing', function () {
@@ -117,7 +121,7 @@ class BitcoinNode extends EventEmitter
     {
         if (is_null($this->config)) {
             $file = getenv("HOME") . "/.bitcoinphp/bitcoin.ini";
-            $this->config = new \Packaged\Config\Provider\Ini\IniConfigProvider();
+            $this->config = new IniConfigProvider();
             $this->config->loadFile($file);
         }
 
@@ -151,6 +155,7 @@ class BitcoinNode extends EventEmitter
     /**
      * @param ChainState $best
      * @param Peer $peer
+     * @param PeerState $state
      */
     private function doDownloadBlocks(ChainState $best, Peer $peer, PeerState $state)
     {
@@ -275,7 +280,7 @@ class BitcoinNode extends EventEmitter
                 if ($lastBlock) {
                     if (!$best->getChain()->containsHash($lastBlock->getHex())) {
                         echo "weird, we dont have this: " . $lastBlock->getHex() . "\n";
-                        $peer->getheaders($this->headers->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
+                        $peer->getheaders($best->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
                     }
                 }
 
@@ -338,7 +343,7 @@ class BitcoinNode extends EventEmitter
                         ->connectNextPeer($locator)
                         ->then(function ($peer) {
                             $this->startHeaderSync($peer);
-                        }, function ($e) {
+                        }, function () {
                             echo "connection wtf?\n";
                         });
                 }

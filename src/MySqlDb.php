@@ -39,16 +39,6 @@ class MySqlDb
     /**
      * @var \PDOStatement
      */
-    private $fetchTipsStmt;
-
-    /**
-     * @var \PDOStatement
-     */
-    private $chainPathStmt;
-
-    /**
-     * @var \PDOStatement
-     */
     private $fetchLftStmt;
 
     /**
@@ -94,37 +84,50 @@ class MySqlDb
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
 
+    /**
+     *
+     */
     public function stop()
     {
         $this->dbh = null;
     }
+
     /**
-     * @param string $hash
+     * @param BlockIndex $index
      * @return bool
      */
-    public function haveHeader($hash)
+    public function insertIndexGenesis(BlockIndex $index)
     {
         if ($this->debug) {
-            echo "db: called haveHeader ($hash)\n";
+            echo "db: called insertIndexGenesis\n";
         }
 
-        if (null == $this->haveHeaderStmt) {
-            $this->haveHeaderStmt = $this->dbh->prepare('SELECT COUNT(*) as count FROM headerIndex WHERE hash = :hash');
+        $stmt = $this->dbh->prepare("
+          INSERT INTO headerIndex (
+            hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt
+          ) VALUES (
+            :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce, :lft, :rgt
+          )
+        ");
+
+        $header = $index->getHeader();
+        if ($stmt->execute(array(
+            'hash' => $index->getHash(),
+            'height' => $index->getHeight(),
+            'work' => $index->getWork(),
+            'version' => $header->getVersion(),
+            'prevBlock' => $header->getPrevBlock(),
+            'merkleRoot' => $header->getMerkleRoot(),
+            'nBits' => $header->getBits()->getInt(),
+            'nTimestamp' => $header->getTimestamp(),
+            'nNonce' => $header->getNonce(),
+            'lft' => 1,
+            'rgt' => 2
+        ))) {
+            return true;
         }
 
-        $stmt = $this->haveHeaderStmt;
-        $stmt->bindParam(':hash', $hash);
-
-        if ($stmt->execute()) {
-            $fetch = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            if ($fetch[0]['count'] == 1) {
-                return true;
-            }
-
-            return false;
-        }
-
-        throw new \RuntimeException('Failed to execute haveHeader query');
+        throw new \RuntimeException('Failed to update insert Genesis block!');
     }
 
     /**
@@ -136,17 +139,10 @@ class MySqlDb
             echo "db: called insertBlockGenesis\n";
         }
 
-        $stmt = $this->dbh->prepare("
-          INSERT INTO blockIndex (
-            hash
-          ) VALUES (
-            :hash
-          )
-        ");
+        $stmt = $this->dbh->prepare("INSERT INTO blockIndex (hash) VALUES (:hash)");
 
         $stmt->bindValue(':hash', $block->getHeader()->getBlockHash());
         $stmt->execute();
-
     }
 
     /**
@@ -265,48 +261,165 @@ class MySqlDb
     }
 
     /**
-     * @param $tableName
-     * @param array $columns
-     * @param array $binding
-     * @param array $list
-     * @param callable $operator
-     * @return array
+     * @param BlockIndex $startIndex
+     * @param BlockIndex[] $index
+     * @return bool
+     * @throws \Exception
      */
-    public function batchInsert($tableName, array $columns, array $binding, array $list, callable $operator)
+    public function insertIndexBatch(BlockIndex $startIndex, array $index)
     {
         if ($this->debug) {
-            echo "db: called batchInsert *** \n";
+            echo "db: called insertIndexBATCH\n";
         }
-        $insertSql = "INSERT INTO $tableName (" . implode(", ", $columns). ") VALUES ";
-        $insertQuery = [];
-        $insertValues = [];
-        $bindingPositions = [];
-        foreach ($binding as $b) {
-            $bindingPositions[] = ":$b{{e}}";
+
+        if (null == $this->fetchLftStmt) {
+            $this->fetchLftStmt = $this->dbh->prepare('SELECT lft FROM headerIndex WHERE hash = :prevBlock');
+            $this->updateIndicesStmt = $this->dbh->prepare('
+                UPDATE headerIndex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
+                UPDATE headerIndex SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
+            ');
         }
-        $bindingRow = implode(", ", $bindingPositions);
 
-        foreach ($list as $li_c => $item) {
-            // Add the prepared statement:
-            $insertQuery[] = str_replace("{{e}}", $li_c, $bindingRow);
+        $fetchParent = $this->fetchLftStmt;
+        $updateIndices = $this->updateIndicesStmt;
 
-            // Now, $operator produces an array indexed by the binding key for the item.
-            // Binding key + $li_c is the expected key for this value (set in insertQuery above)
-            foreach ($operator($item) as $c => $value) {
-                $insertValues[$c . $li_c] = $value;
+        $fetchParent->bindParam(':prevBlock', $startIndex->getHash());
+        if ($fetchParent->execute()) {
+            foreach ($fetchParent->fetchAll() as $record) {
+                $myLeft = $record['lft'];
+            }
+        }
+        $fetchParent->closeCursor();
+        if (!isset($myLeft)) {
+            throw new \RuntimeException('Failed to extract header position');
+        }
+
+        $totalN = count($index);
+        $nTimesTwo = 2 * $totalN;
+        $leftOffset = $myLeft;
+        $rightOffset = $myLeft + $nTimesTwo;
+
+        $this->dbh->beginTransaction();
+        try {
+            if ($updateIndices->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
+                $updateIndices->closeCursor();
+
+                $values = [];
+                $query = [];
+                foreach ($index as $c => $i) {
+                    $query[] = "(:hash$c , :height$c , :work$c ,
+                    :version$c , :prevBlock$c , :merkleRoot$c ,
+                    :nBits$c , :nTimestamp$c , :nNonce$c ,
+                    :lft$c , :rgt$c )";
+
+                    $values['hash' . $c] = $i->getHash();
+                    $values['height' . $c] = $i->getHeight();
+                    $values['work' . $c] = $i->getWork();
+
+                    $header = $i->getHeader();
+                    $values['version' . $c] = $header->getVersion();
+                    $values['prevBlock' . $c] = $header->getPrevBlock();
+                    $values['merkleRoot' . $c] = $header->getMerkleRoot();
+                    $values['nBits' . $c] = $header->getBits()->getInt();
+                    $values['nTimestamp' . $c] = $header->getTimestamp();
+                    $values['nNonce' . $c] = $header->getNonce();
+
+                    $values['lft' . $c] = $leftOffset + 1 + $c;
+                    $values['rgt' . $c] = $rightOffset - $c;
+                }
+
+                $sql = sprintf("INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt ) VALUES %s ", implode(', ', $query));
+                $stmt = $this->dbh->prepare($sql);
+                $count = $stmt->execute($values);
+                $this->dbh->commit();
+                if ($count == $totalN) {
+                    return true;
+                } else {
+                    throw new \RuntimeException('Strange: Failed to update chain!');
+                }
+            }
+        } catch (\Exception $e) {
+            $this->dbh->rollBack();
+            throw $e;
+        }
+
+        throw new \RuntimeException('Failed to update chain!');
+    }
+
+    /**
+     * @param string $hash
+     * @return bool
+     */
+    public function haveHeader($hash)
+    {
+        if ($this->debug) {
+            echo "db: called haveHeader ($hash)\n";
+        }
+
+        if (null == $this->haveHeaderStmt) {
+            $this->haveHeaderStmt = $this->dbh->prepare('SELECT COUNT(*) as count FROM headerIndex WHERE hash = :hash');
+        }
+
+        $stmt = $this->haveHeaderStmt;
+        $stmt->bindParam(':hash', $hash);
+
+        if ($stmt->execute()) {
+            $fetch = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            if ($fetch[0]['count'] == 1) {
+                return true;
+            }
+
+            return false;
+        }
+
+        throw new \RuntimeException('Failed to execute haveHeader query');
+    }
+
+    /**
+     * @param string $hash
+     * @return BlockIndex
+     */
+    public function fetchIndex($hash)
+    {
+        if ($this->debug) {
+            echo "db: called fetchIndex\n";
+        }
+
+        if (null == $this->fetchIndexStmt) {
+            $this->fetchIndexStmt = $this->dbh->prepare('SELECT i.* FROM headerIndex i WHERE i.hash = :hash');
+        }
+
+        $stmt = $this->fetchIndexStmt;
+        $stmt->bindParam(':hash', $hash);
+
+        if ($stmt->execute()) {
+            $row = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (count($row) == 1) {
+                $row = $row[0];
+                return new BlockIndex(
+                    $row['hash'],
+                    $row['height'],
+                    $row['work'],
+                    new BlockHeader(
+                        $row['version'],
+                        $row['prevBlock'],
+                        $row['merkleRoot'],
+                        $row['nTimestamp'],
+                        Buffer::int((string)$row['nBits'], 4),
+                        $row['nNonce']
+                    )
+                );
             }
         }
 
-        $insertSql .= implode(", ", $insertQuery);
-        $statement = $this->dbh->prepare($insertSql);
-        return [$statement, $insertValues];
+        throw new \RuntimeException('Index by that hash not found');
     }
 
     /**
      * @param string $blockHash
      * @return TransactionCollection
      */
-    private function fetchBlockTransactions($blockHash)
+    public function fetchBlockTransactions($blockHash)
     {
         if ($this->debug) {
             echo "db: called fetchBlockTransactions ($blockHash)\n";
@@ -387,6 +500,7 @@ class MySqlDb
         if ($this->debug) {
             echo "db: called fetchBlock ($hash)\n";
         }
+
         $stmt = $this->dbh->prepare('
             SELECT b.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
             FROM blockIndex b
@@ -432,18 +546,18 @@ class MySqlDb
 
         $stmt = $this->dbh->prepare('
             SELECT
- parent.hash as last_hash, parent.work as last_work, parent.height as last_height,
-              parent.version as last_version, parent.prevBlock as last_prevBlock, parent.merkleRoot as last_merkleRoot,
-              parent.nBits as last_nBits, parent.nTimestamp as last_nTimestamp, parent.nNonce as last_nNonce,
+                parent.hash as last_hash, parent.work as last_work, parent.height as last_height
+              , parent.version as last_version, parent.prevBlock as last_prevBlock, parent.merkleRoot as last_merkleRoot
+              , parent.nBits as last_nBits, parent.nTimestamp as last_nTimestamp, parent.nNonce as last_nNonce
 
-              tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work,
-              tip.version as tip_version, tip.prevBlock tip_prevBlock, tip.merkleRoot as tip_merkleRoot,
-              tip.nBits as tip_nBits, tip.nTimestamp as tip_nTimestamp, tip.nNonce as tip_nNonce,
-              count(b.id) as countBlocks
+              , tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work
+              , tip.version as tip_version, tip.prevBlock tip_prevBlock, tip.merkleRoot as tip_merkleRoot
+              , tip.nBits as tip_nBits, tip.nTimestamp as tip_nTimestamp, tip.nNonce as tip_nNonce
+              , count(b.hash) as countBlocks
 FROM headerIndex AS tip, headerIndex AS parent
 INNER JOIN headerIndex AS next ON next.prevBlock = parent.hash
 LEFT JOIN blockIndex AS b ON b.hash = next.hash
-WHERE (tip.rgt = tip.lft + 1 and b.hash IS NULL)
+WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
             ;
         ');
 
@@ -464,39 +578,40 @@ WHERE (tip.rgt = tip.lft + 1 and b.hash IS NULL)
                 $chainPathStmt->bindValue(':hash', $row['tip_hash']);
                 $chainPathStmt->execute();
                 $map = $chainPathStmt->fetchAll(\PDO::FETCH_COLUMN);
-                $states[] = new ChainState(
-                    new Chain(
-                        $map,
-                        new BlockIndex(
-                            $row['tip_hash'],
-                            $row['tip_height'],
-                            $row['tip_work'],
-                            new BlockHeader(
-                                $row['tip_version'],
-                                $row['tip_prevBlock'],
-                                $row['tip_merkleRoot'],
-                                $row['tip_nTimestamp'],
-                                Buffer::int($row['tip_nBits'], 4),
-                                $row['tip_nNonce']
-                            )
+                $states[] =
+                    new ChainState(
+                        new Chain(
+                            $map,
+                            new BlockIndex(
+                                $row['tip_hash'],
+                                $row['tip_height'],
+                                $row['tip_work'],
+                                new BlockHeader(
+                                    $row['tip_version'],
+                                    $row['tip_prevBlock'],
+                                    $row['tip_merkleRoot'],
+                                    $row['tip_nTimestamp'],
+                                    Buffer::int($row['tip_nBits'], 4),
+                                    $row['tip_nNonce']
+                                )
+                            ),
+                            $headers,
+                            $math
                         ),
-                        $headers,
-                        $math
-                    ),
-                    new BlockIndex(
-                        $row['last_hash'],
-                        $row['last_height'],
-                        $row['last_work'],
-                        new BlockHeader(
-                            $row['last_version'],
-                            $row['last_prevBlock'],
-                            $row['last_merkleRoot'],
-                            $row['last_nTimestamp'],
-                            Buffer::int($row['last_nBits'], 4),
-                            $row['last_nNonce']
+                        new BlockIndex(
+                            $row['last_hash'],
+                            $row['last_height'],
+                            $row['last_work'],
+                            new BlockHeader(
+                                $row['last_version'],
+                                $row['last_prevBlock'],
+                                $row['last_merkleRoot'],
+                                $row['last_nTimestamp'],
+                                Buffer::int($row['last_nBits'], 4),
+                                $row['last_nNonce']
+                            )
                         )
-                    )
-                );
+                    );
             }
 
             return $states;
@@ -506,241 +621,43 @@ WHERE (tip.rgt = tip.lft + 1 and b.hash IS NULL)
     }
 
     /**
-     * Query for headers/blocks chain state - populates Chains.
+     * We use this to help other nodes sync headers. We must
      *
-     * @param Headers $headers
-     * @return ChainState[]
+     * @param Chain $activeChain
+     * @param BlockLocator $locator
+     * @return false|string
      */
-    public function fetchChainStateBackup(Headers $headers)
+    public function findFork(Chain $activeChain, BlockLocator $locator)
     {
         if ($this->debug) {
-            echo "db: called fetchChainState \n";
+            echo "db: called findFork\n";
+        }
+        $hashes = [$activeChain->getIndex()->getHash()];
+        foreach ($locator->getHashes() as $hash) {
+            $hashes[] = $hash->getHex();
         }
 
-        $stmt = $this->dbh->prepare('
-            SELECT
-              parent.hash as last_hash, parent.work as last_work, parent.height as last_height,
-              parent.version as last_version, parent.prevBlock as last_prevBlock, parent.merkleRoot as last_merkleRoot,
-              parent.nBits as last_nBits, parent.nTimestamp as last_nTimestamp, parent.nNonce as last_nNonce,
-
-              tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work,
-              tip.version as tip_version, tip.prevBlock tip_prevBlock, tip.merkleRoot as tip_merkleRoot,
-              tip.nBits as tip_nBits, tip.nTimestamp as tip_nTimestamp, tip.nNonce as tip_nNonce
-            FROM headerIndex AS tip,
-                 headerIndex AS parent
-            JOIN blockIndex b ON b.hash = parent.hash
-            WHERE tip.rgt = tip.lft + 1 AND b.hash IS NOT NULL
-            GROUP BY parent.hash
-            ORDER BY parent.rgt;
-        ');
-
-        if ($stmt->execute()) {
-            $chainPathStmt = $this->dbh->prepare("
-                SELECT parent.hash
-                FROM headerIndex AS node,
-                     headerIndex AS parent
-                WHERE node.lft BETWEEN parent.lft AND parent.rgt
-                                AND node.hash = :hash
-                ORDER BY node.lft, parent.height;
-            ");
-            // column was hash, join was inner
-            //return $stmt->fetch(\PDO::FETCH_COLUMN);
-            $states = [];
-            $math = Bitcoin::getMath();
-            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                $chainPathStmt->bindValue(':hash', $row['tip_hash']);
-                $chainPathStmt->execute();
-                $map = $chainPathStmt->fetchAll(\PDO::FETCH_COLUMN);
-
-                $states[] = new ChainState(
-                    new Chain(
-                        $map,
-                        new BlockIndex(
-                            $row['tip_hash'],
-                            $row['tip_height'],
-                            $row['tip_work'],
-                            new BlockHeader(
-                                $row['tip_version'],
-                                $row['tip_prevBlock'],
-                                $row['tip_merkleRoot'],
-                                $row['tip_nTimestamp'],
-                                Buffer::int($row['tip_nBits'], 4),
-                                $row['tip_nNonce']
-                            )
-                        ),
-                        $headers,
-                        $math
-                    ),
-                    new BlockIndex(
-                        $row['last_hash'],
-                        $row['last_height'],
-                        $row['last_work'],
-                        new BlockHeader(
-                            $row['last_version'],
-                            $row['last_prevBlock'],
-                            $row['last_merkleRoot'],
-                            $row['last_nTimestamp'],
-                            Buffer::int($row['last_nBits'], 4),
-                            $row['last_nNonce']
-                        )
-                    )
-                );
-            }
-
-            return $states;
-        }
-
-        throw new \RuntimeException('Failed to fetch block progress');
-    }
-
-    /**
-     * Return the hash of last index in $chain that
-     * has full block data
-     *
-     * @param Chain $chain
-     */
-    public function fetchTipsProcess()
-    {
-        if ($this->debug) {
-            echo "db: called fetchBlocksProcess \n";
-        }
-
-        $stmt = $this->dbh->prepare('
-            SELECT b.*,
-              parent.hash as last_hash, parent.work as last_work, parent.height as last_height,
-              tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work
-            FROM headerIndex AS tip,
-                 headerIndex AS parent
-            JOIN blockIndex b ON b.hash = parent.hash
-            WHERE tip.rgt = tip.lft + 1 AND b.hash IS NOT NULL
-            ORDER BY parent.rgt;
-        ');
-
-        if ($stmt->execute()) {
-            // column was hash, join was inner
-            //return $stmt->fetch(\PDO::FETCH_COLUMN);
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        }
-
-        throw new \RuntimeException('Failed to fetch block progress');
-    }
-
-    /**
-     * Return the hash of last index in $chain that
-     * has full block data
-     *
-     * @param Chain $chain
-     */
-    public function fetchBlocksProcess(Chain $chain)
-    {
-        if ($this->debug) {
-            echo "db: called fetchBlocksProcess \n";
-        }
-
-        $stmt = $this->dbh->prepare('
-            SELECT b.hash
+        $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
+        $stmt = $this->dbh->prepare("
+            SELECT node.hash
             FROM headerIndex AS node,
                  headerIndex AS parent
-            INNER JOIN blockIndex b ON b.hash = parent.hash
-            WHERE node.lft BETWEEN parent.lft AND parent.rgt
-            AND node.hash = :hash
-            ORDER BY parent.rgt LIMIT 1;
-        ');
-
-        $stmt->bindValue(':hash', $chain->getIndex()->getHash());
-        if ($stmt->execute()) {
-            return $stmt->fetch(\PDO::FETCH_COLUMN);
-        }
-
-        throw new \RuntimeException('Failed to fetch block progress');
-    }
-
-    /**
-     * @param string $hash
-     * @return BlockIndex
-     */
-    public function fetchIndex($hash)
-    {
-        if ($this->debug) {
-            echo "db: called fetchIndex\n";
-        }
-
-        if (null == $this->fetchIndexStmt) {
-            $this->fetchIndexStmt = $this->dbh->prepare('
-              SELECT
-                i.*
-              FROM headerIndex i
-              WHERE i.hash = :hash
-            ');
-        }
-
-        $stmt = $this->fetchIndexStmt;
-        $stmt->bindParam(':hash', $hash);
-
-        if ($stmt->execute()) {
-            $row = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            if (count($row) == 1) {
-                $row = $row[0];
-                return new BlockIndex(
-                    $row['hash'],
-                    $row['height'],
-                    $row['work'],
-                    new BlockHeader(
-                        $row['version'],
-                        $row['prevBlock'],
-                        $row['merkleRoot'],
-                        $row['nTimestamp'],
-                        Buffer::int((string)$row['nBits'], 4),
-                        $row['nNonce']
-                    )
-                );
-            }
-        }
-
-        throw new \RuntimeException('Index by that hash not found');
-    }
-
-    /**
-     * @param BlockIndex $index
-     * @return bool
-     */
-    public function insertIndexGenesis(BlockIndex $index)
-    {
-        if ($this->debug) {
-            echo "db: called insertIndexGenesis\n";
-        }
-
-        $stmt = $this->dbh->prepare("
-          INSERT INTO headerIndex (
-            hash, height, work, version, prevBlock, merkleRoot,
-            nBits, nTimestamp, nNonce, lft, rgt
-          ) VALUES (
-            :hash, :height, :work, :version, :prevBlock, :merkleRoot,
-            :nBits, :nTimestamp, :nNonce, :lft, :rgt
-          )
+            WHERE parent.hash = ? AND node.hash in ($placeholders)
+            ORDER BY node.rgt LIMIT 1
         ");
 
-        $header = $index->getHeader();
-        if ($stmt->execute(array(
-            'hash' => $index->getHash(),
-            'height' => $index->getHeight(),
-            'work' => $index->getWork(),
-            'version' => $header->getVersion(),
-            'prevBlock' => $header->getPrevBlock(),
-            'merkleRoot' => $header->getMerkleRoot(),
-            'nBits' => $header->getBits()->getInt(),
-            'nTimestamp' => $header->getTimestamp(),
-            'nNonce' => $header->getNonce(),
-            'lft' => 1,
-            'rgt' => 2
-        ))) {
-            return true;
+        if ($stmt->execute($hashes)) {
+            $column = $stmt->fetch();
+            $stmt->closeCursor();
+            return $column['hash'];
         }
 
-        throw new \RuntimeException('Failed to update insert Genesis block!');
+        throw new \RuntimeException('Failed to execute findFork');
     }
 
     /**
+     * Here, we return max 2000 headers following $hash.
+     * Useful for helping other nodes sync.
      * @param string $hash
      * @return array
      */
@@ -778,195 +695,52 @@ WHERE (tip.rgt = tip.lft + 1 and b.hash IS NULL)
     }
 
     /**
-     * @param Chain $activeChain
-     * @param BlockLocator $locator
-     * @return false|string
-     */
-    public function findFork(Chain $activeChain, BlockLocator $locator)
-    {
-        if ($this->debug) {
-            echo "db: called findFork\n";
-        }
-        $hashes = [$activeChain->getIndex()->getHash()];
-        foreach ($locator->getHashes() as $hash) {
-            $hashes[] = $hash->getHex();
-        }
-
-        $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
-        $stmt = $this->dbh->prepare("
-            SELECT node.hash
-            FROM headerIndex AS node,
-                 headerIndex AS parent
-            WHERE parent.hash = ? AND node.hash in ($placeholders)
-            ORDER BY node.rgt LIMIT 1
-        ");
-
-        if ($stmt->execute($hashes)) {
-            $column = $stmt->fetch();
-            $stmt->closeCursor();
-            return $column['hash'];
-        }
-
-        throw new \RuntimeException('Failed to execute findFork');
-    }
-
-    /**
-     * 				SELECT parent.hash, node.hash, count(b.id) as bCount
-    FROM headerIndex AS node,
-    headerIndex AS parent
-    INNER JOIN headerIndex AS next ON next.prevBlock = parent.hash
-    JOIN blockIndex AS b ON b.hash = next.hash
-    WHERE node.rgt = node.lft + 1
-     * @param Index\Headers $headers
+     * @param $tableName
+     * @param array $columns
+     * @param array $binding
+     * @param array $list
+     * @param callable $operator
      * @return array
      */
-    public function fetchTips(Index\Headers $headers)
+    private function batchInsert($tableName, array $columns, array $binding, array $list, callable $operator)
     {
         if ($this->debug) {
-            echo "db: called fetchTips\n";
+            echo "db: called batchInsert *** \n";
         }
-
-        if (null == $this->fetchTipsStmt) {
-            $this->fetchTipsStmt = $this->dbh->prepare("SELECT h.* FROM headerIndex h WHERE rgt = lft + 1;");
-            $this->chainPathStmt = $this->dbh->prepare("
-                SELECT parent.hash
-                FROM headerIndex AS node,
-                     headerIndex AS parent
-                WHERE node.lft BETWEEN parent.lft AND parent.rgt
-                                AND node.hash = :hash
-                ORDER BY node.lft, parent.height;
-            ");
+        $insertSql = "INSERT INTO $tableName (" . implode(", ", $columns). ") VALUES ";
+        $insertQuery = [];
+        $insertValues = [];
+        $bindingPositions = [];
+        foreach ($binding as $b) {
+            $bindingPositions[] = ":$b{{e}}";
         }
+        $bindingRow = implode(", ", $bindingPositions);
 
-        $getTips = $this->fetchTipsStmt;
-        $getChainPath = $this->chainPathStmt;
+        foreach ($list as $li_c => $item) {
+            // Add the prepared statement:
+            $insertQuery[] = str_replace("{{e}}", $li_c, $bindingRow);
 
-        if ($getTips->execute()) {
-            $tips = array();
-            while ($tip = $getTips->fetch()) {
-                $getChainPath->execute(['hash' => $tip['hash']]);
-                $mapArr = $getChainPath->fetchAll(\PDO::FETCH_COLUMN);
-
-                $tips[$tip['hash']] = new Chain(
-                    array_flip(array_flip($mapArr)),
-                    new BlockIndex(
-                        $tip['hash'],
-                        $tip['height'],
-                        $tip['work'],
-                        new BlockHeader(
-                            $tip['version'],
-                            $tip['prevBlock'],
-                            $tip['merkleRoot'],
-                            $tip['nTimestamp'],
-                            Buffer::int($tip['nBits']),
-                            $tip['nNonce']
-                        )
-                    ),
-                    $headers,
-                    Bitcoin::getMath()
-                );
+            // Now, $operator produces an array indexed by the binding key for the item.
+            // Binding key + $li_c is the expected key for this value (set in insertQuery above)
+            foreach ($operator($item) as $c => $value) {
+                $insertValues[$c . $li_c] = $value;
             }
-
-            $getTips->closeCursor();
-
-            return $tips;
         }
 
-        throw new \RuntimeException('Failed to query tips');
+        $insertSql .= implode(", ", $insertQuery);
+        $statement = $this->dbh->prepare($insertSql);
+        return [$statement, $insertValues];
     }
 
-    /**
-     * @param BlockIndex $startIndex
-     * @param BlockIndex[] $index
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertIndexBatch(BlockIndex $startIndex, array $index)
+    public function getOutputSet($inputs)
     {
-        if ($this->debug) {
-            echo "db: called insertIndexBATCH\n";
-        }
+        $stmt = $this->dbh->prepare("SELECT o.*
+                  from transaction_output o
+                    LEFT JOIN transaction_input i ON i.hashPrevOut = o.parent_tx AND i.nPrevOut = o.nOutput
+                    WHERE i.hashPrevOut IS NULL
 
-        if (null == $this->fetchLftStmt) {
-            $this->fetchLftStmt = $this->dbh->prepare('SELECT lft FROM headerIndex WHERE hash = :prevBlock');
-            $this->updateIndicesStmt = $this->dbh->prepare('
-                UPDATE headerIndex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
-                UPDATE headerIndex SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
-            ');
-        }
+                ORDER BY node.lft, parent.height;");
 
-        $fetchParent = $this->fetchLftStmt;
-        $updateIndices = $this->updateIndicesStmt;
 
-        $fetchParent->bindParam(':prevBlock', $startIndex->getHash());
-        if ($fetchParent->execute()) {
-            foreach ($fetchParent->fetchAll() as $record) {
-                $myLeft = $record['lft'];
-            }
-        }
-        $fetchParent->closeCursor();
-        if (!isset($myLeft)) {
-            throw new \RuntimeException('Failed to extract header position');
-        }
-
-        $totalN = count($index);
-        $nTimesTwo = 2 * $totalN;
-        $leftOffset = $myLeft;
-        $rightOffset = $myLeft + $nTimesTwo;
-
-        $this->dbh->beginTransaction();
-        try {
-            if ($updateIndices->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
-                $updateIndices->closeCursor();
-
-                $values = [];
-                $query = [];
-                foreach ($index as $c => $i) {
-                    $query[] = "(:hash$c , :height$c , :work$c ,
-                    :version$c , :prevBlock$c , :merkleRoot$c ,
-                    :nBits$c , :nTimestamp$c , :nNonce$c ,
-                    :lft$c , :rgt$c )";
-
-                    $values['hash' . $c] = $i->getHash();
-                    $values['height' . $c] = $i->getHeight();
-                    $values['work' . $c] = $i->getWork();
-
-                    $header = $i->getHeader();
-                    $values['version' . $c] = $header->getVersion();
-                    $values['prevBlock' . $c] = $header->getPrevBlock();
-                    $values['merkleRoot' . $c] = $header->getMerkleRoot();
-                    $values['nBits' . $c] = $header->getBits()->getInt();
-                    $values['nTimestamp' . $c] = $header->getTimestamp();
-                    $values['nNonce' . $c] = $header->getNonce();
-
-                    $values['lft' . $c] = $leftOffset + 1 + $c;
-                    $values['rgt' . $c] = $rightOffset - $c;
-                }
-
-                $sql = sprintf("
-                INSERT INTO headerIndex (
-                    hash, height, work,
-                    version, prevBlock, merkleRoot,
-                    nBits, nTimestamp, nNonce,
-                    lft, rgt
-                ) VALUES %s
-            ", implode(', ', $query));
-
-                $stmt = $this->dbh->prepare($sql);
-                $count = $stmt->execute($values);
-                $this->dbh->commit();
-                if ($count == $totalN) {
-                    return true;
-                } else {
-                    throw new \RuntimeException('Strange: Failed to update chain!');
-                }
-            }
-        } catch (\Exception $e) {
-            echo "ROLLBACK!\n";
-            $this->dbh->rollBack();
-            throw $e;
-        }
-
-        throw new \RuntimeException('Failed to update chain!');
     }
 }

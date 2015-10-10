@@ -4,8 +4,18 @@ namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Amount;
+use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
+use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Script\ScriptFactory;
+use BitWasp\Bitcoin\Transaction\Transaction;
+use BitWasp\Bitcoin\Transaction\TransactionCollection;
+use BitWasp\Bitcoin\Transaction\TransactionInput;
+use BitWasp\Bitcoin\Transaction\TransactionInputCollection;
+use BitWasp\Bitcoin\Transaction\TransactionOutput;
+use BitWasp\Bitcoin\Transaction\TransactionOutputCollection;
+use BitWasp\Buffertools\Buffer;
 
 class Consensus
 {
@@ -17,19 +27,37 @@ class Consensus
     private $math;
 
     /**
-     * @var Params
+     * @var ParamsInterface
      */
     private $params;
 
     /**
      * @param Math $math
-     * @param Params $params
+     * @param ParamsInterface $params
      */
-    public function __construct(Math $math, Params $params)
+    public function __construct(Math $math, ParamsInterface $params)
     {
         $this->math = $math;
         $this->params = $params;
     }
+
+    /**
+     * @return ParamsInterface
+     */
+    public function getParams()
+    {
+        return $this->params;
+    }
+
+    /**
+     * @param int|string $amount
+     * @return bool
+     */
+    public function checkAmount($amount)
+    {
+        return $this->math->cmp($amount, $this->math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
+    }
+
 
     /**
      * @param int $height

@@ -3,17 +3,14 @@
 namespace BitWasp\Bitcoin\Node\Index;
 
 
-use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Chain\Difficulty;
+
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\BlockIndex;
-use BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Chains;
 use BitWasp\Bitcoin\Node\MySqlDb;
-use BitWasp\Bitcoin\Node\Params;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Bitcoin\Node\Params;
 
 class Headers
 {
@@ -23,14 +20,9 @@ class Headers
     private $adapter;
 
     /**
-     * @var Difficulty
+     * @var Chains
      */
-    private $difficulty;
-
-    /**
-     * @var ProofOfWork
-     */
-    private $pow;
+    private $chains;
 
     /**
      * @var BlockHeaderInterface
@@ -43,28 +35,33 @@ class Headers
     private $genesisHash;
 
     /**
-     * @var Chains
+     * @var ProofOfWork
      */
-    private $chains;
+    private $pow;
 
     /**
      * @param MySqlDb $db
      * @param EcAdapterInterface $ecAdapter
      * @param Params $params
+     * @param ProofOfWork $proofOfWork
      * @param Chains $chains
-     * @throws \Exception
      */
-    public function __construct(MySqlDb $db, EcAdapterInterface $ecAdapter, Params $params, Chains $chains)
-    {
-        $this->chains = $chains;
+    public function __construct(
+        MySqlDb $db,
+        EcAdapterInterface $ecAdapter,
+        Params $params,
+        ProofOfWork $proofOfWork,
+        Chains $chains
+    ) {
         $this->db = $db;
         $this->adapter = $ecAdapter;
         $this->params = $params;
+        $this->pow = $proofOfWork;
+        $this->chains = $chains;
+
         $this->genesis = $params->getGenesisBlock()->getHeader();
         $this->genesisHash = $this->genesis->getBlockHash();
         $this->init();
-        $this->difficulty = new Difficulty($ecAdapter->getMath(), $params->getLowestBits());
-        $this->pow = new ProofOfWork($ecAdapter->getMath(), $this->difficulty, '');
     }
 
     /**
@@ -97,57 +94,6 @@ class Headers
     }
 
     /**
-     * Produce a block locator for a given block height.
-     * @param int $height
-     * @param Buffer|null $final
-     * @return BlockLocator
-     */
-    public function getLocator($height, Buffer $final = null)
-    {
-        echo "Produce GETHEADERS locator ($height) \n";
-        $step = 1;
-        $hashes = [];
-        $math = $this->adapter->getMath();
-        $tip = $this->chains->best()->getChain();
-        $headerHash = $tip->getHashFromHeight($height);
-
-        $h = [];
-        while (true) {
-            $hashes[] = Buffer::hex($headerHash, 32, $math);
-            $h[$height] = $headerHash;
-            if ($height == 0) {
-                break;
-            }
-
-            $height = max($height - $step, 0);
-            $headerHash = $tip->getHashFromHeight($height);
-            if (count($hashes) >= 10) {
-                $step *= 2;
-            }
-        }
-
-        if (is_null($final)) {
-            $hashStop = new Buffer('', 32, $math);
-        } else {
-            $hashStop = $final;
-        }
-
-        return new BlockLocator(
-            $hashes,
-            $hashStop
-        );
-    }
-
-    /**
-     * Produce a block locator given the current view of the chain
-     * @return BlockLocator
-     */
-    public function getLocatorCurrent()
-    {
-        return $this->getLocator($this->chains->best()->getChainIndex()->getHeight());
-    }
-
-    /**
      * @param string $hash
      * @return BlockHeaderInterface
      */
@@ -173,14 +119,16 @@ class Headers
         return true;
     }
 
+    public function checkContextual(BlockHeaderInterface $header)
+    {
+
+    }
+
     /**
      * Adds a header to the index. Will update the current tip,
      * otherwise creates a new tip for others to follow.
-     *
-     * @param BlockIndex $ancestor
      * @param BlockHeaderInterface $header
      * @return BlockIndex
-     * @throws \Exception
      */
     public function addToIndex(BlockHeaderInterface $header)
     {
@@ -193,7 +141,7 @@ class Headers
             // We create a BlockIndex
             $math = $this->adapter->getMath();
             $newHeight = $math->add($ancestor->getHeight(), 1);
-            $newWork = $math->add($this->difficulty->getWork($header->getBits()), $ancestor->getWork());
+            $newWork = $math->add($this->pow->getWork($header->getBits()), $ancestor->getWork());
             $newIndex = new BlockIndex($hash, $newHeight, $newWork, $header);
 
             $this->db->insertIndexBatch($ancestor, [$newIndex]);
@@ -269,7 +217,7 @@ class Headers
             // We create a BlockIndex
             $math = $this->adapter->getMath();
             $newHeight = $math->add($prevIndex->getHeight(), 1);
-            $newWork = $math->add($this->difficulty->getWork($header->getBits()), $prevIndex->getWork());
+            $newWork = $math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork());
 
             $tip->updateTip(new BlockIndex($hash, $newHeight, $newWork, $header));
 

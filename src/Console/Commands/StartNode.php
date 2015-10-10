@@ -4,6 +4,9 @@ namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 
 
+use BitWasp\Bitcoin\Bitcoin;
+use BitWasp\Bitcoin\Node\BitcoinNode;
+use BitWasp\Bitcoin\Node\Params;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -33,9 +36,10 @@ class StartNode extends AbstractCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $params = new \BitWasp\Bitcoin\Node\Params();
+        $math = Bitcoin::getMath();
+        $params = new Params($math);
         $loop = \React\EventLoop\Factory::create();
-        $app = new \BitWasp\Bitcoin\Node\BitcoinNode($params, $loop);
+        $app = new BitcoinNode($params, $loop);
 
         $context = new \React\ZMQ\Context($loop);
 

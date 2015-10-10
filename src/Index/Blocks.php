@@ -3,9 +3,8 @@
 namespace BitWasp\Bitcoin\Node\Index;
 
 
+use BitWasp\Bitcoin\Amount;
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Chain\Difficulty;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;
@@ -23,11 +22,6 @@ class Blocks
      * @var EcAdapterInterface
      */
     private $adapter;
-
-    /**
-     * @var Difficulty
-     */
-    private $difficulty;
 
     /**
      * @var ProofOfWork
@@ -59,17 +53,29 @@ class Blocks
      */
     private $chains;
 
-    public function __construct(MySqlDb $db, EcAdapterInterface $ecAdapter, Params $params, Chains $state)
-    {
-        $this->chains = $state;
+    /**
+     * @param MySqlDb $db
+     * @param EcAdapterInterface $ecAdapter
+     * @param Params $params
+     * @param ProofOfWork $pow
+     * @param Chains $state
+     */
+    public function __construct(
+        MySqlDb $db,
+        EcAdapterInterface $ecAdapter,
+        Params $params,
+        ProofOfWork $pow,
+        Chains $state
+    ) {
         $this->db = $db;
         $this->adapter = $ecAdapter;
         $this->params = $params;
+        $this->pow = $pow;
+        $this->chains = $state;
+
         $this->genesis = $params->getGenesisBlock();
         $this->genesisHash = $this->genesis->getHeader()->getBlockHash();
         $this->init();
-        $this->difficulty = new Difficulty($ecAdapter->getMath(), $params->getLowestBits());
-        $this->pow = new ProofOfWork($ecAdapter->getMath(), $this->difficulty, '');
     }
 
     /**
@@ -111,7 +117,7 @@ class Blocks
             }
 
             $valueIn = $math->add($out->getValue(), $valueIn);
-            if ( !$this->params->checkAmount($valueIn) || !$this->params->checkAmount($out->getValue())) {
+            if ( !$this->checkAmount($valueIn) || !$this->checkAmount($out->getValue())) {
                 return false;
             }
         }
@@ -121,7 +127,7 @@ class Blocks
         $outputs = $tx->getOutputs()->getOutputs();
         foreach ($outputs as $output) {
             $valueOut = $math->add($output->getValue(), $valueOut);
-            if ($this->params->checkAmount($valueOut) || $this->params->checkAmount($output->getValue())) {
+            if ($this->checkAmount($valueOut) || $this->checkAmount($output->getValue())) {
                 return false;
             }
         }
@@ -135,7 +141,7 @@ class Blocks
             return false;
         }
 
-        if (!$this->params->checkAmount($fee)) {
+        if (!$this->checkAmount($fee)) {
             return false;
         }
 
@@ -213,6 +219,16 @@ class Blocks
     }
 
     /**
+     * @param int|string $amount
+     * @return bool
+     */
+    public function checkAmount($amount)
+    {
+        $math = $this->adapter->getMath();
+        return $math->cmp($amount, $math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
+    }
+
+    /**
      * @param TransactionInterface $transaction
      * @param bool|true $checkSize
      * @return bool
@@ -247,12 +263,12 @@ class Blocks
                 echo "txout.val err1";
                 return false;
             }
-            if (!$this->params->checkAmount($out->getValue())) {
+            if (!$this->checkAmount($out->getValue())) {
                 echo "txout.val err2";
                 return false;
             }
             $value = $math->add($value, $out->getValue());
-            if ($math->cmp($value, 0) < 0 || !$this->params->checkAmount($value)) {
+            if ($math->cmp($value, 0) < 0 || !$this->checkAmount($value)) {
                 echo "txout.val err3";
                 return false;
             }
@@ -303,7 +319,6 @@ class Blocks
     public function check(BlockInterface $block)
     {
         $header = $block->getHeader();
-
         if ($block->getMerkleRoot() !== $header->getMerkleRoot()) {
             echo 'merkle woes';
             return false;
@@ -365,4 +380,18 @@ class Blocks
         return $index;
     }
 
+    public function validateTxSet(BlockInterface $block)
+    {
+        $arr = [];
+        $txs = $block->getTransactions();
+        $nTx = count($txs);
+        for ($i = 0; $i < $nTx; $i++) {
+            $tx = $txs->getTransaction($i);
+            foreach ($tx->getInputs()->getInputs() as $in) {
+                $arr[] = [$in->getTransactionId(), $in->getVout()];
+            }
+        }
+
+
+    }
 }

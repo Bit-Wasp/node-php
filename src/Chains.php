@@ -31,6 +31,9 @@ class Chains
         $this->adapter = $adapter;
     }
 
+    /**
+     *
+     */
     public function checkTips()
     {
         $tips = $this->states;
