@@ -6,6 +6,7 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
+use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Buffertools\Buffer;
 
 class ChainState
@@ -21,10 +22,11 @@ class ChainState
     private $lastBlock;
 
     /**
+     * @param Math $math
      * @param Chain $chain
      * @param BlockIndex $lastBlock
      */
-    public function __construct(Chain $chain, BlockIndex $lastBlock)
+    public function __construct(Math $math, Chain $chain, BlockIndex $lastBlock)
     {
         $this->chain = $chain;
         $this->lastBlock = $lastBlock;
@@ -43,8 +45,22 @@ class ChainState
      */
     public function updateLastBlock(BlockIndex $index)
     {
-        if ($index->getHeader()->getPrevBlock() !== $this->lastBlock->getHash()) {
-            throw new \InvalidArgumentException('Index does not elongate chain');
+        if ($this->lastBlock->getHash() !== $index->getHeader()->getPrevBlock()) {
+            print_r($this->lastBlock);
+            print_r($index);
+            die('Block does not extend this chain');
+            throw new \RuntimeException('Block does not extend this chain');
+        }
+
+
+        if ($this->lastBlock->getHeight() != $index->getHeight() - 1) {
+            var_dump($this->lastBlock->getHeight());
+            var_dump($index->getHeight());
+            var_dump($index->getHeight() - 1);
+            print_r($this->lastBlock);
+            print_r($index);
+            die();
+            throw new \RuntimeException('Incorrect chain height');
         }
 
         $this->lastBlock = $index;
@@ -64,22 +80,6 @@ class ChainState
     public function getChainIndex()
     {
         return $this->chain->getIndex();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getHeadersWork()
-    {
-        return $this->chain->getIndex()->getWork();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getBlocksWork()
-    {
-        return $this->lastBlock->getWork();
     }
 
     /**
@@ -106,7 +106,6 @@ class ChainState
      */
     public function getLocator($height, Buffer $final = null)
     {
-        echo "Produce locator ($height) \n";
         $step = 1;
         $hashes = [];
         $headerHash = $this->chain->getHashFromHeight($height);
@@ -144,6 +143,7 @@ class ChainState
      */
     public function getHeadersLocator(Buffer $hashStop = null)
     {
+        echo "Produce Headers locator (".$this->chain->getIndex()->getHeight().") \n";
         return $this->getLocator($this->chain->getIndex()->getHeight(), $hashStop);
     }
 
@@ -153,38 +153,9 @@ class ChainState
      */
     public function getBlockLocator(Buffer $hashStop = null)
     {
-        echo $this->lastBlock->getHeight(). "\n";
-        return $this->getLocator($this->lastBlock->getHeight(), $hashStop);
+        echo "Produce Block locator (".$this->lastBlock->getHeight().") \n";
+        return $this->getLocator($this->lastBlock->getHeight() - 1, $hashStop);
     }
-
-    /**
-     * @param string $hash
-     * @return bool
-     */
-    public function checkForHeaders($hash)
-    {
-        return $this->chain->containsHash($hash);
-    }
-
-    /**
-     * @param string $hash
-     * @return bool
-     */
-    public function checkForBlock($hash)
-    {
-        if (!$this->chain->containsHash($hash)) {
-            return false;
-        }
-
-        $bestBlockHeight = $this->lastBlock->getHeight();
-        $blockHeight = $this->chain->getHeightFromHash($hash);
-        if ($blockHeight > $bestBlockHeight) {
-            return false;
-        }
-
-        return true;
-    }
-
 
     public function calculateNextWorkRequired(BlockIndex $indexLast, $timeFirstBlock)
     {

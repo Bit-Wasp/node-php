@@ -38,7 +38,10 @@ class Chains
     {
         $tips = $this->states;
         $sort = function (ChainState $a, ChainState $b) {
-            return $this->adapter->getMath()->cmp($a->getHeadersWork(), $b->getHeadersWork());
+            $a = $a->getChainIndex()->getWork();
+            $b = $b->getChainIndex()->getWork();
+
+            return $this->adapter->getMath()->cmp($a, $b);
         };
 
         usort($tips, $sort);

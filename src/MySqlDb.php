@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
 use BitWasp\Bitcoin\Transaction\TransactionOutputCollection;
+use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use Packaged\Config\ConfigProviderInterface;
 
@@ -146,12 +147,11 @@ class MySqlDb
     }
 
     /**
-     * @param int $height
      * @param BlockInterface $block
      * @return bool
      * @throws \Exception
      */
-    public function insertBlock($height, BlockInterface $block)
+    public function insertBlock(BlockInterface $block)
     {
         if ($this->debug) {
             echo "db: called insertBlock \n";
@@ -161,28 +161,21 @@ class MySqlDb
 
         try {
             $this->dbh->beginTransaction();
-            // Insert the blocks hash
-            $blockInsert = $this->dbh->prepare("INSERT INTO blockIndex ( hash ) VALUES ( :hash )");
-            $blockInsert->bindValue(':hash', $blockHash);
 
             $txListBind = [];
             $txListData = ['blockHash' => $blockHash];
-            $txListSql = "INSERT INTO block_transactions (block_hash, transaction_hash) VALUES ";
 
             // Prepare SQL statement adding all transaction inputs in this block.
             $inBind = [];
             $inData = [];
-            $inSql = "INSERT INTO transaction_input (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ";
 
             // Prepare SQL statement adding all transaction outputs in this block
             $outBind = [];
             $outData = [ ];
-            $outSql = "INSERT INTO transaction_output (parent_tx, nOutput, value, scriptPubKey) VALUES ";
 
             // Add all transactions in the block
             $txBind = [];
             $txData = [];
-            $insertTxSql = "INSERT INTO transactions (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES ";
 
             $transactions = $block->getTransactions();
             $nTx = count($transactions);
@@ -228,19 +221,20 @@ class MySqlDb
             }
 
             // Finish & prepare each statement
-            $insertTxSql .= implode(", ", $txBind);
-            $insertTx = $this->dbh->prepare($insertTxSql);
+            // Insert the blocks hash
+            $blockInsert = $this->dbh->prepare("INSERT INTO blockIndex ( hash ) VALUES ( :hash )");
+            $blockInsert->bindValue(':hash', $blockHash);
 
-            $txListSql .= implode(", ", $txListBind);
-            $insertTxList = $this->dbh->prepare($txListSql);
+            $insertTx = $this->dbh->prepare("INSERT INTO transactions (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES " . implode(", ", $txBind));
+            unset($txBind);
+
+            $insertTxList = $this->dbh->prepare("INSERT INTO block_transactions (block_hash, transaction_hash) VALUES " . implode(", ", $txListBind));
             unset($txListBind);
 
-            $inSql .= implode(", ", $inBind);
-            $insertInputs = $this->dbh->prepare($inSql);
+            $insertInputs = $this->dbh->prepare("INSERT INTO transaction_input (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES " . implode(", ", $inBind));
             unset($inBind);
 
-            $outSql .= implode(", ", $outBind);
-            $insertOutputs = $this->dbh->prepare($outSql);
+            $insertOutputs = $this->dbh->prepare("INSERT INTO transaction_output (parent_tx, nOutput, value, scriptPubKey) VALUES " . implode(", ", $outBind));
             unset($outBind);
 
             $blockInsert->execute();
@@ -255,6 +249,7 @@ class MySqlDb
         } catch (\Exception $e) {
             echo "INSERT FAIL!\n";
             echo $e->getMessage() . "\n";
+            die();
             $this->dbh->rollBack();
             return;
         }
@@ -328,8 +323,10 @@ class MySqlDb
                     $values['rgt' . $c] = $rightOffset - $c;
                 }
 
-                $sql = sprintf("INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt ) VALUES %s ", implode(', ', $query));
-                $stmt = $this->dbh->prepare($sql);
+                $stmt = $this->dbh->prepare("
+                  INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt )
+                  VALUES " . implode(', ', $query));
+
                 $count = $stmt->execute($values);
                 $this->dbh->commit();
                 if ($count == $totalN) {
@@ -357,7 +354,11 @@ class MySqlDb
         }
 
         if (null == $this->haveHeaderStmt) {
-            $this->haveHeaderStmt = $this->dbh->prepare('SELECT COUNT(*) as count FROM headerIndex WHERE hash = :hash');
+            $this->haveHeaderStmt = $this->dbh->prepare('
+              SELECT    COUNT(*) as count
+              FROM      headerIndex
+              WHERE     hash = :hash
+            ');
         }
 
         $stmt = $this->haveHeaderStmt;
@@ -386,7 +387,11 @@ class MySqlDb
         }
 
         if (null == $this->fetchIndexStmt) {
-            $this->fetchIndexStmt = $this->dbh->prepare('SELECT i.* FROM headerIndex i WHERE i.hash = :hash');
+            $this->fetchIndexStmt = $this->dbh->prepare('
+               SELECT     i.*
+               FROM       headerIndex i
+               WHERE      i.hash = :hash
+            ');
         }
 
         $stmt = $this->fetchIndexStmt;
@@ -443,15 +448,16 @@ class MySqlDb
             ');
 
             $this->txOutStmt = $this->dbh->prepare('
-                SELECT txOut.parent_tx, txOut.value, txOut.scriptPubKey
-                FROM transaction_output txOut
-                JOIN block_transactions bt ON bt.transaction_hash = txOut.parent_tx
-                WHERE bt.block_hash = :hash
-                GROUP BY txOut.parent_tx
-                ORDER BY txOut.nOutput
+              SELECT    txOut.parent_tx, txOut.value, txOut.scriptPubKey
+              FROM      transaction_output txOut
+              JOIN      block_transactions bt ON bt.transaction_hash = txOut.parent_tx
+              WHERE     bt.block_hash = :hash
+              GROUP BY  txOut.parent_tx
+              ORDER BY  txOut.nOutput
             ');
         }
 
+        // We pass a callback instead of looping
         $this->txsStmt->bindValue(':hash', $blockHash);
         $this->txsStmt->execute();
         $txs = [];
@@ -502,16 +508,15 @@ class MySqlDb
         }
 
         $stmt = $this->dbh->prepare('
-            SELECT b.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
-            FROM blockIndex b
-            JOIN headerIndex h ON b.hash = h.hash
-            WHERE b.hash = :hash
+           SELECT     h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
+           FROM       blockIndex b
+           JOIN       headerIndex h ON b.hash = h.hash
+           WHERE      b.hash = :hash
         ');
 
         $stmt->bindValue(':hash', $hash);
         if ($stmt->execute()) {
             $r = $stmt->fetch();
-
             $stmt->closeCursor();
             if ($r) {
                 return new Block(
@@ -545,6 +550,7 @@ class MySqlDb
         }
 
         $stmt = $this->dbh->prepare('
+SELECT * FROM (
             SELECT
                 parent.hash as last_hash, parent.work as last_work, parent.height as last_height
               , parent.version as last_version, parent.prevBlock as last_prevBlock, parent.merkleRoot as last_merkleRoot
@@ -553,33 +559,33 @@ class MySqlDb
               , tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work
               , tip.version as tip_version, tip.prevBlock tip_prevBlock, tip.merkleRoot as tip_merkleRoot
               , tip.nBits as tip_nBits, tip.nTimestamp as tip_nTimestamp, tip.nNonce as tip_nNonce
-              , count(b.hash) as countBlocks
+
 FROM headerIndex AS tip, headerIndex AS parent
-INNER JOIN headerIndex AS next ON next.prevBlock = parent.hash
+LEFT JOIN headerIndex AS next ON next.prevBlock = parent.hash
 LEFT JOIN blockIndex AS b ON b.hash = next.hash
 WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
-            ;
-        ');
+) as r
+GROUP BY r.tip_hash;');
 
         if ($stmt->execute()) {
             $chainPathStmt = $this->dbh->prepare("
-                SELECT parent.hash
-                FROM headerIndex AS node,
-                     headerIndex AS parent
-                WHERE node.lft BETWEEN parent.lft AND parent.rgt
-                                AND node.hash = :hash
-                ORDER BY node.lft, parent.height;
+               SELECT   node.hash, parent.hash
+               FROM     headerIndex AS node,
+                        headerIndex AS parent
+               WHERE    node.rgt = node.lft + 1
+               AND      node.lft BETWEEN parent.lft AND parent.rgt
             ");
-            // column was hash, join was inner
-            //return $stmt->fetch(\PDO::FETCH_COLUMN);
+            $chainPathStmt->execute();
+            $fetch = $chainPathStmt->fetchAll(\PDO::FETCH_GROUP | \PDO::FETCH_COLUMN);
+
             $states = [];
             $math = Bitcoin::getMath();
+
             foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                $chainPathStmt->bindValue(':hash', $row['tip_hash']);
-                $chainPathStmt->execute();
-                $map = $chainPathStmt->fetchAll(\PDO::FETCH_COLUMN);
+                $map = $fetch[$row['tip_hash']];
                 $states[] =
                     new ChainState(
+                        $math,
                         new Chain(
                             $map,
                             new BlockIndex(
@@ -621,7 +627,8 @@ WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
     }
 
     /**
-     * We use this to help other nodes sync headers. We must
+     * We use this to help other nodes sync headers. Identify last common
+     * hash in our chain
      *
      * @param Chain $activeChain
      * @param BlockLocator $locator
@@ -639,11 +646,11 @@ WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
 
         $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
         $stmt = $this->dbh->prepare("
-            SELECT node.hash
-            FROM headerIndex AS node,
-                 headerIndex AS parent
-            WHERE parent.hash = ? AND node.hash in ($placeholders)
-            ORDER BY node.rgt LIMIT 1
+            SELECT    node.hash
+            FROM      headerIndex AS node,
+                      headerIndex AS parent
+            WHERE     parent.hash = ? AND node.hash in ($placeholders)
+            ORDER BY  node.rgt LIMIT 1
         ");
 
         if ($stmt->execute($hashes)) {
@@ -667,13 +674,12 @@ WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
             echo "db: called fetchNextHeaders ($hash)\n";
         }
         $stmt = $this->dbh->prepare("
-            SELECT
-               child.version, child.prevBlock, child.merkleRoot,
-               child.nTimestamp, child.nBits, child.nNonce, child.height
-            FROM headerIndex AS child, headerIndex AS parent
-            WHERE child.rgt < parent.rgt
-            AND parent.hash = :hash
-            LIMIT 2000
+            SELECT    child.version, child.prevBlock, child.merkleRoot,
+                      child.nTimestamp, child.nBits, child.nNonce, child.height
+            FROM      headerIndex AS child, headerIndex AS parent
+            WHERE     child.rgt < parent.rgt
+            AND       parent.hash = :hash
+            LIMIT     2000
         ");
 
         $stmt->bindParam(':hash', $hash);
@@ -692,55 +698,116 @@ WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
             $stmt->closeCursor();
             return $results;
         }
+
+        throw new \RuntimeException('Failed to fetch next headers ' . $hash);
     }
 
     /**
-     * @param $tableName
-     * @param array $columns
-     * @param array $binding
-     * @param array $list
-     * @param callable $operator
-     * @return array
+     * @param BlockInterface $block
+     * @param Chain $activeChain
+     * @return UtxoView
+     * @throws \Exception
      */
-    private function batchInsert($tableName, array $columns, array $binding, array $list, callable $operator)
+    public function fetchUtxoView(BlockInterface $block, Chain $activeChain)
     {
-        if ($this->debug) {
-            echo "db: called batchInsert *** \n";
+        $txs = $block->getTransactions();
+        $txCount = count($txs);
+        if (1 == $txCount) {
+            return new UtxoView([]);
         }
-        $insertSql = "INSERT INTO $tableName (" . implode(", ", $columns). ") VALUES ";
-        $insertQuery = [];
-        $insertValues = [];
-        $bindingPositions = [];
-        foreach ($binding as $b) {
-            $bindingPositions[] = ":$b{{e}}";
-        }
-        $bindingRow = implode(", ", $bindingPositions);
 
-        foreach ($list as $li_c => $item) {
-            // Add the prepared statement:
-            $insertQuery[] = str_replace("{{e}}", $li_c, $bindingRow);
+        $joinList = '';
+        $queryValues = ['hash' => $block->getHeader()->getBlockHash()];
+        $last = $txCount - 1;
+        $c = 0;
 
-            // Now, $operator produces an array indexed by the binding key for the item.
-            // Binding key + $li_c is the expected key for this value (set in insertQuery above)
-            foreach ($operator($item) as $c => $value) {
-                $insertValues[$c . $li_c] = $value;
+        for ($i = 1; $i < $txCount; $i++) {
+            $utxo_txid = $txs->getTransaction($i);
+            $inputs = $utxo_txid->getInputs();
+            $lastIn = count($inputs) - 1;
+
+            foreach ($inputs->getInputs() as $vin => $in) {
+                if (0 == $c) {
+                    $joinList .= "SELECT :hparent$c as hashParent, :noutparent$c as nOut, :c$c as txidx\n";
+                } else {
+                    $joinList .= "  SELECT :hparent$c, :noutparent$c, :c$c \n";
+                }
+
+                if ($vin < $lastIn || $i < $last ) {
+                    $joinList .= "  UNION ALL\n";
+                }
+
+                $queryValues["hparent$c"] = $in->getTransactionId();
+                $queryValues["c$c"] = $i;
+                $queryValues["noutparent$c"] = $in->getVout();
+                $c++;
             }
         }
 
-        $insertSql .= implode(", ", $insertQuery);
-        $statement = $this->dbh->prepare($insertSql);
-        return [$statement, $insertValues];
+        $stmt = $this->dbh->prepare("
+              SELECT    listed.hashParent as txid, listed.nOut as vout,
+                        o.value, o.scriptPubKey,
+                        allowed_block.height, listed.txidx
+              FROM      transaction_output o
+              RIGHT JOIN (
+                $joinList
+              ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
+              LEFT JOIN (
+                    SELECT    b.transaction_hash, parent.height
+                    FROM      headerIndex AS tip,
+                              headerIndex AS parent
+                    JOIN      block_transactions b on (b.block_hash = parent.hash)
+                    WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
+              ) as allowed_block on o.parent_tx = allowed_block.transaction_hash
+              WHERE listed.hashParent IS NOT NULL");
+
+        try {
+            $stmt->execute($queryValues);
+
+            $cache = [];
+            $utxos = [];
+
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
+                $tx = $txs->getTransaction($utxo['txidx']);
+                $newtx = $tx->getTransactionId();
+
+                // We will always have these
+                $txid = $utxo['txid'];
+                $vout = $utxo['vout'];
+
+                // Populate $value and $script, relying on transactions
+                // coming in sequence in a block
+                if (!is_null($utxo['scriptPubKey'])) {
+                    $output = new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey'])));
+                } else {
+                    if (!isset($cache[$txid]) || !isset($cache[$txid][$vout])) {
+                        throw new \RuntimeException('Utxo not found in storage or block!');
+                    }
+                    $output = $cache[$txid][$vout];
+                }
+
+                // To allow parsing chains of transactions, keep an
+                // indexed temporary store of all utxos, because its
+                if (!isset($cache[$newtx])) {
+                    $cache[$newtx] = [];
+                    foreach ($tx->getOutputs()->getOutputs() as $v => $tmp) {
+                        $cache[$newtx][$v] = $tmp;
+                    }
+                }
+
+                $utxos[] = new Utxo($txid, $vout, $output);
+            }
+
+            if (count($utxos) !== $c) {
+                throw new \RuntimeException('Either invalid block, or chain of dependent transactions');
+            }
+
+            return new UtxoView($utxos);
+
+        } catch (\Exception $e) {
+            echo $e->getMessage() . "\n";
+            throw $e;
+        }
     }
 
-    public function getOutputSet($inputs)
-    {
-        $stmt = $this->dbh->prepare("SELECT o.*
-                  from transaction_output o
-                    LEFT JOIN transaction_input i ON i.hashPrevOut = o.parent_tx AND i.nPrevOut = o.nOutput
-                    WHERE i.hashPrevOut IS NULL
-
-                ORDER BY node.lft, parent.height;");
-
-
-    }
 }

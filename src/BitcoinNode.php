@@ -4,7 +4,6 @@ namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Bitcoin;
-use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Networking\Factory as NetworkingFactory;
 use BitWasp\Bitcoin\Networking\Messages\Block;
@@ -16,6 +15,7 @@ use BitWasp\Bitcoin\Networking\NetworkMessage;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
+use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerState;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Buffertools\Buffer;
@@ -61,12 +61,12 @@ class BitcoinNode extends EventEmitter
     public $db;
 
     /**
-     * @var ParamsInterface
+     * @var Params
      */
     public $params;
 
     /**
-     * @param ParamsInterface $params
+     * @param Params $params
      * @param LoopInterface $loop
      */
     public function __construct(Params $params, LoopInterface $loop)
@@ -80,6 +80,8 @@ class BitcoinNode extends EventEmitter
         $this->adapter = Bitcoin::getEcAdapter();
         $this->network = Bitcoin::getNetwork();
         $this->netFactory = new NetworkingFactory($loop);
+        $this->peersOutbound = new Peers();
+        $this->peersInbound = new Peers();
         $this->peerState = new PeerStateCollection();
         $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
         $this->inventory = new KnownInventory();
@@ -96,7 +98,6 @@ class BitcoinNode extends EventEmitter
             echo " [App] ... BLOCKS: syncing\n";
         });
 
-
         $this->on('headers.syncing', function () {
             echo " [App] ... HEADERS: syncing\n";
         });
@@ -110,8 +111,10 @@ class BitcoinNode extends EventEmitter
 
     public function stop()
     {
-        $this->db->stop();
+        $this->peersInbound->close();
+        $this->peersOutbound->close();
         $this->loop->stop();
+        $this->db->stop();
     }
 
     /**
@@ -148,7 +151,7 @@ class BitcoinNode extends EventEmitter
             $state->useForDownload();
             $this->emit('headers.syncing');
 
-            $peer->getheaders($this->chains->best()->getHeadersLocator());
+            $peer->getheaders($this->chain()->getHeadersLocator());
         }
     }
 
@@ -159,10 +162,10 @@ class BitcoinNode extends EventEmitter
      */
     private function doDownloadBlocks(ChainState $best, Peer $peer, PeerState $state)
     {
-        $headerHeight = $best->getChain()->getIndex()->getHeight();
         $blockHeight = $best->getLastBlock()->getHeight();
 
-        $stopHeight = min($headerHeight, $blockHeight + 16);
+        // We make sure to sync no more than 64 blocks at a time.
+        $stopHeight = min($blockHeight + 500, $best->getChainIndex()->getHeight());
         $hashStop = Buffer::hex($best->getChain()->getHashFromHeight($stopHeight), 32, $this->adapter->getMath());
         $locator = $best->getLocator($blockHeight, $hashStop);
         $peer->getblocks($locator);
@@ -177,11 +180,11 @@ class BitcoinNode extends EventEmitter
      */
     public function startBlockSync(Peer $peer)
     {
-        $this->emit('blocks.syncing');
-
         $peerState = $this->peerState->fetch($peer);
-        $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
-
+        if (!$peerState->isBlockDownload()) {
+            $this->emit('blocks.syncing');
+            $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
+        }
     }
 
     /**
@@ -210,6 +213,15 @@ class BitcoinNode extends EventEmitter
     }
 
     /**
+     * @return ChainState
+     */
+    public function chain()
+    {
+        return $this->chains->best();
+    }
+
+
+    /**
      *
      */
     public function start()
@@ -221,9 +233,12 @@ class BitcoinNode extends EventEmitter
         $locator = $peerFactory->getLocator();
 
         $txRelay = $this->config->getItem('config', 'tx_relay', false);
-        $manager = $peerFactory->getManager(false);
+        $manager = $peerFactory->getManager($txRelay);
         $manager->on('outbound', function (Peer $peer) {
-
+            $this->peersOutbound->add($peer);
+        });
+        $manager->on('inbound', function (Peer $peer) {
+            $this->peersInbound->add($peer);
         });
         $manager->registerHandler($handler);
 
@@ -241,32 +256,46 @@ class BitcoinNode extends EventEmitter
 
         // Only for outbound peers
         $handler->on('outbound', function (Peer $peer) {
-
             $peer->on('msg', function (Peer $peer, NetworkMessage $msg) {
-                echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - " . $msg->getCommand(). "\n";
+                $payload = $msg->getPayload();
+
+                if ($msg->getCommand() == 'block') {
+                    /** @var Block $payload */
+                    echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - block - " . $payload->getBlock()->getHeader()->getBlockHash() . "\n";
+                } else {
+                    echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - " . $msg->getCommand(). "\n";
+                }
             });
 
             $peer->on('block', function (Peer $peer, Block $blockMsg) {
+
                 $block = $blockMsg->getBlock();
-                echo "Received block: " . $block->getHeader()->getBlockHash() . "\n";
-                $best = $this->chains->best();
-                $index = $this->blocks->accept($block, $this->headers);
-                $best->updateLastBlock($index);
-                $this->chains->checkTips();
-                $peerState = $this->peerState->fetch($peer);
-                if ($peerState->isBlockDownload()) {
-                    $peerState->unsetDownloadBlock();
-                    if (!$peerState->hasDownloadBlocks()) {
-                        echo "do download blocks!\n";
-                        $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
+                $best = $this->chain();
+
+                try {
+                    $index = $this->blocks->accept($block, $this->headers);
+                    $best->updateLastBlock($index);
+                    $this->chains->checkTips();
+                    $peerState = $this->peerState->fetch($peer);
+                    if ($peerState->isBlockDownload()) {
+                        $peerState->unsetDownloadBlock();
+                        if (!$peerState->hasDownloadBlocks()) {
+                            echo "do download blocks!\n";
+                            $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
+                        }
                     }
+                } catch (\Exception $e) {
+                    echo "Failed to accept block\n";
+                    echo $e->getTraceAsString() . PHP_EOL;
+                    echo $e->getMessage() . PHP_EOL;
                 }
+
             });
 
             $peer->on('inv', function (Peer $peer, Inv $inv) {
                 echo "INV size: " . count($inv->getItems()) . "\n";
-                $best = $this->chains->best();
-                $bestHeaderIndex = $best->getChainIndex();
+                $best = $this->chain();
+
                 $vFetch = [];
                 $lastBlock = false;
                 foreach ($inv->getItems() as $item) {
@@ -279,11 +308,10 @@ class BitcoinNode extends EventEmitter
 
                 if ($lastBlock) {
                     if (!$best->getChain()->containsHash($lastBlock->getHex())) {
-                        echo "weird, we dont have this: " . $lastBlock->getHex() . "\n";
-                        $peer->getheaders($best->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
+                        //echo "weird, we dont have this: " . $lastBlock->getHex() . "\n";
+                        //$peer->getheaders($best->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
                     }
                 }
-
 
                 if (!empty($vFetch)) {
                     $peer->getdata($vFetch);
@@ -291,6 +319,7 @@ class BitcoinNode extends EventEmitter
             });
 
             $peer->on('getheaders', function (Peer $peer, GetHeaders $getHeaders ) {
+
                 $state = $this->chains->best();
                 $chain = $state->getChain();
                 $locator = $getHeaders->getLocator();
@@ -301,6 +330,14 @@ class BitcoinNode extends EventEmitter
                 }
 
                 $headers = $this->db->fetchNextHeaders($start);
+                echo "Respond to GETHEADERS\n";
+                $theirbest = $locator->getHashes()[0]->getHex() ;
+                $tbh = $state->getChain()->getHeightFromHash($theirbest) . "\n";
+                echo "Their best: " . $theirbest . "\n";
+                echo "their best height: " . $tbh . PHP_EOL;
+                echo "We found fork to be: " . $start . "\n";
+                echo "We found fork height to be: " . $state->getChain()->getHeightFromHash($theirbest) . "\n";
+
                 echo "Sending " . count($headers) . " headers \n";
                 $peer->headers($headers);
             });
@@ -311,7 +348,6 @@ class BitcoinNode extends EventEmitter
                 $chain = $state->getChain();
                 $startHeight = $chain->getIndex()->getHeight();
 
-                $last = null;
                 $vHeaders = $headers->getHeaders();
                 $c = count($vHeaders);
 
@@ -320,29 +356,28 @@ class BitcoinNode extends EventEmitter
                     $this->headers->acceptBatch($vHeaders);
                 }
 
-                echo "tx took " . (microtime(true) - $tx) . "\n";
                 $newHeight = $state->getChainIndex()->getHeight();
-                echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . "\n";
 
                 if (count($vHeaders) == 2000) {
                     echo " ... continue syncing (current height = " . $newHeight . " ... \n";
-                    $peer->getheaders($this->chains->best()->getHeadersLocator());
+                    $peer->getheaders($state->getHeadersLocator());
                 } else {
                     $this->emit('headers.synced');
                 }
 
-                $this->startBlockSync($peer);
+                echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . " - took " . (microtime(true) - $tx) . "\n";
             });
         });
 
         $locator
             ->queryDnsSeeds(1)
             ->then(function (Locator $locator) use ($manager, $handler) {
-                for($i = 0; $i < 2  ; $i++) {
+                for ($i = 0; $i < 2  ; $i++) {
                     $manager
                         ->connectNextPeer($locator)
                         ->then(function ($peer) {
                             $this->startHeaderSync($peer);
+                            $this->doDownloadBlocks($this->chains->best(), $peer, $this->peerState->fetch($peer));
                         }, function () {
                             echo "connection wtf?\n";
                         });

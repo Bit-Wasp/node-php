@@ -118,7 +118,7 @@ class Chain
     public function updateTip(BlockIndex $index)
     {
         if ($this->index->getHash() !== $index->getHeader()->getPrevBlock()) {
-            throw new \RuntimeException('Block does not extend this chain');
+            throw new \RuntimeException('Header does not extend this chain');
         }
 
         if ($index->getHeight() - 1 != $this->index->getHeight()) {

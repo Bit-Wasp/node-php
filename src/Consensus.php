@@ -4,22 +4,12 @@ namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Amount;
-use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Script\ScriptFactory;
-use BitWasp\Bitcoin\Transaction\Transaction;
-use BitWasp\Bitcoin\Transaction\TransactionCollection;
-use BitWasp\Bitcoin\Transaction\TransactionInput;
-use BitWasp\Bitcoin\Transaction\TransactionInputCollection;
-use BitWasp\Bitcoin\Transaction\TransactionOutput;
-use BitWasp\Bitcoin\Transaction\TransactionOutputCollection;
-use BitWasp\Buffertools\Buffer;
 
 class Consensus
 {
-    const P2SH_ACTIVATION = '1333238400';
 
     /**
      * @var Math
@@ -57,7 +47,6 @@ class Consensus
     {
         return $this->math->cmp($amount, $this->math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
     }
-
 
     /**
      * @param int $height
