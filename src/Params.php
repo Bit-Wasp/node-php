@@ -17,7 +17,6 @@ use BitWasp\Buffertools\Buffer;
 
 class Params extends \BitWasp\Bitcoin\Chain\Params
 {
-    protected static $p2shActiveTime = 1333238400;
 
     /**
      * @var Math
@@ -30,14 +29,6 @@ class Params extends \BitWasp\Bitcoin\Chain\Params
     public function __construct(Math $math)
     {
         $this->math = $math;
-    }
-
-    /**
-     * @return int
-     */
-    public function p2shActivateTime()
-    {
-        return static::$p2shActiveTime;
     }
 
     /**
