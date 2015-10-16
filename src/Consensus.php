@@ -66,6 +66,60 @@ class Consensus
     }
 
     /**
+     * @param BlockIndex $prevIndex
+     * @param $timeFirstBlock
+     * @return int|string
+     */
+    public function calculateNextWorkRequired(BlockIndex $prevIndex, $timeFirstBlock)
+    {
+        $header = $prevIndex->getHeader();
+        $math = $this->math;
+        $timespan = $math->sub($header->getTimestamp(), $timeFirstBlock);
+
+        $lowest = $math->div($this->params->powTargetTimespan(), 4);
+        $highest = $math->mul($this->params->powTargetTimespan(), 4);
+
+        if ($math->cmp($timespan, $lowest) < 0) {
+            $timespan = $lowest;
+        }
+
+        if ($math->cmp($timespan, $highest) > 0) {
+            $timespan = $highest;
+        }
+
+        $target = $math->compact()->set($header->getBits()->getInt());
+        $limit = $this->math->compact()->set($this->params->powBitsLimit());
+        $new = bcdiv(bcmul($target, $timespan), $this->params->powTargetTimespan());
+        if ($math->cmp($new, $limit) > 0) {
+            $new = $limit;
+        }
+
+        return $math->compact()->read($new, false);
+
+    }
+
+    /**
+     * @param ChainState $state
+     * @return int|string
+     */
+    public function getWorkRequired(ChainState $state)
+    {
+        $math = $this->math;
+        $index = $state->getChain()->getIndex();
+        if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) != 0) {
+            // No change in difficulty
+            return $index->getHeader()->getBits()->getInt();
+        }
+
+        // Retarget
+        $heightLastRetarget = $math->sub($index->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
+
+        $lastTime = $state->getChain()->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
+
+        return $this->calculateNextWorkRequired($index, $lastTime);
+    }
+
+    /**
      * @param Index\Blocks $blocks
      * @param int $currentHeight
      * @return bool

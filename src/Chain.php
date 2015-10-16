@@ -3,9 +3,12 @@
 namespace BitWasp\Bitcoin\Node;
 
 
-use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Math\Math;
 
+/**
+ * This class retains all of this in memory. It must be
+ * rebuilt on startup.
+ */
 class Chain
 {
     /**
@@ -19,14 +22,9 @@ class Chain
     private $index;
 
     /**
-     * @var string[]
+     * @var ChainCache
      */
-    private $map = [];
-
-    /**
-     * @var string[]
-     */
-    private $reverseMap = [];
+    private $chainCache;
 
     /**
      * @var Math
@@ -41,9 +39,8 @@ class Chain
      */
     public function __construct(array $map, BlockIndex $index, Index\Headers $headers, Math $math)
     {
-        $this->map = $map;
         $this->math = $math;
-        $this->reverseMap = array_flip($map);
+        $this->chainCache = new ChainCache($map);
         $this->index = $index;
         $this->headers = $headers;
     }
@@ -57,11 +54,11 @@ class Chain
     }
 
     /**
-     * @return array|\string[]
+     * @return ChainCache
      */
-    public function getMap()
+    public function getChainCache()
     {
-        return $this->map;
+        return $this->chainCache;
     }
 
     /**
@@ -70,7 +67,7 @@ class Chain
      */
     public function containsHash($hash)
     {
-        return isset($this->reverseMap[$hash]);
+        return $this->chainCache->containsHash($hash);
     }
 
     /**
@@ -79,11 +76,7 @@ class Chain
      */
     public function getHeightFromHash($hash)
     {
-        if ($this->containsHash($hash)) {
-            return $this->reverseMap[$hash];
-        }
-
-        throw new \RuntimeException('Hash not found');
+        return $this->chainCache->getHeight($hash);
     }
 
     /**
@@ -92,20 +85,16 @@ class Chain
      */
     public function getHashFromHeight($height)
     {
-        if (!isset($this->map[$height])) {
-            throw new \RuntimeException('fetchhashbyheight: index at this height ('.$height.') not known');
-        }
-
-        return $this->map[$height];
+        return $this->chainCache->getHash($height);
     }
 
     /**
      * @param string $hash
-     * @return BlockHeaderInterface
+     * @return BlockIndex
      */
     public function fetchByHash($hash)
     {
-        if (!in_array($hash, $this->map)) {
+        if (!$this->chainCache->containsHash($hash)) {
             throw new \RuntimeException('Index by this hash not known');
         }
 
@@ -125,8 +114,16 @@ class Chain
             throw new \RuntimeException('Incorrect chain height');
         }
 
+        $this->chainCache->add($index);
         $this->index = $index;
-        $this->map[] = $index->getHash();
-        $this->reverseMap[$index->getHash()] = $index->getHeight();
+    }
+
+    /**
+     * @param int $height
+     * @return BlockIndex
+     */
+    public function fetchAncestor($height)
+    {
+        return $this->fetchByHash($this->getHashFromHeight($height));
     }
 }

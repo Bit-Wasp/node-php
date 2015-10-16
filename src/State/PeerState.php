@@ -124,6 +124,7 @@ class PeerState extends AbstractState
     {
         $unknownHash = $this->getHashLastUnknownBlock();
         if (!is_null($unknownHash)) {
+
             $find = $blocks->findHash($unknownHash);
             if ($find) {
                 // Hash exists. It exceeds indexBestKnownBlock, or just unset unknownHash anyway.

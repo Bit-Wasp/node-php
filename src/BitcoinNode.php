@@ -220,7 +220,6 @@ class BitcoinNode extends EventEmitter
         return $this->chains->best();
     }
 
-
     /**
      *
      */
@@ -269,13 +268,17 @@ class BitcoinNode extends EventEmitter
 
             $peer->on('block', function (Peer $peer, Block $blockMsg) {
 
-                $block = $blockMsg->getBlock();
                 $best = $this->chain();
+                $block = $blockMsg->getBlock();
+                echo "Got block ".$block->getHeader()->getBlockHash()." size: ".$block->getBuffer()->getSize() . "\n";
+
 
                 try {
-                    $index = $this->blocks->accept($block, $this->headers);
+
+                    $index = $this->blocks->accept($best, $block, $this->headers);
                     $best->updateLastBlock($index);
                     $this->chains->checkTips();
+
                     $peerState = $this->peerState->fetch($peer);
                     if ($peerState->isBlockDownload()) {
                         $peerState->unsetDownloadBlock();
@@ -284,11 +287,25 @@ class BitcoinNode extends EventEmitter
                             $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
                         }
                     }
+
                 } catch (\Exception $e) {
+                    $header = $block->getHeader();
+
                     echo "Failed to accept block\n";
                     echo $e->getTraceAsString() . PHP_EOL;
                     echo $e->getMessage() . PHP_EOL;
+                    if ($best->getChain()->containsHash($block->getHeader()->getPrevBlock())) {
+                        if ($header->getPrevBlock() == $best->getLastBlock()->getHash()) {
+                            echo $block->getHeader()->getBlockHash() . "\n";
+                            echo $block->getHex() . "\n";
+                            die('We have prevblockIndex, so this is weird.');
+                        } else {
+                            echo "Didn't elongate the chain, probably from the future..\n";
+                        }
+                    }
                 }
+
+                echo "Finished block\n";
 
             });
 
@@ -299,6 +316,7 @@ class BitcoinNode extends EventEmitter
                 $vFetch = [];
                 $lastBlock = false;
                 foreach ($inv->getItems() as $item) {
+                    echo ".";
                     if ($item->isBlock() && !$this->inventory->check($item)) {
                         $this->inventory->save($item);
                         $vFetch[] = $item;
@@ -308,20 +326,19 @@ class BitcoinNode extends EventEmitter
 
                 if ($lastBlock) {
                     if (!$best->getChain()->containsHash($lastBlock->getHex())) {
-                        //echo "weird, we dont have this: " . $lastBlock->getHex() . "\n";
-                        //$peer->getheaders($best->getLocator($bestHeaderIndex->getHeight(), $lastBlock));
+                        $peer->getheaders($best->getLocator($this->chain()->getChainIndex()->getHeight(), $lastBlock));
                     }
                 }
 
                 if (!empty($vFetch)) {
+                    echo "Sending getdata\n";
                     $peer->getdata($vFetch);
                 }
             });
 
             $peer->on('getheaders', function (Peer $peer, GetHeaders $getHeaders ) {
-
-                $state = $this->chains->best();
-                $chain = $state->getChain();
+                return;
+                $chain = $this->chain()->getChain();
                 $locator = $getHeaders->getLocator();
                 if (count($locator->getHashes()) == 0) {
                     $start = $locator->getHashStop()->getHex();
@@ -330,42 +347,40 @@ class BitcoinNode extends EventEmitter
                 }
 
                 $headers = $this->db->fetchNextHeaders($start);
-                echo "Respond to GETHEADERS\n";
-                $theirbest = $locator->getHashes()[0]->getHex() ;
-                $tbh = $state->getChain()->getHeightFromHash($theirbest) . "\n";
-                echo "Their best: " . $theirbest . "\n";
-                echo "their best height: " . $tbh . PHP_EOL;
-                echo "We found fork to be: " . $start . "\n";
-                echo "We found fork height to be: " . $state->getChain()->getHeightFromHash($theirbest) . "\n";
-
-                echo "Sending " . count($headers) . " headers \n";
                 $peer->headers($headers);
+                echo "Sending from " . $start . " + " . count($headers) . " headers \n";
             });
 
-            // Process headers
             $peer->on('headers', function (Peer $peer, Headers $headers) {
-                $state = $this->chains->best();
-                $chain = $state->getChain();
-                $startHeight = $chain->getIndex()->getHeight();
-
+                echo "GOT headers\n";
+                $state = $this->chain();
                 $vHeaders = $headers->getHeaders();
                 $c = count($vHeaders);
-
                 $tx = microtime(true);
-                if ($c > 0) {
-                    $this->headers->acceptBatch($vHeaders);
+                try {
+                    $startHeight = $state->getChain()->getIndex()->getHeight();
+
+                    if ($c > 0) {
+                        $this->headers->acceptBatch($state, $vHeaders);
+                    }
+
+                    if (count($vHeaders) == 2000) {
+                        echo " ... continue syncing ... \n";
+                        $peer->getheaders($state->getHeadersLocator());
+                    } else {
+                        $this->emit('headers.synced');
+                    }
+
+                    $this->chains->checkTips();
+                    $this->doDownloadBlocks($state, $peer, $this->peerState->fetch($peer));
+                    $newHeight = $state->getChain()->getIndex()->getHeight();
+
+                    echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . " - took " . (microtime(true) - $tx) . "\n";
+                } catch (\Exception $e) {
+                    echo $e->getMessage() . PHP_EOL;
+                    echo $e->getTraceAsString() . PHP_EOL;
                 }
 
-                $newHeight = $state->getChainIndex()->getHeight();
-
-                if (count($vHeaders) == 2000) {
-                    echo " ... continue syncing (current height = " . $newHeight . " ... \n";
-                    $peer->getheaders($state->getHeadersLocator());
-                } else {
-                    $this->emit('headers.synced');
-                }
-
-                echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . " - took " . (microtime(true) - $tx) . "\n";
             });
         });
 
@@ -377,7 +392,7 @@ class BitcoinNode extends EventEmitter
                         ->connectNextPeer($locator)
                         ->then(function ($peer) {
                             $this->startHeaderSync($peer);
-                            $this->doDownloadBlocks($this->chains->best(), $peer, $this->peerState->fetch($peer));
+                            //$this->doDownloadBlocks($this->chains->best(), $peer, $this->peerState->fetch($peer));
                         }, function () {
                             echo "connection wtf?\n";
                         });

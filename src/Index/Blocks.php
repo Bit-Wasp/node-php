@@ -8,7 +8,7 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\BlockIndex;
-use BitWasp\Bitcoin\Node\Chains;
+use BitWasp\Bitcoin\Node\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\MySqlDb;
 use BitWasp\Bitcoin\Node\Params;
@@ -52,29 +52,21 @@ class Blocks
     private $genesisHash;
 
     /**
-     * @var Chains
-     */
-    private $chains;
-
-    /**
      * @param MySqlDb $db
      * @param EcAdapterInterface $ecAdapter
      * @param Params $params
      * @param ProofOfWork $pow
-     * @param Chains $state
      */
     public function __construct(
         MySqlDb $db,
         EcAdapterInterface $ecAdapter,
         Params $params,
-        ProofOfWork $pow,
-        Chains $state
+        ProofOfWork $pow
     ) {
         $this->db = $db;
         $this->adapter = $ecAdapter;
         $this->params = $params;
         $this->pow = $pow;
-        $this->chains = $state;
         $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
         $this->genesis = $params->getGenesisBlock();
         $this->genesisHash = $this->genesis->getHeader()->getBlockHash();
@@ -160,6 +152,7 @@ class Blocks
             if ($checkScripts) {
                 $nInputs = count($tx->getInputs());
                 for ($i = 0; $i < $nInputs; $i++) {
+                    echo " . ";
                     $factory = new ConsensusFactory($this->adapter);
                     $consensus = $factory->getConsensus($flags);
                     $input = $tx->getInput($i);
@@ -261,6 +254,7 @@ class Blocks
         if ($transaction->isCoinbase()) {
             $first = $transaction->getInput(0);
             $parsed = $first->getScript()->getScriptParser()->parse();
+
             array_filter($parsed, function ($var) {
                 return !$var instanceof Buffer;
             });
@@ -340,29 +334,32 @@ class Blocks
     }
 
     /**
+     * @param ChainState $state
      * @param BlockInterface $block
      * @param Headers $headers
      * @return BlockIndex|false
      * @throws \Exception
      */
-    public function accept(BlockInterface $block, Headers $headers)
+    public function accept(ChainState $state, BlockInterface $block, Headers $headers)
     {
         $math = $this->adapter->getMath();
-        $header = $block->getHeader();
-        $best = $this->chains->best();
-        $bestBlock = $this->chains->best()->getLastBlock();
+        $bestBlock = $state->getLastBlock();
 
-        $index = $headers->accept($header);
-        if (!$index) {
-            throw new \RuntimeException('Failed to accept header');
-        }
+        try {
+            $index = $headers->accept($state, $block->getHeader());
+            if (!$this->check($block) || !$this->checkContextual($block, $bestBlock)) {
+                throw new \RuntimeException('We cannot yet deal with out of sequence blocks');
+            }
 
-        if (!$this->check($block) || !$this->checkContextual($block, $bestBlock)) {
-            throw new \RuntimeException('We cannot yet deal with out of sequence blocks');
+            $view = $this->db->fetchUtxoView($block, $state->getChain());
+
+            $flagP2sh = $math->cmp($bestBlock->getHeader()->getTimestamp(), $this->params->p2shActivateTime()) >= 0;
+            $flags = new Flags($flagP2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
+
+        } catch (\Exception $e) {
+            echo $e->getMessage() . "\n";
+            throw $e;
         }
-        $view = $this->db->fetchUtxoView($block, $best->getChain());
-        $flagP2sh = $math->cmp($bestBlock->getHeader()->getTimestamp(), $this->params->p2shActivateTime()) >= 0;
-        $flags = new Flags($flagP2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
 
         $nInputs = 0;
         $nFees = 0;

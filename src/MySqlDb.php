@@ -249,10 +249,10 @@ class MySqlDb
         } catch (\Exception $e) {
             echo "INSERT FAIL!\n";
             echo $e->getMessage() . "\n";
-            die();
             $this->dbh->rollBack();
-            return;
         }
+
+        throw new \RuntimeException('MySqlDb: ');
     }
 
     /**
@@ -704,6 +704,46 @@ GROUP BY r.tip_hash;');
 
     /**
      * @param BlockInterface $block
+     * @return array
+     */
+    public function filterUtxoRequest(BlockInterface $block)
+    {
+        $need = [];
+        $utxos = [];
+
+        // Iterating backwards, record all required inputs.
+        // If an Output can be found in a transaction in
+        // the same block, it will be dropped from the list
+        // of required inputs, and returned as a UTXO.
+
+        $vTx = $block->getTransactions();
+        for ($i = count($vTx) - 1; $i > 0; $i--) {
+            $tx = $vTx->getTransaction($i);
+            foreach ($tx->getInputs()->getInputs() as $in) {
+                $txid = $in->getTransactionId();
+                $vout = $in->getVout();
+                $need[$txid.$vout] = $i;
+            }
+
+            $hash = $tx->getTransactionId();
+            foreach ($tx->getOutputs()->getOutputs() as $v => $out) {
+                if (isset($need[$hash.$v])) {
+                    $utxos[] = new Utxo($hash, $v, $out);
+                    unset($need[$hash.$v]);
+                }
+            }
+        }
+
+        $required = [];
+        foreach ($need as $str => $txidx) {
+            $required[] = [substr($str, 0, 64), substr($str, 64), $txidx];
+        }
+
+        return [$required, $utxos];
+    }
+
+    /**
+     * @param BlockInterface $block
      * @param Chain $activeChain
      * @return UtxoView
      * @throws \Exception
@@ -716,32 +756,26 @@ GROUP BY r.tip_hash;');
             return new UtxoView([]);
         }
 
+        list ($required, $utxos) = $this->filterUtxoRequest($block);
+
         $joinList = '';
         $queryValues = ['hash' => $block->getHeader()->getBlockHash()];
-        $last = $txCount - 1;
-        $c = 0;
+        for ($i = 0, $c = count($required), $last = $c - 1; $i < $c; $i++) {
+            list ($txid, $vout, $txidx) = $required[$i];
 
-        for ($i = 1; $i < $txCount; $i++) {
-            $utxo_txid = $txs->getTransaction($i);
-            $inputs = $utxo_txid->getInputs();
-            $lastIn = count($inputs) - 1;
-
-            foreach ($inputs->getInputs() as $vin => $in) {
-                if (0 == $c) {
-                    $joinList .= "SELECT :hparent$c as hashParent, :noutparent$c as nOut, :c$c as txidx\n";
-                } else {
-                    $joinList .= "  SELECT :hparent$c, :noutparent$c, :c$c \n";
-                }
-
-                if ($vin < $lastIn || $i < $last ) {
-                    $joinList .= "  UNION ALL\n";
-                }
-
-                $queryValues["hparent$c"] = $in->getTransactionId();
-                $queryValues["c$c"] = $i;
-                $queryValues["noutparent$c"] = $in->getVout();
-                $c++;
+            if (0 == $i) {
+                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :c$i as txidx\n";
+            } else {
+                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :c$i \n";
             }
+
+            if ($i < $last) {
+                $joinList .= "  UNION ALL\n";
+            }
+
+            $queryValues["hashParent$i"] = $txid;
+            $queryValues["noutparent$i"] = $vout;
+            $queryValues["c$i"] = $txidx;
         }
 
         $stmt = $this->dbh->prepare("
@@ -763,51 +797,27 @@ GROUP BY r.tip_hash;');
 
         try {
             $stmt->execute($queryValues);
+            $all = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $cache = [];
-            $utxos = [];
-
-            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
-                $tx = $txs->getTransaction($utxo['txidx']);
-                $newtx = $tx->getTransactionId();
-
-                // We will always have these
-                $txid = $utxo['txid'];
-                $vout = $utxo['vout'];
-
-                // Populate $value and $script, relying on transactions
-                // coming in sequence in a block
-                if (!is_null($utxo['scriptPubKey'])) {
-                    $output = new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey'])));
-                } else {
-                    if (!isset($cache[$txid]) || !isset($cache[$txid][$vout])) {
-                        throw new \RuntimeException('Utxo not found in storage or block!');
-                    }
-                    $output = $cache[$txid][$vout];
+            for ($i = 0, $c = count($all); $i < $c; $i++) {
+                $utxo = $all[$i];
+                if (is_null($utxo['scriptPubKey'])) {
+                    throw new \RuntimeException('Utxo was not found');
                 }
 
-                // To allow parsing chains of transactions, keep an
-                // indexed temporary store of all utxos, because its
-                if (!isset($cache[$newtx])) {
-                    $cache[$newtx] = [];
-                    foreach ($tx->getOutputs()->getOutputs() as $v => $tmp) {
-                        $cache[$newtx][$v] = $tmp;
-                    }
-                }
-
-                $utxos[] = new Utxo($txid, $vout, $output);
+                $utxos[] = new Utxo($utxo['txid'], $utxo['vout'], new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+                echo "-.";
             }
 
-            if (count($utxos) !== $c) {
-                throw new \RuntimeException('Either invalid block, or chain of dependent transactions');
-            }
+            echo "Queried " . count($utxos) . " UTXOS\n";
 
             return new UtxoView($utxos);
 
         } catch (\Exception $e) {
             echo $e->getMessage() . "\n";
-            throw $e;
         }
+
+        throw new \RuntimeException('NEWP');
     }
 
 }

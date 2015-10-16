@@ -31,6 +31,16 @@ class Chains
         $this->adapter = $adapter;
     }
 
+    public function compareIndexWork(BlockIndex $a, BlockIndex $b)
+    {
+        return $this->adapter->getMath()->cmp($a->getWork(), $b->getWork());
+    }
+
+    public function compareChainStateWork(ChainState $a, ChainState $b)
+    {
+        return $this->compareIndexWork($a->getChain()->getIndex(), $b->getChain()->getIndex());
+    }
+
     /**
      *
      */
@@ -44,7 +54,7 @@ class Chains
             return $this->adapter->getMath()->cmp($a, $b);
         };
 
-        usort($tips, $sort);
+        usort($tips, array($this, 'compareChainStateWork'));
 
         $greatestWork = end($tips);
         $this->best = $greatestWork;

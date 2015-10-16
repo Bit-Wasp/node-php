@@ -8,6 +8,8 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\BlockIndex;
 use BitWasp\Bitcoin\Node\Chains;
+use BitWasp\Bitcoin\Node\ChainState;
+use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\MySqlDb;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Params;
@@ -18,11 +20,6 @@ class Headers
      * @var EcAdapterInterface
      */
     private $adapter;
-
-    /**
-     * @var Chains
-     */
-    private $chains;
 
     /**
      * @var BlockHeaderInterface
@@ -44,21 +41,18 @@ class Headers
      * @param EcAdapterInterface $ecAdapter
      * @param Params $params
      * @param ProofOfWork $proofOfWork
-     * @param Chains $chains
      */
     public function __construct(
         MySqlDb $db,
         EcAdapterInterface $ecAdapter,
         Params $params,
-        ProofOfWork $proofOfWork,
-        Chains $chains
+        ProofOfWork $proofOfWork
     ) {
         $this->db = $db;
         $this->adapter = $ecAdapter;
         $this->params = $params;
+        $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
         $this->pow = $proofOfWork;
-        $this->chains = $chains;
-
         $this->genesis = $params->getGenesisBlock()->getHeader();
         $this->genesisHash = $this->genesis->getBlockHash();
         $this->init();
@@ -95,7 +89,7 @@ class Headers
 
     /**
      * @param string $hash
-     * @return BlockHeaderInterface
+     * @return BlockIndex
      */
     public function fetchByHash($hash)
     {
@@ -105,93 +99,97 @@ class Headers
     /**
      * @param BlockHeaderInterface $header
      * @param bool|true $checkPow
-     * @return bool
-     * @throws \Exception
+     * @return $this
      */
     public function check(BlockHeaderInterface $header, $checkPow = true)
     {
-        if ($checkPow && !$this->pow->checkHeader($header)) {
-            return false;
+        try {
+            if ($checkPow) {
+                $this->pow->checkHeader($header);
+            }
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Headers::check() - failed validating the header');
         }
 
-        // todo: check timestamp
-
-        return true;
-    }
-
-    public function checkContextual(BlockHeaderInterface $header)
-    {
-
+        return $this;
     }
 
     /**
-     * Adds a header to the index. Will update the current tip,
-     * otherwise creates a new tip for others to follow.
+     * @param ChainState $state
+     * @param BlockHeaderInterface $header
+     * @return $this
+     */
+    public function checkContextual(ChainState $state, BlockHeaderInterface $header)
+    {
+        $math = $this->adapter->getMath();
+        $work = $this->consensus->getWorkRequired($state);
+        if ($math->cmp($header->getBits()->getInt(), $work) != 0) {
+            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
+        }
+
+        // check timestamp
+        // reject block version 1 when 95% has upgraded
+        // reject block version 2 when 95% has upgraded
+
+        return $this;
+    }
+
+    /**
+     * @param ChainState $state
+     * @param BlockHeaderInterface $header
+     * @return BlockIndex
+     * @throws \Exception
+     */
+    public function addToIndex(ChainState $state, BlockHeaderInterface $header)
+    {
+        $math = $this->adapter->getMath();
+
+        $ancestor = $state->getChain()->getIndex();
+
+        // We create a BlockIndex
+        $newIndex = new BlockIndex(
+            $header->getBlockHash(),
+            $math->add($ancestor->getHeight(), 1),
+            $math->add($this->pow->getWork($header->getBits()), $ancestor->getWork()),
+            $header
+        );
+
+        $this->db->insertIndexBatch($ancestor, [$newIndex]);
+
+        $state->getChain()->updateTip($newIndex);
+
+        return $newIndex;
+    }
+
+    /**
+     * @param ChainState $state
      * @param BlockHeaderInterface $header
      * @return BlockIndex
      */
-    public function addToIndex(BlockHeaderInterface $header)
+    public function accept(ChainState $state, BlockHeaderInterface $header)
     {
         $hash = $header->getBlockHash();
-
-        try {
-            $tip = $this->chains->findTipForNext($header);
-            $ancestor = $tip->getIndex();
-
-            // We create a BlockIndex
-            $math = $this->adapter->getMath();
-            $newHeight = $math->add($ancestor->getHeight(), 1);
-            $newWork = $math->add($this->pow->getWork($header->getBits()), $ancestor->getWork());
-            $newIndex = new BlockIndex($hash, $newHeight, $newWork, $header);
-
-            $this->db->insertIndexBatch($ancestor, [$newIndex]);
-
-            $tip->updateTip($newIndex);
-            return $newIndex;
-
-        } catch (\Exception $e) {
-            if ($e instanceof \PDOException) {
-                throw $e;
-            }
-
-            throw new \RuntimeException('New header did not elongate tip - new fork - have not implemented this yet');
-        }
-    }/**/
-
-    /**
-     * @param BlockHeaderInterface $header
-     * @return false|BlockIndex
-     */
-    public function accept(BlockHeaderInterface $header)
-    {
-        $hash = $header->getBlockHash();
-        if ($header == $this->genesis || $this->db->haveHeader($hash)) {
+        if ($header == $this->genesis || $state->getChain()->containsHash($hash)) {
             // todo: check for rejected block
             return $this->db->fetchIndex($hash);
         }
 
-        if (!$this->check($header)) {
-            echo "failed to check\n";
-            throw new \RuntimeException('Header invalid');
-        }
-
-        echo "Headers: addToIndex()\n";
-        return $this->addToIndex($header);
-
-    }/**/
+        return $this
+            ->check($header)
+            ->checkContextual($state, $header)
+            ->addToIndex($state, $header);
+    }
 
     /**
+     * @param ChainState $state
      * @param BlockHeaderInterface[] $headers
      * @return bool
+     * @throws \Exception
      */
-    public function acceptBatch(array $headers)
+    public function acceptBatch(ChainState $state, array $headers)
     {
-        $first = $headers[0];
-        try {
-            $tip = $this->chains->findTipForNext($first);
-        } catch (\Exception $e) {
-            return false;
-        }
+        $math = $this->adapter->getMath();
+        $tip = $state->getChain();
 
         $batch = array();
         $startIndex = $tip->getIndex();
@@ -199,10 +197,15 @@ class Headers
         foreach ($headers as $header) {
             $prevIndex = $tip->getIndex();
 
-            /** @var \BitWasp\Bitcoin\Block\BlockHeaderInterface $last */
             if ($prevIndex->getHash() !== $header->getPrevBlock()) {
-                echo "mismatch\n";
-                return false;
+                echo "Our tip: " . $prevIndex->getHash() . "\n";
+                echo "New block: " . $header->getBlockHash() . "\n";
+                echo "points to " . $header->getPrevBlock() . "\n";
+                $havePrev = $state->getChain()->getChainCache()->containsHash($header->getPrevBlock());
+                $haveBest = $state->getChain()->getChainCache()->containsHash($header->getBlockHash());
+                echo "Have prev: " . ($havePrev ? 'yes' : 'no') . "\n";
+                echo "Have best: " . ($haveBest ? 'yes' : 'no') . "\n";
+                throw new \RuntimeException('Header mismatch, header.prevBlock does not refer to tip');
             }
 
             $hash = $header->getBlockHash();
@@ -210,16 +213,17 @@ class Headers
                 return true;
             }
 
-            if (!$this->check($header)) {
-                return false;
-            }
+            $this
+                ->check($header)
+                ->checkContextual($state, $header);
 
             // We create a BlockIndex
-            $math = $this->adapter->getMath();
-            $newHeight = $math->add($prevIndex->getHeight(), 1);
-            $newWork = $math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork());
-
-            $tip->updateTip(new BlockIndex($hash, $newHeight, $newWork, $header));
+            $tip->updateTip(new BlockIndex(
+                $header->getBlockHash(),
+                $math->add($prevIndex->getHeight(), 1),
+                $math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork()),
+                $header
+            ));
 
             $batch[] = $tip->getIndex();
         }
@@ -227,8 +231,6 @@ class Headers
         // Starting at $startIndex, do a batch update of the chain
         $this->db->insertIndexBatch($startIndex, $batch);
         unset($batch);
-
-        $this->chains->checkTips();
 
         return true;
     }

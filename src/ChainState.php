@@ -3,8 +3,6 @@
 namespace BitWasp\Bitcoin\Node;
 
 
-use BitWasp\Bitcoin\Bitcoin;
-use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Buffertools\Buffer;
@@ -46,21 +44,11 @@ class ChainState
     public function updateLastBlock(BlockIndex $index)
     {
         if ($this->lastBlock->getHash() !== $index->getHeader()->getPrevBlock()) {
-            print_r($this->lastBlock);
-            print_r($index);
-            die('Block does not extend this chain');
-            throw new \RuntimeException('Block does not extend this chain');
+            throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
         }
 
-
         if ($this->lastBlock->getHeight() != $index->getHeight() - 1) {
-            var_dump($this->lastBlock->getHeight());
-            var_dump($index->getHeight());
-            var_dump($index->getHeight() - 1);
-            print_r($this->lastBlock);
-            print_r($index);
-            die();
-            throw new \RuntimeException('Incorrect chain height');
+            throw new \RuntimeException('UpdateLastBlock: Incorrect chain height');
         }
 
         $this->lastBlock = $index;
@@ -88,6 +76,16 @@ class ChainState
     public function getLastBlock()
     {
         return $this->lastBlock;
+    }
+
+    /**
+     * @return ChainCache
+     */
+    public function bestBlocksCache()
+    {
+        return $this->chain
+            ->getChainCache()
+            ->subset($this->lastBlock->getHeight());
     }
 
     /**
@@ -157,49 +155,4 @@ class ChainState
         return $this->getLocator($this->lastBlock->getHeight() - 1, $hashStop);
     }
 
-    public function calculateNextWorkRequired(BlockIndex $indexLast, $timeFirstBlock)
-    {
-        $math = Bitcoin::getMath();
-        $header = $indexLast->getHeader();
-        $timespan = $math->sub($header->getTimestamp(), $timeFirstBlock);
-
-        $lowest = $math->div($this->params->targetTimespan(), 4);
-        $highest = $math->mul($this->params->targetTimespan(), 4);
-        if ($math->cmp($timespan, $lowest) < 0) {
-            $timespan = $lowest;
-        }
-        if ($math->cmp($timespan, $highest) > 0) {
-            $timespan = $highest;
-        }
-        $new = $math->unpackCompact($header->getBits());
-        $new = bcdiv(bcmul($new, $timespan), $this->params->targetTimespan());
-        if ($math->cmp($new, $this->params->getPowLimit()) > 0) {
-            return $this->params->getPowLimit();
-        }
-
-        //return $math->getCompact($new);
-    }
-
-    /**
-     * @param BlockIndex $indexLast
-     * @param BlockHeaderInterface $header
-     * @return Buffer
-     */
-    public function getWorkRequired(BlockIndex $indexLast, BlockHeaderInterface $header)
-    {
-        $powLimitBits = $this->difficulty->lowestBits();
-        if ($indexLast == null) {
-            return $powLimitBits;
-        }
-
-        // Maybe there's no change in difficulty
-        if (($indexLast->getHeight() + 1) % $this->params->difficultyAdjustmentInterval() == 0) {
-            return $indexLast->getHeader()->getBits();
-        }
-
-        // Retarget
-        $math = $this->adapter->getMath();
-        $heightLastRetarget = $math->sub($indexLast->getHeight(), $math->sub($this->params->difficultyAdjustmentInterval(), 1));
-        $indexLastRetarget = $this->fetchByHeight($heightLastRetarget);
-    }
 }
