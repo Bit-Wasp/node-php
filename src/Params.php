@@ -65,23 +65,23 @@ class Params extends \BitWasp\Bitcoin\Chain\Params
             ->op('OP_CHECKSIG')
             ->getScript();
 
-        $tx = new Transaction(
-            '1',
-            new TransactionInputCollection([new TransactionInput(
-                '0000000000000000000000000000000000000000000000000000000000000000',
-                0xffffffff,
-                $inputScript
-            )]),
-            new TransactionOutputCollection([new TransactionOutput(
-                50,
-                $outputScript
-            )])
-        );
-
         return new Block(
             $this->math,
             $this->getGenesisBlockHeader(),
-            new TransactionCollection([$tx])
+            new TransactionCollection([
+                new Transaction(
+                    '1',
+                    new TransactionInputCollection([new TransactionInput(
+                        '0000000000000000000000000000000000000000000000000000000000000000',
+                        0xffffffff,
+                        $inputScript
+                    )]),
+                    new TransactionOutputCollection([new TransactionOutput(
+                        50,
+                        $outputScript
+                    )])
+                )
+            ])
         );
     }
 }
