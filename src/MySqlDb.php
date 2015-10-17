@@ -809,7 +809,7 @@ GROUP BY r.tip_hash;');
                 echo "-.";
             }
 
-            echo "Queried " . count($utxos) . " UTXOS\n";
+            echo "Queried DB for ".count($required)." / " . count($utxos) . " UTXOS\n";
 
             return new UtxoView($utxos);
 
