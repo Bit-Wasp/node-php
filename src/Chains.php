@@ -31,14 +31,13 @@ class Chains
         $this->adapter = $adapter;
     }
 
-    public function compareIndexWork(BlockIndex $a, BlockIndex $b)
-    {
-        return $this->adapter->getMath()->cmp($a->getWork(), $b->getWork());
-    }
-
     public function compareChainStateWork(ChainState $a, ChainState $b)
     {
-        return $this->compareIndexWork($a->getChain()->getIndex(), $b->getChain()->getIndex());
+        return $this->adapter->getMath()
+            ->cmp(
+                $a->getChain()->getIndex()->getWork(),
+                $b->getChain()->getIndex()->getWork()
+            );
     }
 
     /**
@@ -47,13 +46,6 @@ class Chains
     public function checkTips()
     {
         $tips = $this->states;
-        $sort = function (ChainState $a, ChainState $b) {
-            $a = $a->getChainIndex()->getWork();
-            $b = $b->getChainIndex()->getWork();
-
-            return $this->adapter->getMath()->cmp($a, $b);
-        };
-
         usort($tips, array($this, 'compareChainStateWork'));
 
         $greatestWork = end($tips);
@@ -69,7 +61,8 @@ class Chains
      */
     public function isTip($hash, callable $then = null)
     {
-        foreach ($this->getChains() as $tip) {
+        foreach ($this->states as $state) {
+            $tip = $state->getChain();
             if ($tip->getIndex()->getHash() == $hash) {
                 return is_null($then)
                     ? true
@@ -86,7 +79,8 @@ class Chains
      */
     public function findTipForNext(BlockHeaderInterface $header)
     {
-        foreach ($this->getChains() as $tTip) {
+        foreach ($this->states as $state) {
+            $tTip = $state->getChain();
             $tipHash = $tTip->getIndex()->getHash();
             if ($header->getPrevBlock() == $tipHash) {
                 $tip = $tTip;

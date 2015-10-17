@@ -163,8 +163,9 @@ class BitcoinNode extends EventEmitter
     private function doDownloadBlocks(ChainState $best, Peer $peer, PeerState $state)
     {
         $blockHeight = $best->getLastBlock()->getHeight();
+        echo "Download more blocks from (" . $blockHeight . ")\n";
 
-        // We make sure to sync no more than 64 blocks at a time.
+        // We make sure to sync no more than 500 blocks at a time.
         $stopHeight = min($blockHeight + 500, $best->getChainIndex()->getHeight());
         $hashStop = Buffer::hex($best->getChain()->getHashFromHeight($stopHeight), 32, $this->adapter->getMath());
         $locator = $best->getLocator($blockHeight, $hashStop);
@@ -270,8 +271,6 @@ class BitcoinNode extends EventEmitter
 
                 $best = $this->chain();
                 $block = $blockMsg->getBlock();
-                echo "Got block ".$block->getHeader()->getBlockHash()." size: ".$block->getBuffer()->getSize() . "\n";
-
 
                 try {
 
@@ -283,7 +282,6 @@ class BitcoinNode extends EventEmitter
                     if ($peerState->isBlockDownload()) {
                         $peerState->unsetDownloadBlock();
                         if (!$peerState->hasDownloadBlocks()) {
-                            echo "do download blocks!\n";
                             $this->doDownloadBlocks($this->chains->best(), $peer, $peerState);
                         }
                     }
@@ -298,15 +296,14 @@ class BitcoinNode extends EventEmitter
                         if ($header->getPrevBlock() == $best->getLastBlock()->getHash()) {
                             echo $block->getHeader()->getBlockHash() . "\n";
                             echo $block->getHex() . "\n";
-                            die('We have prevblockIndex, so this is weird.');
+                            echo 'We have prevblockIndex, so this is weird.';
+                            //die('We have prevblockIndex, so this is weird.');
                         } else {
                             echo "Didn't elongate the chain, probably from the future..\n";
                         }
                     }
+                    sleep(3);
                 }
-
-                echo "Finished block\n";
-
             });
 
             $peer->on('inv', function (Peer $peer, Inv $inv) {
@@ -372,15 +369,17 @@ class BitcoinNode extends EventEmitter
                     }
 
                     $this->chains->checkTips();
-                    $this->doDownloadBlocks($state, $peer, $this->peerState->fetch($peer));
+
                     $newHeight = $state->getChain()->getIndex()->getHeight();
 
                     echo "\nBest Headers ($c) went from $startHeight to " . $newHeight . " - took " . (microtime(true) - $tx) . "\n";
                 } catch (\Exception $e) {
+                    echo "headers FAILURE..\n";
                     echo $e->getMessage() . PHP_EOL;
                     echo $e->getTraceAsString() . PHP_EOL;
                 }
 
+                $this->doDownloadBlocks($state, $peer, $this->peerState->fetch($peer));
             });
         });
 

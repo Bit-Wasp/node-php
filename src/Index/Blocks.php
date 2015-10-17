@@ -13,7 +13,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\MySqlDb;
 use BitWasp\Bitcoin\Node\Params;
 use BitWasp\Bitcoin\Node\UtxoView;
-use BitWasp\Bitcoin\Script\ConsensusFactory;
+use BitWasp\Bitcoin\Script\ConsensusFactory as ScriptCheck;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Transaction\Locktime;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
@@ -68,6 +68,7 @@ class Blocks
         $this->params = $params;
         $this->pow = $pow;
         $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
+        $this->scriptCheck = new ScriptCheck($this->adapter);
         $this->genesis = $params->getGenesisBlock();
         $this->genesisHash = $this->genesis->getHeader()->getBlockHash();
         $this->init();
@@ -151,17 +152,16 @@ class Blocks
 
             if ($checkScripts) {
                 $nInputs = count($tx->getInputs());
+                $consensus = $this->scriptCheck->getConsensus($flags);
                 for ($i = 0; $i < $nInputs; $i++) {
-                    echo " . ";
-                    $factory = new ConsensusFactory($this->adapter);
-                    $consensus = $factory->getConsensus($flags);
-                    $input = $tx->getInput($i);
-                    $script = $view->fetchByInput($input)
-                        ->getOutput()
-                        ->getScript();
-                    $verify = $consensus->verify($tx, $script, $i);
-
-                    if (!$verify) {
+                    if (!$consensus->verify(
+                        $tx,
+                        $view
+                            ->fetchByInput($tx->getInput($i))
+                            ->getOutput()
+                            ->getScript(),
+                        $i
+                    )) {
                         throw new \RuntimeException("CheckInputs: Input $i failed script verification");
                     }
                 }

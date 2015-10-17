@@ -764,9 +764,9 @@ GROUP BY r.tip_hash;');
             list ($txid, $vout, $txidx) = $required[$i];
 
             if (0 == $i) {
-                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :c$i as txidx\n";
+                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :txidx$i as txidx\n";
             } else {
-                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :c$i \n";
+                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :txidx$i \n";
             }
 
             if ($i < $last) {
@@ -775,7 +775,7 @@ GROUP BY r.tip_hash;');
 
             $queryValues["hashParent$i"] = $txid;
             $queryValues["noutparent$i"] = $vout;
-            $queryValues["c$i"] = $txidx;
+            $queryValues["txidx$i"] = $txidx;
         }
 
         $stmt = $this->dbh->prepare("
