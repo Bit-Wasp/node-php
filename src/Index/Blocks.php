@@ -13,11 +13,11 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\MySqlDb;
 use BitWasp\Bitcoin\Node\Params;
 use BitWasp\Bitcoin\Node\UtxoView;
-use BitWasp\Bitcoin\Script\ConsensusFactory as ScriptCheck;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Transaction\Locktime;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Bitcoin\Node\Routine\ScriptCheck;
 
 class Blocks
 {
@@ -25,6 +25,11 @@ class Blocks
      * @var EcAdapterInterface
      */
     private $adapter;
+
+    /**
+     * @var ScriptCheck
+     */
+    private $scriptCheck;
 
     /**
      * @var ProofOfWork
@@ -68,7 +73,7 @@ class Blocks
         $this->params = $params;
         $this->pow = $pow;
         $this->consensus = new Consensus($this->adapter->getMath(), $this->params);
-        $this->scriptCheck = new ScriptCheck($this->adapter);
+        $this->scriptCheck = new ScriptCheck($ecAdapter);
         $this->genesis = $params->getGenesisBlock();
         $this->genesisHash = $this->genesis->getHeader()->getBlockHash();
         $this->init();
@@ -109,40 +114,41 @@ class Blocks
             $value = $utxo->getOutput()->getValue();
             $valueIn = $math->add($value, $valueIn);
             if ( !$this->consensus->checkAmount($valueIn) || !$this->consensus->checkAmount($value)) {
-                return false;
+                throw new \RuntimeException('CheckAmount failed for inputs value');
             }
         }
 
-        // todo: replace with Tx:getValueOut
         $valueOut = 0;
         $outputs = $tx->getOutputs()->getOutputs();
         foreach ($outputs as $output) {
             $valueOut = $math->add($output->getValue(), $valueOut);
-            if ($this->consensus->checkAmount($valueOut) || $this->consensus->checkAmount($output->getValue())) {
-                return false;
+            if (!$this->consensus->checkAmount($valueOut) || !$this->consensus->checkAmount($output->getValue())) {
+                throw new \RuntimeException('CheckAmount failed for outputs value');
             }
         }
 
         if ($math->cmp($valueIn, $valueOut) < 0) {
-            return false;
+            throw new \RuntimeException('Value-in is less than value out');
         }
 
         $fee = $valueIn - $valueOut;
         if ($math->cmp($fee, 0) < 0) {
-            return false;
+            throw new \RuntimeException('Fee is less than zero');
         }
 
         if (!$this->consensus->checkAmount($fee)) {
-            return false;
+            throw new \RuntimeException('CheckAmount failed for fee');
         }
 
         return true;
     }
 
     /**
+     * @param UtxoView $view
      * @param TransactionInterface $tx
      * @param int $height
      * @param Flags $flags
+     * @param bool|true $checkScripts
      * @return bool
      */
     public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, $checkScripts = true)
@@ -151,19 +157,8 @@ class Blocks
             $this->contextualCheckInputs($view, $tx, $height);
 
             if ($checkScripts) {
-                $nInputs = count($tx->getInputs());
-                $consensus = $this->scriptCheck->getConsensus($flags);
-                for ($i = 0; $i < $nInputs; $i++) {
-                    if (!$consensus->verify(
-                        $tx,
-                        $view
-                            ->fetchByInput($tx->getInput($i))
-                            ->getOutput()
-                            ->getScript(),
-                        $i
-                    )) {
-                        throw new \RuntimeException("CheckInputs: Input $i failed script verification");
-                    }
+                if (!$this->scriptCheck->check($view, $tx, $flags)) {
+                    throw new \RuntimeException('Script verification failed');
                 }
             }
         }
@@ -249,23 +244,20 @@ class Blocks
         if (count($truncated) !== $nInputs) {
             throw new \RuntimeException('CheckTransaction: duplicate inputs');
         }
+
         unset($ins);
+        unset($truncated);
 
         if ($transaction->isCoinbase()) {
             $first = $transaction->getInput(0);
-            $parsed = $first->getScript()->getScriptParser()->parse();
-
-            array_filter($parsed, function ($var) {
-                return !$var instanceof Buffer;
-            });
-            $size = count($parsed);
-            if ($size < 2 || $size > 100) {
+            $scriptSize = $first->getScript()->getBuffer()->getSize();
+            if ($scriptSize < 2 || $scriptSize > 100) {
                 throw new \RuntimeException('CheckTransaction: coinbase scriptSig fails constraints');
             }
         } else {
             foreach ($inputs->getInputs() as $input) {
                 if ($input->isCoinBase()) {
-                    throw new \RuntimeException('CheckTransaction: a transaction input was null');
+                    throw new \RuntimeException('CheckTransaction: a non-coinbase transaction input was null');
                 }
             }
         }
@@ -294,8 +286,7 @@ class Blocks
 
     /**
      * @param BlockInterface $block
-     * @return bool
-     * @throws \Exception
+     * @return $this
      */
     public function check(BlockInterface $block)
     {
@@ -330,7 +321,6 @@ class Blocks
         // todo: sigops
 
         return $this;
-
     }
 
     /**
@@ -345,21 +335,19 @@ class Blocks
         $math = $this->adapter->getMath();
         $bestBlock = $state->getLastBlock();
 
-        try {
-            $index = $headers->accept($state, $block->getHeader());
-            if (!$this->check($block) || !$this->checkContextual($block, $bestBlock)) {
-                throw new \RuntimeException('We cannot yet deal with out of sequence blocks');
-            }
-
-            $view = $this->db->fetchUtxoView($block, $state->getChain());
-
-            $flagP2sh = $math->cmp($bestBlock->getHeader()->getTimestamp(), $this->params->p2shActivateTime()) >= 0;
-            $flags = new Flags($flagP2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
-
-        } catch (\Exception $e) {
-            echo $e->getMessage() . "\n";
-            throw $e;
+        if ($bestBlock->getHash() !== $block->getHeader()->getPrevBlock()) {
+            throw new \RuntimeException('Blocks:accept() Block does not extend this chain!');
         }
+
+        $index = $headers->accept($state, $block->getHeader());
+
+        $this
+            ->check($block)
+            ->checkContextual($block, $bestBlock);
+
+        $view = $this->db->fetchUtxoView($block, $state->getChain());
+        $flagP2sh = $math->cmp($bestBlock->getHeader()->getTimestamp(), $this->params->p2shActivateTime()) >= 0;
+        $flags = new Flags($flagP2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
 
         $nInputs = 0;
         $nFees = 0;
@@ -388,6 +376,8 @@ class Blocks
         }
 
         $this->db->insertBlock($block);
+
+        $state->updateLastBlock($index);
 
         return $index;
     }

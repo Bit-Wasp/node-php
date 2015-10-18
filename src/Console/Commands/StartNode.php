@@ -41,20 +41,6 @@ class StartNode extends AbstractCommand
         $loop = \React\EventLoop\Factory::create();
         $app = new BitcoinNode($params, $loop);
 
-        $context = new \React\ZMQ\Context($loop);
-
-        $pull = $context->getSocket(\ZMQ::SOCKET_PULL);
-        $pull->bind('tcp://127.0.0.1:5560');
-        $pull->on('message', function ($e) use ($app, $loop) {
-            if ($e == 'shutdown') {
-                $loop->stop();
-                $a = microtime(true);
-                $app->stop();
-                echo "Takes " . (microtime(true) - $a) . " to shutdown\n";
-            }
-            echo "RECEIVED MESSAGE: $e\n";
-        });
-
         $app->start();
         $loop->run();
 
