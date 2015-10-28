@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\State;
 
 
+use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Index\Blocks;
 
 class PeerState extends AbstractState
@@ -79,26 +80,6 @@ class PeerState extends AbstractState
     }
 
     /**
-     * @param int $count
-     */
-    public function addDownloadBlocks($count)
-    {
-        $blocks = $this->fetch(self::DOWNLOADBLOCKS);
-        $blocks += $count;
-        $this->save(self::DOWNLOADBLOCKS, $blocks);
-    }
-
-    /**
-     *
-     */
-    public function unsetDownloadBlock()
-    {
-        $blocks = $this->fetch(self::DOWNLOADBLOCKS);
-        $blocks--;
-        $this->save(self::DOWNLOADBLOCKS, $blocks);
-    }
-
-    /**
      * todo: remove, or rewrite
      * @return \BitWasp\Bitcoin\Node\Database\DbBlockIndex|null
      */
@@ -108,7 +89,6 @@ class PeerState extends AbstractState
     }
 
     /**
-     * todo: remove, or rewrite
      * @return string|null
      */
     public function getHashLastUnknownBlock()
@@ -117,43 +97,19 @@ class PeerState extends AbstractState
     }
 
     /**
-     * todo: remove, or rewrite
-     * @param Blocks $blocks
-     */
-    public function processBlockAvailability($blocks)
-    {
-        $unknownHash = $this->getHashLastUnknownBlock();
-        if (!is_null($unknownHash)) {
-
-            $find = $blocks->findHash($unknownHash);
-            if ($find) {
-                // Hash exists. It exceeds indexBestKnownBlock, or just unset unknownHash anyway.
-                $bestKnownBlock = $this->getIndexBestKnownBlock();
-                /* todo: or unknown blocks chainwork greater than ) */
-                if (is_null($bestKnownBlock)) {
-                    $this->save(self::INDEXBESTKNOWNBLOCK, $bestKnownBlock);
-                }
-                $this->save(self::HASHLASTUNKNOWNBLOCK, null);
-            }
-        }
-    }
-
-    /**
-     * todo: remove, or rewrite
-     * @param Blocks $blocks
+     * @param ChainState $state
      * @param string $hash
      */
-    public function updateBestKnownBlock($blocks, $hash)
+    public function updateBlockAvailability(ChainState $state, $hash)
     {
-        $index = $blocks->findHash($hash);
-        if ($index) {
-            if ($this->fetch(self::INDEXBESTKNOWNBLOCK) == null /* todo: or chainwork >= indexBestKnownBlock->chainwork */) {
-                $this->save(self::INDEXBESTKNOWNBLOCK, $index);
-            }
-
-            return;
+        $chain = $state->getChain();
+        var_dump($hash);
+        if ($chain->containsHash($hash)) {
+            echo "update peers BESTKNOWN block (".$chain->getHeightFromHash($hash).")\n";
+            $this->save(self::INDEXBESTKNOWNBLOCK, $hash);
+        } else {
+            echo "update peers HASH UNKNOWN block\n";
+            $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);
         }
-
-        $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);
     }
 }

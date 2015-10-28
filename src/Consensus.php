@@ -7,6 +7,8 @@ use BitWasp\Bitcoin\Amount;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\ChainState;
 
 class Consensus
 {
@@ -120,13 +122,12 @@ class Consensus
     }
 
     /**
-     * @param Index\Blocks $blocks
-     * @param int $currentHeight
+     * @param int|string $currentTime
      * @return bool
      */
-    public function scriptVerifyPayToScriptHash(Index\Blocks $blocks, $currentHeight)
+    public function scriptVerifyPayToScriptHash($currentTime)
     {
-        return $this->math->cmp($blocks->fetchByHeight($currentHeight)->getHeader()->getTimestamp(), self::P2SH_ACTIVATION) >= 0;
+        return $this->math->cmp($currentTime, $this->params->p2shActivateTime()) >= 0;
     }
 
     /**

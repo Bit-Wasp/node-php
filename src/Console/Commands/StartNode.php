@@ -6,7 +6,7 @@ namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\BitcoinNode;
-use BitWasp\Bitcoin\Node\Params;
+use BitWasp\Bitcoin\Chain\Params;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
