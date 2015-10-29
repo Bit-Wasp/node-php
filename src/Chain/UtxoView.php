@@ -87,20 +87,6 @@ class UtxoView implements \Countable
     }
 
     /**
-     * @param TransactionInputCollection $inputs
-     * @return UtxoView
-     */
-    public function filter(TransactionInputCollection $inputs)
-    {
-        $subset = [];
-        foreach ($inputs as $input) {
-            $subset[] = $this->fetchByInput($input);
-        }
-
-        return new self($subset);
-    }
-
-    /**
      * @param Math $math
      * @param TransactionInterface $tx
      * @return int|string

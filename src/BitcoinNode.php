@@ -23,6 +23,9 @@ use BitWasp\Bitcoin\Node\Routine\HeaderCheck;
 use BitWasp\Bitcoin\Node\Routine\ZmqScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
+use BitWasp\Bitcoin\Node\Thread\ScriptCheckThread;
+use BitWasp\Bitcoin\Node\Thread\ScriptWorkerThread;
+use BitWasp\Thread\Init;
 use Evenement\EventEmitter;
 use Packaged\Config\Provider\Ini\IniConfigProvider;
 use React\EventLoop\LoopInterface;
@@ -133,7 +136,6 @@ class BitcoinNode extends EventEmitter
         $this->headers->init($genesis->getHeader());
         $this->blocks->init($genesis);
         $this->initChainState();
-
         $this->blockDownload = new BlockDownloader($this->chains, $this->peerState, $this->peersOutbound);
 
         $this->on('blocks.syncing', function () {
@@ -164,15 +166,15 @@ class BitcoinNode extends EventEmitter
      */
     private function initControl()
     {
-        $subControl = $this->zmq->getSocket(\ZMQ::SOCKET_PUB);
-        $subControl->bind("tcp://127.0.0.1:5594");
+        $threadControl = $this->zmq->getSocket(\ZMQ::SOCKET_PUB);
+        $threadControl->bind("tcp://127.0.0.1:5594");
 
-        $control = $this->zmq->getSocket(\ZMQ::SOCKET_PULL);
-        $control->bind('tcp://127.0.0.1:5560');
-        $control->on('message', function ($e) use ($subControl) {
+        $cmdControl = $this->zmq->getSocket(\ZMQ::SOCKET_PULL);
+        $cmdControl->bind('tcp://127.0.0.1:5560');
+        $cmdControl->on('message', function ($e) use ($threadControl) {
             if ($e == 'shutdown') {
                 echo "Shutdown\n";
-                $subControl->send('shutdown');
+                $threadControl->sendmulti(array('control', 'shutdown'));
                 $this->stop();
             }
         });

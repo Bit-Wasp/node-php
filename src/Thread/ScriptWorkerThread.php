@@ -23,9 +23,10 @@ class ScriptWorkerThread extends Thread
             $context = new ZmqContext($loop);
 
             $control = $context->getSocket(\ZMQ::SOCKET_SUB);
-            $control->connect("tcp://127.0.0.1:5594");
-            $control->on('message', function ($message) use ($loop) {
-                if ($message == 'shutdown') {
+            $control->connect('tcp://127.0.0.1:5594');
+            $control->subscribe('control');
+            $control->on('messages', function ($msg) use ($loop) {
+                if ($msg[1] == 'shutdown') {
                     $loop->stop();
                 }
             });
@@ -54,7 +55,7 @@ class ScriptWorkerThread extends Thread
 
             $loop->run();
 
-            return 0;
+            exit(0);
         });
     }
 }

@@ -39,7 +39,6 @@ class ZmqScriptCheck implements ScriptCheckInterface
         ]));
 
         $result = $this->blockingZmq->recv();
-
         return (bool) $result;
     }
 

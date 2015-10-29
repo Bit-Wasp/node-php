@@ -808,4 +808,60 @@ GROUP BY r.tip_hash;');
         return new UtxoView($outputSet);
 
     }
+
+    public function fetchUtxos($required, $bestBlock)
+    {
+        $requiredCount = count($required);
+        $joinList = '';
+        $queryValues = ['hash' => $bestBlock];
+        for ($i = 0, $last = $requiredCount - 1; $i < $requiredCount; $i++) {
+            list ($txid, $vout, $txidx) = $required[$i];
+
+            if (0 == $i) {
+                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :txidx$i as txidx\n";
+            } else {
+                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :txidx$i \n";
+            }
+
+            if ($i < $last) {
+                $joinList .= "  UNION ALL\n";
+            }
+
+            $queryValues["hashParent$i"] = $txid;
+            $queryValues["noutparent$i"] = $vout;
+            $queryValues["txidx$i"] = $txidx;
+        }
+
+        $sql = "
+              SELECT    listed.hashParent as txid, listed.nOut as vout,
+                        o.value, o.scriptPubKey,
+                        allowed_block.height, listed.txidx
+              FROM      transaction_output o
+              INNER JOIN (
+                $joinList
+              ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
+              INNER JOIN block_transactions as bt on listed.hashParent = bt.transaction_hash
+              JOIN (
+                    SELECT    parent.hash, parent.height
+                    FROM      headerIndex AS tip,
+                              headerIndex AS parent
+                    WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
+              ) as allowed_block on bt.block_hash = allowed_block.hash
+              ";
+
+        $outputSet = [];
+        $stmt = $this->dbh->prepare($sql);
+        $stmt->execute($queryValues);
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
+            $outputSet[] = new Utxo($utxo['txid'], $utxo['vout'], new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) !== $requiredCount) {
+            throw new \RuntimeException('Utxo was not found');
+        }
+
+        echo "DB: Fetched $requiredCount Utxos \n";
+        return new UtxoView($outputSet);
+
+    }
 }
