@@ -17,7 +17,6 @@ class Application extends ConsoleApplication
         $commands[] = new StartNode();
         $commands[] = new StopNode();
         $commands[] = new PrintConfig();
-        $commands[] = new TestNode();
         return $commands;
     }
 }
