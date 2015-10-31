@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Routine\BlockCheckInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
+use BitWasp\Buffertools\Buffer;
 
 class Blocks
 {
@@ -59,17 +60,17 @@ class Blocks
     public function init(BlockInterface $genesisBlock)
     {
         try {
-            $this->db->fetchBlock($genesisBlock->getHeader()->getHash()->getHex());
+            $this->db->fetchBlock($genesisBlock->getHeader()->getHash());
         } catch (\Exception $e) {
             $this->db->insertBlockGenesis($genesisBlock);
         }
     }
 
     /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return BlockInterface
      */
-    public function fetch($hash)
+    public function fetch(Buffer $hash)
     {
         return $this->db->fetchBlock($hash);
     }
@@ -78,10 +79,10 @@ class Blocks
      * @param ChainState $state
      * @param BlockInterface $block
      * @param Headers $headers
-     * @return BlockIndex|false
-     * @throws \Exception
+     * @param UtxoIdx $utxoIdx
+     * @return BlockIndex
      */
-    public function accept(ChainState $state, BlockInterface $block, Headers $headers)
+    public function accept(ChainState $state, BlockInterface $block, Headers $headers, UtxoIdx $utxoIdx)
     {
         $bestBlock = $state->getLastBlock();
         if ($bestBlock->getHash() !== $block->getHeader()->getPrevBlock()) {
@@ -95,6 +96,7 @@ class Blocks
             ->check($block)
             ->checkContextual($block, $bestBlock);
 
+        //$view = $utxoIdx->fetchView($state, $block);
         $view = $this->db->fetchUtxoView($block);
 
         $flagP2sh = $this->consensus->scriptVerifyPayToScriptHash($bestBlock->getHeader()->getTimestamp());

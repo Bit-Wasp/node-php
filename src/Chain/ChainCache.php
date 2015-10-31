@@ -4,15 +4,17 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 
+use BitWasp\Buffertools\Buffer;
+
 class ChainCache
 {
     /**
-     * @var array
+     * @var string[]
      */
     private $hashByHeight = [];
 
     /**
-     * @var array
+     * @var int[]
      */
     private $heightByHash = [];
 
@@ -27,36 +29,22 @@ class ChainCache
     }
 
     /**
-     * @param BlockIndex $index
-     */
-    public function add(BlockIndex $index)
-    {
-        if ($index->getHeader()->getPrevBlock() !== $this->getHash($index->getHeight() - 1)) {
-            throw new \RuntimeException('ChainCache: New BlockIndex does not refer to last');
-        }
-
-        $binary = hex2bin($index->getHash());
-        $this->hashByHeight[] = $binary;
-        $this->heightByHash[$binary] = $index->getHeight();
-    }
-
-    /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return bool
      */
-    public function containsHash($hash)
+    public function containsHash(Buffer $hash)
     {
-        return isset($this->heightByHash[hex2bin($hash)]);
+        return array_key_exists($hash->getBinary(), $this->heightByHash);
     }
 
     /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return int
      */
-    public function getHeight($hash)
+    public function getHeight(Buffer $hash)
     {
         if ($this->containsHash($hash)) {
-            return $this->heightByHash[hex2bin($hash)];
+            return $this->heightByHash[$hash->getBinary()];
         }
 
         throw new \RuntimeException('Hash not found');
@@ -64,15 +52,30 @@ class ChainCache
 
     /**
      * @param int $height
-     * @return string
+     * @throws \RuntimeException
+     * @return Buffer
      */
     public function getHash($height)
     {
-        if (!isset($this->hashByHeight[$height])) {
+        if (!array_key_exists($height, $this->hashByHeight)) {
             throw new \RuntimeException('ChainCache: index at this height ('.$height.') not known');
         }
 
-        return bin2hex($this->hashByHeight[$height]);
+        return new Buffer($this->hashByHeight[$height], 32);
+    }
+
+    /**
+     * @param BlockIndex $index
+     */
+    public function add(BlockIndex $index)
+    {
+        if ($index->getHeader()->getPrevBlock() !== $this->getHash($index->getHeight() - 1)->getHex()) {
+            throw new \RuntimeException('ChainCache: New BlockIndex does not refer to last');
+        }
+
+        $binary = hex2bin($index->getHash());
+        $this->hashByHeight[] = $binary;
+        $this->heightByHash[$binary] = $index->getHeight();
     }
 
     /**

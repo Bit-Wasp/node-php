@@ -21,12 +21,11 @@ class ScriptCheckThread extends Thread
             $workers = $context->getSocket(\ZMQ::SOCKET_PUSH);
             $workers->bind('tcp://127.0.0.1:5592');
 
-            $control = $context->getSocket(\ZMQ::SOCKET_SUB);
-            $control->connect("tcp://127.0.0.1:5594");
-            $control->on('message', function ($message) use ($loop) {
-                error_log("got shutdown\n");
-                if ($message == 'shutdown') {
-                    echo "Called shutdown\n";
+            $sub = $context->getSocket(\ZMQ::SOCKET_SUB);
+            $sub->connect('tcp://127.0.0.1:5594');
+            $sub->subscribe('control');
+            $sub->on('messages', function ($msg) use ($loop) {
+                if ($msg[1] == 'shutdown') {
                     $loop->stop();
                 }
             });
@@ -80,8 +79,8 @@ class ScriptCheckThread extends Thread
             });
 
             $loop->run();
-            error_log('script check thread finished');
-            return 0;
+
+            exit(0);
         });
     }
 }

@@ -23,6 +23,9 @@ use BitWasp\Bitcoin\Node\Routine\HeaderCheck;
 use BitWasp\Bitcoin\Node\Routine\ZmqScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
+use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
+use BitWasp\Bitcoin\Node\Zmq\UserControl;
+use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
 use Packaged\Config\Provider\Ini\IniConfigProvider;
 use React\EventLoop\LoopInterface;
@@ -101,15 +104,15 @@ class BitcoinNode extends EventEmitter
      */
     public function __construct(ParamsInterface $params, LoopInterface $loop)
     {
-        echo " [App] start \n";
+        echo ' [App] start ' . PHP_EOL;
         $start = microtime(true);
 
         $math = Bitcoin::getMath();
         $adapter = Bitcoin::getEcAdapter($math);
 
-        $this->zmq = new ZMQContext($loop);
+        $zmq = new ZMQContext($loop);
         $this
-            ->initControl()
+            ->initControl($zmq)
             ->initConfig();
 
         $this->loop = $loop;
@@ -133,22 +136,22 @@ class BitcoinNode extends EventEmitter
         $this->headers->init($genesis->getHeader());
         $this->blocks->init($genesis);
         $this->initChainState();
-
+        $this->utxo = new Index\UtxoIdx($this->chains, $this->db);
         $this->blockDownload = new BlockDownloader($this->chains, $this->peerState, $this->peersOutbound);
 
         $this->on('blocks.syncing', function () {
-            echo " [App] ... BLOCKS: syncing\n";
+            echo ' [App] ... BLOCKS: syncing' . PHP_EOL;
         });
 
         $this->on('headers.syncing', function () {
-            echo " [App] ... HEADERS: syncing\n";
+            echo ' [App] ... HEADERS: syncing' . PHP_EOL;
         });
 
         $this->on('headers.synced', function () {
-            echo " [App] ... HEADERS: synced!\n";
+            echo ' [App] ... HEADERS: synced!' . PHP_EOL;
         });
 
-        echo " [App] Startup took: " . (microtime(true) - $start) . " seconds \n";
+        echo ' [App] Startup took: ' . (microtime(true) - $start) . ' seconds ' . PHP_EOL;
     }
 
     public function stop()
@@ -162,21 +165,9 @@ class BitcoinNode extends EventEmitter
     /**
      * @return $this
      */
-    private function initControl()
+    private function initControl(ZMQContext $context)
     {
-        $subControl = $this->zmq->getSocket(\ZMQ::SOCKET_PUB);
-        $subControl->bind("tcp://127.0.0.1:5594");
-
-        $control = $this->zmq->getSocket(\ZMQ::SOCKET_PULL);
-        $control->bind('tcp://127.0.0.1:5560');
-        $control->on('message', function ($e) use ($subControl) {
-            if ($e == 'shutdown') {
-                echo "Shutdown\n";
-                $subControl->send('shutdown');
-                $this->stop();
-            }
-        });
-
+        $this->control = new UserControl($context, $this, new ScriptThreadControl($context));
         return $this;
     }
 
@@ -185,8 +176,8 @@ class BitcoinNode extends EventEmitter
      */
     private function initConfig()
     {
-        if (is_null($this->config)) {
-            $file = getenv("HOME") . "/.bitcoinphp/bitcoin.ini";
+        if (null === $this->config) {
+            $file = getenv('HOME') . '/.bitcoinphp/bitcoin.ini';
             $this->config = new IniConfigProvider();
             $this->config->loadFile($file);
         }
@@ -241,7 +232,7 @@ class BitcoinNode extends EventEmitter
         return;
         $chain = $this->chain()->getChain();
         $locator = $getHeaders->getLocator();
-        if (count($locator->getHashes()) == 0) {
+        if (count($locator->getHashes()) === 0) {
             $start = $locator->getHashStop()->getHex();
         } else {
             $start = $this->db->findFork($chain, $locator);
@@ -249,7 +240,7 @@ class BitcoinNode extends EventEmitter
 
         $headers = $this->db->fetchNextHeaders($start);
         $peer->headers($headers);
-        echo "Sending from " . $start . " + " . count($headers) . " headers \n";
+        echo 'Sending from ' . $start . ' + ' . count($headers) . ' headers ' . PHP_EOL;
     }
 
     /**
@@ -261,22 +252,23 @@ class BitcoinNode extends EventEmitter
         $state = $this->chain();
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
-        if ($count > 0) {
+        if ($count === 0) {
+            return;
+        }
 
-            try {
-                $this->headers->acceptBatch($state, $vHeaders);
-                $this->chains->checkTips();
-                if (2000 == $count) {
-                    $peer->getheaders($state->getHeadersLocator());
-                }
+        $this->headers->acceptBatch($state, $vHeaders);
+        $this->chains->checkTips();
 
-                $last = end($vHeaders);
-                $this->peerState->fetch($peer)->updateBlockAvailability($state, $last->getHash()->getHex());
-                $this->blockDownload->start($state, $peer);
+        $last = end($vHeaders);
+        $this->peerState->fetch($peer)->updateBlockAvailability($state, $last->getHash());
 
-            } catch (\Exception $e) {
-                echo $e->getMessage() . "\n";
-            }
+        if (2000 === $count) {
+            $peer->getheaders($state->getHeadersLocator());
+        }
+
+        if ($count < 2000) {
+            echo 'start download' . PHP_EOL;
+            $this->blockDownload->start($state, $peer);
         }
     }
 
@@ -286,7 +278,7 @@ class BitcoinNode extends EventEmitter
      */
     public function onInv(Peer $peer, Inv $inv)
     {
-        echo "INV size: " . count($inv->getItems()) . "\n";
+        echo 'INV size: ' . count($inv->getItems()) . PHP_EOL;
         $best = $this->chain();
 
         $vFetch = [];
@@ -299,12 +291,12 @@ class BitcoinNode extends EventEmitter
             }
         }
 
-        if (!empty($blocks)) {
+        if (count($blocks) !== 0) {
             $blockView = $best->bestBlocksCache();
             $this->blockDownload->advertised($best, $blockView, $peer, $blocks);
         }
 
-        if (!empty($vFetch)) {
+        if (count($vFetch) !== 0) {
             $peer->getdata($vFetch);
         }
     }
@@ -319,25 +311,30 @@ class BitcoinNode extends EventEmitter
         $block = $blockMsg->getBlock();
 
         try {
-            $this->blocks->accept($best, $block, $this->headers);
+            $this->blocks->accept($best, $block, $this->headers, $this->utxo);
             $this->chains->checkTips();
-            $this->blockDownload->received($best, $peer, $block->getHeader()->getHash()->getHex());
+            $this->blockDownload->received($best, $peer, $block->getHeader()->getHash());
 
         } catch (\Exception $e) {
             $header = $block->getHeader();
-            echo "Failed to accept block\n";
-            if ($best->getChain()->containsHash($block->getHeader()->getPrevBlock())) {
-                if ($header->getPrevBlock() == $best->getLastBlock()->getHash()) {
-                    echo $block->getHeader()->getHash()->getHex() . "\n";
-                    echo $block->getHex() . "\n";
+            echo 'Failed to accept block' . PHP_EOL;
+
+            echo $e->getMessage() . PHP_EOL;
+
+            if ($best->getChain()->containsHash(Buffer::hex($block->getHeader()->getPrevBlock()))) {
+                if ($header->getPrevBlock() === $best->getLastBlock()->getHash()) {
+                    echo $block->getHeader()->getHash()->getHex() . PHP_EOL;
+                    echo $block->getHex() . PHP_EOL;
                     echo 'We have prevblockIndex, so this is weird.';
                     echo $e->getTraceAsString() . PHP_EOL;
                     echo $e->getMessage() . PHP_EOL;
                 } else {
-                    echo "Didn't elongate the chain, probably from the future..\n";
+                    echo 'Didn\'t elongate the chain, probably from the future..' . PHP_EOL;
                 }
             }
         }
+
+
     }
 
     /**
@@ -377,11 +374,11 @@ class BitcoinNode extends EventEmitter
             $peer->on('msg', function (Peer $peer, NetworkMessage $msg) {
                 $payload = $msg->getPayload();
 
-                if ($msg->getCommand() == 'block') {
+                if ($msg->getCommand() === 'block') {
                     /** @var Block $payload */
-                    echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - block - " . $payload->getBlock()->getHeader()->getHash()->getHex() . "\n";
+                    echo ' [Peer] ' . $peer->getRemoteAddr()->getIp() . ' - block - ' . $payload->getBlock()->getHeader()->getHash()->getHex() . PHP_EOL;
                 } else {
-                    echo " [Peer] " . $peer->getRemoteAddr()->getIp() . " - " . $msg->getCommand(). "\n";
+                    echo ' [Peer] ' . $peer->getRemoteAddr()->getIp() . ' - ' . $msg->getCommand(). PHP_EOL;
                 }
             });
 
@@ -394,15 +391,13 @@ class BitcoinNode extends EventEmitter
         $locator
             ->queryDnsSeeds(1)
             ->then(function (Locator $locator) use ($manager, $handler) {
-                for ($i = 0; $i < 2 ; $i++) {
+                for ($i = 0; $i < 1 ; $i++) {
                     $manager
                         ->connectNextPeer($locator)
                         ->then(function (Peer $peer) {
                             $chain = $this->chain();
-                            $peer->getheaders($chain->getHeadersLocator());
-                            //$this->blockDownload->start($chain, $peer);
-
-                            echo "init\n";
+                            $height = $chain->getChain()->getIndex()->getHeight();
+                            $peer->getheaders($chain->getLocator($height - 1));
                         });
                 }
             }, function () {

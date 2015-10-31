@@ -1,10 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Chain;
+namespace BitWasp\Bitcoin\Node\Chain\Utxo;
 
 
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;
@@ -84,20 +83,6 @@ class UtxoView implements \Countable
     public function fetchByInput(TransactionInputInterface $input)
     {
         return $this->fetch($input->getTransactionId(), $input->getVout());
-    }
-
-    /**
-     * @param TransactionInputCollection $inputs
-     * @return UtxoView
-     */
-    public function filter(TransactionInputCollection $inputs)
-    {
-        $subset = [];
-        foreach ($inputs as $input) {
-            $subset[] = $this->fetchByInput($input);
-        }
-
-        return new self($subset);
     }
 
     /**

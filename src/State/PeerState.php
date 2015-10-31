@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\State;
 
 
 use BitWasp\Bitcoin\Node\Chain\ChainState;
-use BitWasp\Bitcoin\Node\Index\Blocks;
+use BitWasp\Buffertools\Buffer;
 
 class PeerState extends AbstractState
 {
@@ -80,8 +80,7 @@ class PeerState extends AbstractState
     }
 
     /**
-     * todo: remove, or rewrite
-     * @return \BitWasp\Bitcoin\Node\Database\DbBlockIndex|null
+     * @return \BitWasp\Bitcoin\Node\Chain\BlockIndex
      */
     public function getIndexBestKnownBlock()
     {
@@ -89,7 +88,7 @@ class PeerState extends AbstractState
     }
 
     /**
-     * @return string|null
+     * @return Buffer|null
      */
     public function getHashLastUnknownBlock()
     {
@@ -98,17 +97,16 @@ class PeerState extends AbstractState
 
     /**
      * @param ChainState $state
-     * @param string $hash
+     * @param Buffer $hash
      */
-    public function updateBlockAvailability(ChainState $state, $hash)
+    public function updateBlockAvailability(ChainState $state, Buffer $hash)
     {
         $chain = $state->getChain();
-        var_dump($hash);
         if ($chain->containsHash($hash)) {
-            echo "update peers BESTKNOWN block (".$chain->getHeightFromHash($hash).")\n";
+            echo 'update peers BESTKNOWN block ('.$chain->getHeightFromHash($hash).')' . PHP_EOL;
             $this->save(self::INDEXBESTKNOWNBLOCK, $hash);
         } else {
-            echo "update peers HASH UNKNOWN block\n";
+            echo 'update peers HASH UNKNOWN block' . PHP_EOL;
             $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);
         }
     }
