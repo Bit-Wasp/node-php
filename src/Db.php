@@ -12,7 +12,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\Chain;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
-use BitWasp\Bitcoin\Node\Chain\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
@@ -881,8 +881,6 @@ GROUP BY r.tip_hash;');
             throw new \RuntimeException('Utxo was not found');
         }
 
-        echo "DB: Fetched $requiredCount Utxos \n";
         return $outputSet;
-
     }
 }
