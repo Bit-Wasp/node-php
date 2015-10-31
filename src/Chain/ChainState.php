@@ -44,13 +44,11 @@ class ChainState
     public function updateLastBlock(BlockIndex $index)
     {
         if ($this->lastBlock->getHash() !== $index->getHeader()->getPrevBlock()) {
-            echo sprintf("last %s  prev %s", $this->lastBlock->getHash(), $index->getHeader()->getPrevBlock());
-            die();
             throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
         }
 
-        if ($this->lastBlock->getHeight() != $index->getHeight() - 1) {
-            throw new \RuntimeException('UpdateLastBlock: Incorrect chain height');
+        if ($this->lastBlock->getHeight() != ($index->getHeight() - 1)) {
+            throw new \RuntimeException('UpdateLastBlock: Incorrect chain height' . ($index->getHeight() - 1));
         }
 
         $this->lastBlock = $index;
@@ -110,11 +108,9 @@ class ChainState
         $hashes = [];
         $headerHash = $this->chain->getHashFromHeight($height);
 
-        $h = [];
         while (true) {
-            $hashes[] = Buffer::hex($headerHash, 32);
-            $h[$height] = $headerHash;
-            if ($height == 0) {
+            $hashes[] = $headerHash;
+            if ($height === 0) {
                 break;
             }
 
@@ -125,7 +121,7 @@ class ChainState
             }
         }
 
-        if (is_null($final)) {
+        if (null === $final) {
             $hashStop = new Buffer('', 32);
         } else {
             $hashStop = $final;
@@ -143,8 +139,9 @@ class ChainState
      */
     public function getHeadersLocator(Buffer $hashStop = null)
     {
-        echo "Produce Headers locator (".$this->chain->getIndex()->getHeight().") \n";
-        return $this->getLocator($this->chain->getIndex()->getHeight(), $hashStop);
+        echo 'Produce Headers locator (' . $this->chain->getIndex()->getHeight() . ') ' . PHP_EOL;
+        $height = $this->chain->getIndex()->getHeight();
+        return $this->getLocator($height, $hashStop);
     }
 
     /**
@@ -153,8 +150,8 @@ class ChainState
      */
     public function getBlockLocator(Buffer $hashStop = null)
     {
-        echo "Produce Block locator (".$this->lastBlock->getHeight().") \n";
-        return $this->getLocator($this->lastBlock->getHeight() - 1, $hashStop);
+        echo 'Produce Blocks locator (' . $this->lastBlock->getHeight() . ') ' . PHP_EOL;
+        return $this->getLocator($this->lastBlock->getHeight(), $hashStop);
     }
 
 }

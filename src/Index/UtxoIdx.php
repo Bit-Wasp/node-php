@@ -3,58 +3,54 @@
 namespace BitWasp\Bitcoin\Node\Index;
 
 
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoViewInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
-use BitWasp\Bitcoin\Node\Chain\Utxo\CachedUtxoView;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoCache;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Utxo\Utxo;
-use Doctrine\Common\Cache\ArrayCache;
 
 class UtxoIdx
 {
     private $db;
-    private $sets;
 
     public function __construct(Chains $chains, Db $db)
     {
         $this->db = $db;
-        $this->sets = new \SplObjectStorage();
-        foreach ($chains as $chain) {
-            $this->sets->attach($chain, new CachedUtxoView([], new UtxoCache(new ArrayCache())));
-        }
     }
 
     /**
      * @param BlockInterface $block
      * @return array
      */
-    public function reduceFromBlock( BlockInterface $block, $utxos = [])
+    public function filter(BlockInterface $block)
     {
         $need = [];
 
         // Iterating backwards, record all required inputs.
         // If an Output can be found in a transaction in
         // the same block, it will be dropped from the list
-        // of required inputs, and returned as a UTXO.
+        // of required inputs.
+        // Any UTXO's from the block which are not consumed
+        // are returned as the second value.
 
+        $utxos = [];
         $vTx = $block->getTransactions();
         for ($i = count($vTx) - 1; $i > 0; $i--) {
             $tx = $vTx->get($i);
             foreach ($tx->getInputs() as $in) {
-                $txid = $in->getTransactionId();
-                $vout = $in->getVout();
-                $need[$txid.$vout] = $i;
+                $index = $in->getTransactionId() . $in->getVout();
+                $need[$index] = $i;
             }
 
             $hash = $tx->getTxId()->getHex();
             foreach ($tx->getOutputs() as $v => $out) {
-                if (isset($need[$hash.$v])) {
+                $index = $hash . $v;
+                if (isset($need[$index])) {
+                    unset($need[$index]);
+                } else {
                     $utxos[] = new Utxo($hash, $v, $out);
-                    unset($need[$hash.$v]);
                 }
             }
         }
@@ -68,22 +64,22 @@ class UtxoIdx
     }
 
     /**
-     * @param ChainState $state
-     * @param $required
-     * @param Utxo[] $utxos
+     * @param UtxoCache $cache
+     * @param array $required
      * @return array
      */
-    public function reduceFromCache(ChainState $state, $required, $utxos = [])
+    public function reduceCache(UtxoCache $cache, array $required)
     {
-        /** @var UtxoViewInterface $cache */
-        $cache = $this->sets->offsetGet($state);
+        $utxos = [];
         $stillRequired = [];
         foreach ($required as $input) {
             list ($txid, $vout) = $input;
             try {
-                $utxo = $cache->fetch($txid, $vout);
-                $utxos[] = $utxo;
+                echo "found in cache!\n";
+                $utxos[] = $cache->fetch($txid, $vout);
+                $cache->remove($txid, $vout);
             } catch (\Exception $e) {
+                echo '.';
                 $stillRequired[] = $input;
             }
         }
@@ -92,6 +88,7 @@ class UtxoIdx
     }
 
     /**
+     * @param ChainState $state
      * @param BlockInterface $block
      * @return UtxoView
      */
@@ -99,18 +96,14 @@ class UtxoIdx
     {
         $txs = $block->getTransactions();
         $txCount = count($txs);
-        if (1 == $txCount) {
+        if (1 === $txCount) {
             return new UtxoView([]);
         }
 
-        list ($required, $outputSet) = $this->reduceFromBlock($block);
-        list ($required, $outputSet) = $this->reduceFromCache($state, $required, $outputSet);
+        list ($required, $newUnspent) = $this->filter($block);
 
-        $view = $this->db->fetchUtxos($required, $block->getHeader()->getPrevBlock());
-        return $view;
-    }
-    public function createView()
-    {
+        $found = $this->db->fetchUtxos($required, $block->getHeader()->getPrevBlock());
 
+        return new UtxoView(array_merge($found, $newUnspent));
     }
 }

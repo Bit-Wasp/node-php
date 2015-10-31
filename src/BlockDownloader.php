@@ -10,7 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
-use BitWasp\Bitcoin\Node\Thread\BlockRequest;
+use BitWasp\Buffertools\Buffer;
 
 class BlockDownloader
 {
@@ -29,11 +29,6 @@ class BlockDownloader
      * @var PeerStateCollection
      */
     private $peerState;
-
-    /**
-     * @var string[]
-     */
-    private $blocksInFlight = [];
 
     /**
      * @param PeerStateCollection $peerStates
@@ -69,22 +64,24 @@ class BlockDownloader
         $fetch = [];
         $lastUnknown = null;
         foreach ($items as $inv) {
-            $hash = $inv->getHash()->getHex();
+            $hash = $inv->getHash();
             if ($chain->containsHash($hash) ){
                 if (!$chainView->containsHash($hash)) {
                     $fetch[] = $inv;
                 }
             } else {
-                $lastUnknown = $inv->getHash();
+                $lastUnknown = $hash;
             }
         }
 
-        if (!is_null($lastUnknown)) {
+        if (null !== $lastUnknown) {
+            echo "send headers\n";
             $peer->getheaders($state->getHeadersLocator($lastUnknown));
+            $this->peerState->fetch($peer)->updateBlockAvailability($state, $lastUnknown);
         }
 
         if (count($fetch) > 0) {
-            echo "SEND GETDATA:" . count($fetch) . "\n";
+            echo 'SEND GETDATA:' . count($fetch) . '\n';
             $peer->getdata($fetch);
         }
 
@@ -93,9 +90,9 @@ class BlockDownloader
     /**
      * @param ChainState $bestChain
      * @param Peer $peer
-     * @param string $hash
+     * @param Buffer $hash
      */
-    public function received(ChainState $bestChain, Peer $peer, $hash)
+    public function received(ChainState $bestChain, Peer $peer, Buffer $hash)
     {
         if ($this->request->isInFlight($hash)) {
             $this->request->markReceived($hash);
@@ -103,4 +100,5 @@ class BlockDownloader
 
         $this->request->requestNextBlocks($bestChain, $peer);
     }
+
 }

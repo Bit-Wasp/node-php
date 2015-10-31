@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Thread;
+namespace BitWasp\Bitcoin\Node;
 
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;
@@ -19,16 +19,18 @@ class BlockRequest
     private $inFlight = [];
 
     /**
-     * @var
+     * @var Buffer|null
      */
     private $lastRequested;
 
     /**
      * @param ChainState $state
-     * @param string $startHash
+     * @param Buffer $startHash
+     * @throws \RuntimeException
+     * @throws \Exception
      * @return array
      */
-    private function relativeNextInventory(ChainState $state, $startHash)
+    private function relativeNextInventory(ChainState $state, Buffer $startHash)
     {
         $best = $state->getChain();
         if (!$best->containsHash($startHash)) {
@@ -41,7 +43,7 @@ class BlockRequest
 
         $request = [];
         for ($i = $startHeight; $i < $stopHeight && $nInFlight < self::MAX_IN_FLIGHT; $i++) {
-            $request[] = Inventory::block(Buffer::hex($best->getHashFromHeight($i)));
+            $request[] = Inventory::block($best->getHashFromHeight($i));
             $nInFlight++;
         }
 
@@ -50,33 +52,35 @@ class BlockRequest
 
     /**
      * @param ChainState $state
-     * @return Inventory[]
+     * @return array
+     * @throws \RuntimeException
+     * @throws \Exception
      */
     public function nextInventory(ChainState $state)
     {
-        $last = $state->getLastBlock();
-
-        return $this->relativeNextInventory($state, $last->getHash());
+        return $this->relativeNextInventory($state, Buffer::hex($state->getLastBlock()->getHash()));
     }
 
     /**
      * @param ChainState $state
      * @param Peer $peer
+     * @throws \RuntimeException
+     * @throws \Exception
      */
     public function requestNextBlocks(ChainState $state, Peer $peer)
     {
-        if (is_null($this->lastRequested)) {
+        /** @var Inventory[] $nextData */
+        if (null === $this->lastRequested) {
             $nextData = $this->nextInventory($state);
         } else {
             $nextData = $this->relativeNextInventory($state, $this->lastRequested);
         }
 
-        $dataCount = count($nextData);
-        if ($dataCount > 0) {
+        if (count($nextData) > 0) {
             $last = null;
             foreach ($nextData as $inv) {
-                $last = $inv->getHash()->getHex();
-                $this->inFlight[$last] = 1;
+                $last = $inv->getHash();
+                $this->inFlight[$last->getHex()] = 1;
             }
             $this->lastRequested = $last;
             $peer->getdata($nextData);
@@ -84,21 +88,21 @@ class BlockRequest
     }
 
     /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return bool
      */
-    public function isInFlight($hash)
+    public function isInFlight(Buffer $hash)
     {
-        return isset($this->inFlight[$hash]);
+        return array_key_exists($hash->getHex(), $this->inFlight);
     }
 
     /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return $this
      */
-    public function markReceived($hash)
+    public function markReceived(Buffer $hash)
     {
-        unset($this->inFlight[$hash]);
+        unset($this->inFlight[$hash->getHex()]);
         return $this;
     }
 }

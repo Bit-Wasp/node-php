@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Routine\HeaderCheckInterface;
+use BitWasp\Buffertools\Buffer;
 
 class Headers
 {
@@ -56,12 +57,12 @@ class Headers
      */
     public function init(BlockHeaderInterface $header)
     {
-        $hash = $header->getHash()->getHex();
+        $hash = $header->getHash();
 
         try {
             $this->db->fetchIndex($hash);
         } catch (\Exception $e) {
-            $this->db->insertIndexGenesis(new BlockIndex($hash, 0, 0, $header));
+            $this->db->insertIndexGenesis(new BlockIndex($hash->getHex(), 0, 0, $header));
         }
     }
 
@@ -69,7 +70,7 @@ class Headers
      * @param string $hash
      * @return BlockIndex
      */
-    public function fetch($hash)
+    public function fetch(Buffer $hash)
     {
         return $this->db->fetchIndex($hash);
     }
@@ -81,7 +82,7 @@ class Headers
      */
     public function accept(ChainState $state, BlockHeaderInterface $header)
     {
-        $hash = $header->getHash()->getHex();
+        $hash = $header->getHash();
         if ($state->getChain()->containsHash($hash)) {
             // todo: check for rejected block
             return $this->db->fetchIndex($hash);
@@ -114,14 +115,13 @@ class Headers
         $startIndex = $tip->getIndex();
 
         foreach ($headers as $header) {
+            if ($tip->containsHash($header->getHash())) {
+                continue;
+            }
+
             $prevIndex = $tip->getIndex();
             if ($prevIndex->getHash() !== $header->getPrevBlock()) {
                 throw new \RuntimeException('Header mismatch, header.prevBlock does not refer to tip');
-            }
-
-            $hash = $header->getHash()->getHex();
-            if ($tip->containsHash($hash)) {
-                continue;
             }
 
             $index = $this
@@ -135,10 +135,11 @@ class Headers
             $batch[] = $tip->getIndex();
         }
 
-        // Starting at $startIndex, do a batch update of the chain
-        $this->db->insertIndexBatch($startIndex, $batch);
-
-        unset($batch);
+        // Do a batch update of the chain
+        if (count($batch) > 0) {
+            $this->db->insertIndexBatch($startIndex, $batch);
+            unset($batch);
+        }
 
         return true;
     }

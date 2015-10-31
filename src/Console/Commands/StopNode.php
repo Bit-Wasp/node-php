@@ -26,8 +26,14 @@ class StopNode extends AbstractCommand
 
         $context = new \React\ZMQ\Context($loop);
 
-        $push = $context->getSocket(\ZMQ::SOCKET_PUSH);
+        $push = $context->getSocket(\ZMQ::SOCKET_REQ);
         $push->connect('tcp://127.0.0.1:5560');
+        $push->on('message', function ($message = '') use ($loop) {
+            if ($message == 'shutdown') {
+                echo "Shutdown successfully\n";
+            }
+            $loop->stop();
+        });
         $push->send('shutdown');
 
         $loop->run();
