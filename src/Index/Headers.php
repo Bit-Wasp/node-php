@@ -8,7 +8,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
-use BitWasp\Bitcoin\Node\Routine\HeaderCheckInterface;
+use BitWasp\Bitcoin\Node\Validation\HeaderCheckInterface;
 use BitWasp\Buffertools\Buffer;
 
 class Headers

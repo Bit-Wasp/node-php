@@ -10,7 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Bitcoin\Node\Routine\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Buffertools\Buffer;
 

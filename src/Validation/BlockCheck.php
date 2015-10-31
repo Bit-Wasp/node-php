@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Routine;
+namespace BitWasp\Bitcoin\Node\Validation;
 
 
 use BitWasp\Bitcoin\Block\BlockInterface;
@@ -10,7 +10,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\Chain\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Locktime;
 use BitWasp\Bitcoin\Chain\ParamsInterface;

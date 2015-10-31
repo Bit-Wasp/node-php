@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Request;
 
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;

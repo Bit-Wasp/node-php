@@ -1,11 +1,11 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Routine;
+namespace BitWasp\Bitcoin\Node\Validation;
 
 
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;
-use BitWasp\Bitcoin\Node\Chain\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\ConsensusFactory;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 

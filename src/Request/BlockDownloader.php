@@ -1,10 +1,11 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Request;
 
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
+use BitWasp\Bitcoin\Node\Request\BlockRequest;
 use BitWasp\Bitcoin\Node\Chain\ChainCache;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;

@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Routine;
+namespace BitWasp\Bitcoin\Node\Validation;
 
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
