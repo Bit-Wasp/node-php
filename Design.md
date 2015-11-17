@@ -4,7 +4,7 @@
  ### Configuration
   
   This library uses an .ini configuration file, located by default in 
-  `~/.bitcoinphp/bitcoin.ini`. An empty config file can be generated 
+  `~/.phpnode/bitcoin.ini`. An empty config file can be generated
    using `phpnode print-config`. 
     
   At the very least, an SQL database must be configured as a data store. 

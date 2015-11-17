@@ -28,7 +28,7 @@
   `phpnode print-config > config.ini`
    
   Create in the default location:
-  `mkdir ~/.bitcoinphp && phpnode print-config > ~/.bitcoinphp/bitcoin.ini`
+  `mkdir ~/.phpnode && phpnode print-config > ~/.phpnode/bitcoin.ini`
   
  ## Run the software
  
