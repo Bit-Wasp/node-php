@@ -3,10 +3,10 @@
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 
+use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Packaged\Config\Provider\Ini\IniConfigProvider;
 
 class DbReset extends AbstractCommand
 {
@@ -24,13 +24,7 @@ class DbReset extends AbstractCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $file = getenv('HOME') . '/.bitcoinphp/bitcoin.ini';
-        $config = new IniConfigProvider();
-        try {
-            $config->loadFile($file);
-        } catch (\Exception $e) {
-            throw new \RuntimeException('Failed to load config file');
-        }
+        $config = (new ConfigLoader())->load();
 
         $db = new Db($config);
         $db->reset();

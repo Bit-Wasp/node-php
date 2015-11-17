@@ -18,6 +18,7 @@ use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
@@ -28,7 +29,6 @@ use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
 use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
-use Packaged\Config\Provider\Ini\IniConfigProvider;
 use React\EventLoop\LoopInterface;
 use React\ZMQ\Context as ZMQContext;
 
@@ -81,11 +81,6 @@ class BitcoinNode extends EventEmitter
     private $params;
 
     /**
-     * @var ZMQContext
-     */
-    private $zmq;
-
-    /**
      * @var BlockDownloader
      */
     private $blockDownload;
@@ -94,6 +89,7 @@ class BitcoinNode extends EventEmitter
      * @var Peers
      */
     private $peersInbound;
+
     /**
      * @var Peers
      */
@@ -177,11 +173,7 @@ class BitcoinNode extends EventEmitter
      */
     private function initConfig()
     {
-        if (null === $this->config) {
-            $file = getenv('HOME') . '/.bitcoinphp/bitcoin.ini';
-            $this->config = new IniConfigProvider();
-            $this->config->loadFile($file);
-        }
+        $this->config = (new ConfigLoader())->load();
 
         return $this;
     }
@@ -268,7 +260,6 @@ class BitcoinNode extends EventEmitter
         }
 
         if ($count < 2000) {
-            echo 'start download' . PHP_EOL;
             $this->blockDownload->start($state, $peer);
         }
     }
@@ -279,7 +270,6 @@ class BitcoinNode extends EventEmitter
      */
     public function onInv(Peer $peer, Inv $inv)
     {
-        echo 'INV size: ' . count($inv->getItems()) . PHP_EOL;
         $best = $this->chain();
 
         $vFetch = [];
@@ -387,6 +377,7 @@ class BitcoinNode extends EventEmitter
             $peer->on('inv', array ($this, 'onInv'));
             $peer->on('getheaders', array ($this, 'onGetHeaders'));
             $peer->on('headers', array ($this, 'onHeaders'));
+
         });
 
         $locator
@@ -398,7 +389,9 @@ class BitcoinNode extends EventEmitter
                         ->then(function (Peer $peer) {
                             $chain = $this->chain();
                             $height = $chain->getChain()->getIndex()->getHeight();
-                            $peer->getheaders($chain->getLocator($height - 1));
+                            echo "height $height\n";
+
+                            $peer->getheaders($chain->getLocator($height));
                         });
                 }
             }, function () {

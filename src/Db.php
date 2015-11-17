@@ -129,7 +129,7 @@ class Db
         ");
 
         $header = $index->getHeader();
-        var_dump($index);
+
         if ($stmt->execute(array(
             'hash' => $index->getHash(),
             'height' => $index->getHeight(),
@@ -345,13 +345,11 @@ class Db
                   INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt )
                   VALUES " . implode(', ', $query));
 
-                $count = $stmt->execute($values);
+                $stmt->execute($values);
                 $this->dbh->commit();
-                if ($count === $totalN) {
-                    return true;
-                } else {
-                    throw new \RuntimeException('Strange: Failed to update chain!');
-                }
+
+                return true;
+
             }
         } catch (\Exception $e) {
             $this->dbh->rollBack();
