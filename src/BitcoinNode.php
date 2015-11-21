@@ -245,15 +245,13 @@ class BitcoinNode extends EventEmitter
         $state = $this->chain();
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
-        if ($count === 0) {
-            return;
+         if ($count > 0) {
+            $this->headers->acceptBatch($state, $vHeaders);
+            $this->chains->checkTips();
+
+            $last = end($vHeaders);
+            $this->peerState->fetch($peer)->updateBlockAvailability($state, $last->getHash());
         }
-
-        $this->headers->acceptBatch($state, $vHeaders);
-        $this->chains->checkTips();
-
-        $last = end($vHeaders);
-        $this->peerState->fetch($peer)->updateBlockAvailability($state, $last->getHash());
 
         if (2000 === $count) {
             $peer->getheaders($state->getHeadersLocator());
@@ -390,7 +388,9 @@ class BitcoinNode extends EventEmitter
                             $chain = $this->chain();
                             $height = $chain->getChain()->getIndex()->getHeight();
                             echo "height $height\n";
-
+                            if ($height !== 0) {
+                                $height--;
+                            }
                             $peer->getheaders($chain->getLocator($height));
                         });
                 }

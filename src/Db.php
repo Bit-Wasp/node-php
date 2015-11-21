@@ -735,7 +735,7 @@ GROUP BY r.tip_hash;');
 
         $vTx = $block->getTransactions();
         for ($i = count($vTx) - 1; $i > 0; $i--) {
-            $tx = $vTx->get($i);
+            $tx = $vTx[$i];
             foreach ($tx->getInputs() as $in) {
                 $txid = $in->getTransactionId();
                 $vout = $in->getVout();
