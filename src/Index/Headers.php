@@ -67,7 +67,7 @@ class Headers
     }
 
     /**
-     * @param string $hash
+     * @param Buffer $hash
      * @return BlockIndex
      */
     public function fetch(Buffer $hash)

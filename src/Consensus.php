@@ -89,8 +89,10 @@ class Consensus
             $timespan = $highest;
         }
 
-        $target = $math->compact()->set($header->getBits()->getInt());
-        $limit = $this->math->compact()->set($this->params->powBitsLimit());
+        $negative = false;
+        $overflow = false;
+        $target = $math->compact()->set($header->getBits()->getInt(), $negative, $overflow);
+        $limit = $this->math->compact()->set($this->params->powBitsLimit(), $negative, $overflow);
         $new = bcdiv(bcmul($target, $timespan), $this->params->powTargetTimespan());
         if ($math->cmp($new, $limit) > 0) {
             $new = $limit;
