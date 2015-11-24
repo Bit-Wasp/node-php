@@ -117,7 +117,7 @@ class BlockCheck implements BlockCheckInterface
     public function checkTransactionIsFinal(TransactionInterface $tx, $height, $time)
     {
         $nLockTime = $tx->getLockTime();
-        if (0 == $nLockTime) {
+        if (0 === $nLockTime) {
             return true;
         }
 
@@ -144,14 +144,16 @@ class BlockCheck implements BlockCheckInterface
         $value = 0;
         foreach ($outputs as $output) {
             if ($this->math->cmp($output->getValue(), 0) < 0) {
-                throw new \RuntimeException('CheckTransaction: tx.out error 1');
+                throw new \RuntimeException('CheckOutputsAmount: value negative');
             }
+
             if (!$this->consensus->checkAmount($output->getValue())) {
-                throw new \RuntimeException('CheckTransaction: tx.out error 2');
+                throw new \RuntimeException('CheckOutputsAmount: invalid amount');
             }
+
             $value = $this->math->add($value, $output->getValue());
             if ($this->math->cmp($value, 0) < 0 || !$this->consensus->checkAmount($value)) {
-                throw new \RuntimeException('CheckTransaction: tx.out error 3');
+                throw new \RuntimeException('CheckOutputsAmount: invalid total amount');
             }
         }
 
@@ -236,7 +238,7 @@ class BlockCheck implements BlockCheckInterface
 
         $transactions = $block->getTransactions();
         $txCount = count($transactions);
-        if ($txCount == 0 || $block->getBuffer()->getSize() > $this->params->maxBlockSizeBytes()) {
+        if (0 === $txCount || $block->getBuffer()->getSize() > $this->params->maxBlockSizeBytes()) {
             throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
         }
 
@@ -246,7 +248,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         for ($i = 1; $i < $txCount; $i++) {
-            if ($transactions->offsetGet($i)->isCoinbase()) {
+            if ($transactions[$i]->isCoinbase()) {
                 throw new \RuntimeException('Blocks::check(): more than one coinbase');
             }
         }
@@ -276,7 +278,8 @@ class BlockCheck implements BlockCheckInterface
     public function checkContextualInputs(UtxoView $view, TransactionInterface $tx, $spendHeight)
     {
         $valueIn = 0;
-        for ($i = 0; $i < count($tx->getInputs()); $i++) {
+        $nInputs = count($tx->getInputs());
+        for ($i = 0; $i < $nInputs; $i++) {
             $utxo = $view->fetchByInput($tx->getInput($i));
             /*if ($out->isCoinbase()) {
                 // todo: cb / height
