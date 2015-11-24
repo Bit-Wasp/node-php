@@ -8,6 +8,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class AbstractNodeClient extends AbstractCommand
 {
+    /**
+     * @var string
+     */
     protected $description;
 
     /**

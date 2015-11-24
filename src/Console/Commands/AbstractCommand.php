@@ -25,23 +25,6 @@ abstract class AbstractCommand extends Command
     protected $defaultRedisHost = '127.0.0.1';
 
     /**
-     * @param ConfigProviderInterface $config
-     * @return StorageProvider
-     */
-    protected function loadStorageProvider(ConfigProviderInterface $config)
-    {
-        if ($config->getItem('config', 'storage-redis', false)) {
-            $redis = new \Redis();
-            $redis->connect($config->getItem('redis', 'host', $this->defaultRedisHost));
-            $mkCache = StorageProvider::makeRedis($redis);
-        } else {
-            throw new \RuntimeException('No storage module loaded');
-        }
-
-        return new StorageProvider($mkCache);
-    }
-
-    /**
      * @param string|null $file
      * @return \Packaged\Config\Provider\Ini\IniConfigProvider
      */

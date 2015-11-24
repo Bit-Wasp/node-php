@@ -96,7 +96,6 @@ class Blocks
             ->check($block)
             ->checkContextual($block, $bestBlock);
 
-        //$view = $utxoIdx->fetchView($state, $block);
         $view = $this->db->fetchUtxoView($block);
 
         $flagP2sh = $this->consensus->scriptVerifyPayToScriptHash($bestBlock->getHeader()->getTimestamp());

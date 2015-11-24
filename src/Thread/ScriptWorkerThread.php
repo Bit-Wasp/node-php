@@ -2,6 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Thread;
 
+use BitWasp\Bitcoin\Script\ScriptFactory;
 use \BitWasp\Thread\Thread;
 use \React\EventLoop\Factory as LoopFactory;
 use \React\ZMQ\Context as ZmqContext;
@@ -17,7 +18,6 @@ class ScriptWorkerThread extends Thread
     public function __construct()
     {
         parent::__construct(function () {
-            $consensus = new ConsensusFactory(Bitcoin::getEcAdapter());
 
             $loop = LoopFactory::create();
             $context = new ZmqContext($loop);
@@ -31,12 +31,12 @@ class ScriptWorkerThread extends Thread
                 }
             });
 
-            $results = $context->getSocket(\ZMQ::SOCKET_PUSH);
-            $results->connect("tcp://127.0.0.1:5593");
+            $this->results = $context->getSocket(\ZMQ::SOCKET_PUSH);
+            $this->results->connect("tcp://127.0.0.1:5593");
 
             $workers = $context->getSocket(\ZMQ::SOCKET_PULL);
             $workers->connect('tcp://127.0.0.1:5592');
-            $workers->on('message', function ($message) use ($consensus, $results) {
+            $workers->on('message', function ($message) {
                 $details = json_decode($message, true);
                 $txid = $details['txid'];
                 $flags = $details['flags'];
@@ -44,12 +44,10 @@ class ScriptWorkerThread extends Thread
                 $scriptPubKey = new Script(Buffer::hex($details['scriptPubKey']));
                 $tx = TransactionFactory::fromHex($details['tx']);
 
-                $results->send(json_encode([
+                $this->results->send(json_encode([
                     'txid' => $txid,
                     'vin' => $vin,
-                    'result' => $consensus
-                        ->getConsensus(new Flags($flags))
-                        ->verify($tx, $scriptPubKey, $vin)
+                    'result' => ScriptFactory::consensus(new Flags($flags))->verify($tx, $scriptPubKey, $vin)
                 ]));
             });
 

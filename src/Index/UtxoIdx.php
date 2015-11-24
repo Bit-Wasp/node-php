@@ -7,14 +7,22 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoCache;
-use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Db;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Utxo\Utxo;
 
 class UtxoIdx
 {
+    /**
+     * @var Db
+     */
     private $db;
 
+    /**
+     * UtxoIdx constructor.
+     * @param Chains $chains
+     * @param Db $db
+     */
     public function __construct(Chains $chains, Db $db)
     {
         $this->db = $db;
@@ -38,7 +46,7 @@ class UtxoIdx
         $utxos = [];
         $vTx = $block->getTransactions();
         for ($i = count($vTx) - 1; $i > 0; $i--) {
-            $tx = $vTx->get($i);
+            $tx = $vTx[$i];
             foreach ($tx->getInputs() as $in) {
                 $index = $in->getTransactionId() . $in->getVout();
                 $need[$index] = $i;
