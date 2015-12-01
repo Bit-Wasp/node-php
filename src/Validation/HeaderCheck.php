@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;

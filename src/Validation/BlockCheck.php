@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;

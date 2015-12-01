@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
-
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;

@@ -43,5 +43,4 @@ class ConfigLoader
         $config->loadFile($this->location);
         return $config;
     }
-
 }

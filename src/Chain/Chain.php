@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Index;
 use BitWasp\Buffertools\Buffer;
@@ -82,7 +81,7 @@ class Chain
     }
 
     /**
-     * @param $height
+     * @param int $height
      * @return Buffer
      */
     public function getHashFromHeight($height)

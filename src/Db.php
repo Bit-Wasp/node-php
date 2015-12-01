@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
@@ -116,9 +115,6 @@ class Db
      */
     public function insertIndexGenesis(BlockIndex $index)
     {
-        if ($this->debug) {
-            echo "db: called insertIndexGenesis\n";
-        }
 
         $stmt = $this->dbh->prepare("
           INSERT INTO headerIndex (
@@ -154,9 +150,6 @@ class Db
      */
     public function insertBlockGenesis(BlockInterface $block)
     {
-        if ($this->debug) {
-            echo "db: called insertBlockGenesis\n";
-        }
 
         $stmt = $this->dbh->prepare("INSERT INTO blockIndex (hash) VALUES (:hash)");
 
@@ -171,10 +164,6 @@ class Db
      */
     public function insertBlock(BlockInterface $block)
     {
-        if ($this->debug) {
-            echo "db: called insertBlock \n";
-        }
-
         $blockHash = $block->getHeader()->getHash()->getHex();
 
         try {
@@ -263,11 +252,7 @@ class Db
             return true;
 
         } catch (\Exception $e) {
-
             $this->dbh->rollBack();
-            echo "INSERT FAIL!\n";
-            echo $e->getMessage() . "\n";
-            die("this shouldn't happen");
         }
 
         throw new \RuntimeException('MySqlDb: ');
@@ -281,11 +266,7 @@ class Db
      */
     public function insertIndexBatch(BlockIndex $startIndex, array $index)
     {
-        if ($this->debug) {
-            echo "db: called insertIndexBATCH\n";
-        }
-
-        if (null == $this->fetchLftStmt) {
+        if (null === $this->fetchLftStmt) {
             $this->fetchLftStmt = $this->dbh->prepare('SELECT lft FROM headerIndex WHERE hash = :prevBlock');
             $this->updateIndicesStmt = $this->dbh->prepare('
                 UPDATE headerIndex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
@@ -365,10 +346,6 @@ class Db
      */
     public function haveHeader($hash)
     {
-        if ($this->debug) {
-            echo "db: called haveHeader ($hash)\n";
-        }
-
         if (null === $this->haveHeaderStmt) {
             $this->haveHeaderStmt = $this->dbh->prepare('
               SELECT    COUNT(*) as count
@@ -398,9 +375,6 @@ class Db
      */
     public function fetchIndex(Buffer $hash)
     {
-        if ($this->debug) {
-            echo "db: called fetchIndex\n";
-        }
 
         if (null == $this->fetchIndexStmt) {
             $this->fetchIndexStmt = $this->dbh->prepare('
@@ -442,9 +416,6 @@ class Db
      */
     public function fetchBlockTransactions(Buffer $blockHash)
     {
-        if ($this->debug) {
-            echo sprintf('[db] called fetchBlockTransactions (%s)', $blockHash->getHex());
-        }
 
         if (null === $this->txsStmt) {
             $this->txsStmt = $this->dbh->prepare('
@@ -512,9 +483,6 @@ class Db
      */
     public function fetchBlock(Buffer $hash)
     {
-        if ($this->debug) {
-            echo 'db: called fetchBlock (' . $hash->getHex() . '\n';
-        }
 
         $stmt = $this->dbh->prepare('
            SELECT     h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
@@ -554,9 +522,6 @@ class Db
      */
     public function fetchChainState(Headers $headers)
     {
-        if ($this->debug) {
-            echo "db: called fetchChainState \n";
-        }
 
         $stmt = $this->dbh->prepare('
 SELECT * FROM (
@@ -625,7 +590,8 @@ GROUP BY r.tip_hash;');
                     )
                 );
 
-                $states[] = new ChainState($math,
+                $states[] = new ChainState(
+                    $math,
                     new Chain(
                         $map,
                         $bestHeader,
@@ -652,9 +618,7 @@ GROUP BY r.tip_hash;');
      */
     public function findFork(Chain $activeChain, BlockLocator $locator)
     {
-        if ($this->debug) {
-            echo "db: called findFork\n";
-        }
+
         $hashes = [$activeChain->getIndex()->getHash()];
         foreach ($locator->getHashes() as $hash) {
             $hashes[] = $hash->getHex();
@@ -686,9 +650,7 @@ GROUP BY r.tip_hash;');
      */
     public function fetchNextHeaders($hash)
     {
-        if ($this->debug) {
-            echo "db: called fetchNextHeaders ($hash)\n";
-        }
+
         $stmt = $this->dbh->prepare("
             SELECT    child.version, child.prevBlock, child.merkleRoot,
                       child.nTimestamp, child.nBits, child.nNonce, child.height
@@ -823,7 +785,6 @@ GROUP BY r.tip_hash;');
             throw new \RuntimeException('Utxo was not found');
         }
 
-        echo "Fetched $requiredCount of " . ($initialCount + $requiredCount) . "\n";
         return new UtxoView($outputSet);
 
     }

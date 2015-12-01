@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-
 use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;

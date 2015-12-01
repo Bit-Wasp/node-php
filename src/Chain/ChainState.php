@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Buffertools\Buffer;
@@ -139,9 +138,7 @@ class ChainState
      */
     public function getHeadersLocator(Buffer $hashStop = null)
     {
-        echo 'Produce Headers locator (' . $this->chain->getIndex()->getHeight() . ') ' . PHP_EOL;
-        $height = $this->chain->getIndex()->getHeight();
-        return $this->getLocator($height, $hashStop);
+        return $this->getLocator($this->chain->getIndex()->getHeight(), $hashStop);
     }
 
     /**
@@ -150,8 +147,6 @@ class ChainState
      */
     public function getBlockLocator(Buffer $hashStop = null)
     {
-        echo 'Produce Blocks locator (' . $this->lastBlock->getHeight() . ') ' . PHP_EOL;
         return $this->getLocator($this->lastBlock->getHeight(), $hashStop);
     }
-
 }

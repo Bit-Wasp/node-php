@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 
 class KnownInventory

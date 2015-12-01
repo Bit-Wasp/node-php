@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
-
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;

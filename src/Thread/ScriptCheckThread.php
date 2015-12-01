@@ -6,7 +6,6 @@ use BitWasp\Thread\Thread;
 use \React\EventLoop\Factory as LoopFactory;
 use \React\ZMQ\Context as ZmqContext;
 
-
 class ScriptCheckThread extends Thread
 {
     public function __construct()
