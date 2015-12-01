@@ -2,16 +2,17 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
+use React\ZMQ\Context;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class StopNode extends AbstractCommand
+class WatchNode extends AbstractCommand
 {
     protected function configure()
     {
         $this
-            ->setName('stop')
-            ->setDescription('Issue the stop signal');
+            ->setName('watch')
+            ->setDescription('Watch for messages from the bitcoin node');
     }
 
     /**
@@ -22,19 +23,15 @@ class StopNode extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $loop = \React\EventLoop\Factory::create();
-
-        $context = new \React\ZMQ\Context($loop);
-
-        $push = $context->getSocket(\ZMQ::SOCKET_REQ);
-        $push->connect('tcp://127.0.0.1:5560');
-        $push->on('message', function ($message = '') use ($loop) {
-            if ($message === 'shutdown') {
-                echo "Shutdown successfully\n";
-            }
-            $loop->stop();
+        $context = new Context($loop);
+        $cmdControl = $context->getSocket(\ZMQ::SOCKET_SUB);
+        $cmdControl->connect('tcp://127.0.0.1:5566');
+        $cmdControl->subscribe('');
+        $cmdControl->on('message', function ($e) {
+            echo $e . PHP_EOL;
         });
-        $push->send('shutdown');
-
         $loop->run();
+
+        return 0;
     }
 }

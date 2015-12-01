@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\State;
 
-
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Buffertools\Buffer;
 

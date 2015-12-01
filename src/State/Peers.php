@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\State;
 
-
 use BitWasp\Bitcoin\Networking\NetworkSerializable;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 

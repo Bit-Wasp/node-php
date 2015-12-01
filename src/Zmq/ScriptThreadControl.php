@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq;
 
-
 use React\ZMQ\Context;
 
 class ScriptThreadControl

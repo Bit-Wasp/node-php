@@ -5,7 +5,6 @@ namespace BitWasp\Bitcoin\Node\Zmq;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use \React\ZMQ\Context;
 
-
 class UserControl
 {
     /**

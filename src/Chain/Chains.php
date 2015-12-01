@@ -2,11 +2,11 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use Evenement\EventEmitter;
 
-class Chains
+class Chains extends EventEmitter
 {
     /**
      * @var EcAdapterInterface
@@ -22,6 +22,11 @@ class Chains
      * @var ChainState
      */
     private $best;
+
+    /**
+     * @var BlockIndex
+     */
+    private $bestIndex;
 
     /**
      * @param EcAdapterInterface $adapter
@@ -49,9 +54,12 @@ class Chains
         usort($tips, array($this, 'compareChainStateWork'));
 
         $greatestWork = end($tips);
-        $this->best = $greatestWork;
-        //echo "Setting chain with best headers to:: " . $greatestWork->getChainIndex()->getHash() . " (work: " . $greatestWork->getChainIndex()->getWork() . ") \n\n";
-        //echo "                   best block     :: " . $greatestWork->getLastBlock()->getHash() . "\n";
+        /** @var ChainState $greatestWork */
+        if (!isset($this->best) || $this->bestIndex !== $greatestWork->getChainIndex()) {
+            $this->best = $greatestWork;
+            $this->bestIndex = $greatestWork->getChainIndex();
+            $this->emit('newtip', [$greatestWork]);
+        }
     }
 
     /**

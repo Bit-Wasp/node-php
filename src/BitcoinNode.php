@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
@@ -12,10 +11,8 @@ use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
 use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
-use BitWasp\Bitcoin\Networking\NetworkMessage;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
-use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
@@ -25,6 +22,7 @@ use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\Validation\ZmqScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
+use BitWasp\Bitcoin\Node\Zmq\Notifier;
 use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
 use BitWasp\Buffertools\Buffer;
@@ -59,11 +57,6 @@ class BitcoinNode extends EventEmitter
      * @var \BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface
      */
     private $adapter;
-
-    /**
-     * @var NetworkingFactory
-     */
-    private $netFactory;
 
     /**
      * @var PeerStateCollection
@@ -115,12 +108,17 @@ class BitcoinNode extends EventEmitter
         $this->loop = $loop;
         $this->params = $params;
         $this->adapter = $adapter;
+        $this->notifier = new Notifier($zmq, $this);
         $this->chains = new Chains($adapter);
+        $this->chains->on('newtip', function (ChainState $state) {
+            $index = $state->getChainIndex();
+            $this->notifier->send('chain.newtip', ['hash' => $index->getHash(), 'height' => $index->getHeight(), 'work' => $index->getWork()]);
+        });
+
         $this->inventory = new KnownInventory();
         $this->peerState = new PeerStateCollection();
         $this->peersInbound = new Peers();
         $this->peersOutbound = new Peers();
-        $this->netFactory = new NetworkingFactory($loop);
 
         $this->db = new Db($this->config, false);
         $consensus = new Consensus($math, $params);
@@ -192,23 +190,6 @@ class BitcoinNode extends EventEmitter
     }
 
     /**
-     * @param Inventory $inventory
-     * @return bool
-     */
-    public function checkInventory(Inventory $inventory)
-    {
-        if ($inventory->isBlock()) {
-            //return isset($this->blocks->hashIndex[$inventory->getHash()->getHex()]);
-        }
-
-        if ($inventory->isTx()) {
-            return $this->db->transactions->fetch($inventory->getHash()->getHex()) !== null;
-        }
-
-        return true;
-    }
-
-    /**
      * @return ChainState
      */
     public function chain()
@@ -220,7 +201,7 @@ class BitcoinNode extends EventEmitter
      * @param Peer $peer
      * @param GetHeaders $getHeaders
      */
-    public function onGetHeaders(Peer $peer, GetHeaders $getHeaders )
+    public function onGetHeaders(Peer $peer, GetHeaders $getHeaders)
     {
         return;
         $chain = $this->chain()->getChain();
@@ -245,7 +226,7 @@ class BitcoinNode extends EventEmitter
         $state = $this->chain();
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
-         if ($count > 0) {
+        if ($count > 0) {
             $this->headers->acceptBatch($state, $vHeaders);
             $this->chains->checkTips();
 
@@ -260,6 +241,8 @@ class BitcoinNode extends EventEmitter
         if ($count < 2000) {
             $this->blockDownload->start($state, $peer);
         }
+
+        $this->notifier->send('p2p.headers', ['count' => count($vHeaders)]);
     }
 
     /**
@@ -271,14 +254,16 @@ class BitcoinNode extends EventEmitter
         $best = $this->chain();
 
         $vFetch = [];
+        $txs = [];
         $blocks = [];
         foreach ($inv->getItems() as $item) {
             if ($item->isBlock()) {
                 $blocks[] = $item;
-            } else {
-                $vFetch[] = $item;
+            } elseif ($item->isTx()) {
+                $txs[] = $item;
             }
         }
+        $this->notifier->send('p2p.inv', ['blocks' => count($blocks), 'txs' => count($txs)]);
 
         if (count($blocks) !== 0) {
             $blockView = $best->bestBlocksCache();
@@ -300,7 +285,9 @@ class BitcoinNode extends EventEmitter
         $block = $blockMsg->getBlock();
 
         try {
-            $this->blocks->accept($best, $block, $this->headers, $this->utxo);
+            $index = $this->blocks->accept($best, $block, $this->headers, $this->utxo);
+            $this->notifier->send('p2p.block', ['hash' => $index->getHash(), 'height' => $index->getHeight()]);
+
             $this->chains->checkTips();
             $this->blockDownload->received($best, $peer, $block->getHeader()->getHash());
 
@@ -322,8 +309,6 @@ class BitcoinNode extends EventEmitter
                 }
             }
         }
-
-
     }
 
     /**
@@ -331,72 +316,54 @@ class BitcoinNode extends EventEmitter
      */
     public function start()
     {
-        $dns = $this->netFactory->getDns();
-        $peerFactory = $this->netFactory->getPeerFactory($dns);
-        $handler = $peerFactory->getPacketHandler();
-        $locator = $peerFactory->getLocator();
-
         $txRelay = $this->config->getItem('config', 'tx_relay', false);
+        $netFactory = new NetworkingFactory($this->loop);
+
+        $dns = $netFactory->getDns();
+        $peerFactory = $netFactory->getPeerFactory($dns);
+        $handler = $peerFactory->getPacketHandler();
+        $handler->on('ping', function (Peer $peer, Ping $ping) {
+            $peer->pong($ping);
+        });
+
+        $locator = $peerFactory->getLocator();
         $manager = $peerFactory->getManager($txRelay);
-        $manager->on('outbound', function (Peer $peer) {
-            $this->peersOutbound->add($peer);
-        });
-        $manager->on('inbound', function (Peer $peer) {
-            $this->peersInbound->add($peer);
-        });
         $manager->registerHandler($handler);
 
         // Setup listener if required
         if ($this->config->getItem('config', 'listen', '0')) {
-            echo ' [App - networking] enable listener';
             $server = new \React\Socket\Server($this->loop);
             $listener = $peerFactory->getListener($server);
             $manager->registerListener($listener);
         }
 
-        $handler->on('ping', function (Peer $peer, Ping $ping) {
-            $peer->pong($ping);
-        });
-
-        // Only for outbound peers
-        $handler->on('outbound', function (Peer $peer) {
-            $peer->on('msg', function (Peer $peer, NetworkMessage $msg) {
-                $payload = $msg->getPayload();
-
-                if ($msg->getCommand() === 'block') {
-                    /** @var Block $payload */
-                    echo ' [Peer] ' . $peer->getRemoteAddr()->getIp() . ' - block - ' . $payload->getBlock()->getHeader()->getHash()->getHex() . PHP_EOL;
-                } else {
-                    echo ' [Peer] ' . $peer->getRemoteAddr()->getIp() . ' - ' . $msg->getCommand(). PHP_EOL;
-                }
-            });
-
+        $manager->on('outbound', function (Peer $peer) {
             $peer->on('block', array ($this, 'onBlock'));
             $peer->on('inv', array ($this, 'onInv'));
             $peer->on('getheaders', array ($this, 'onGetHeaders'));
             $peer->on('headers', array ($this, 'onHeaders'));
 
+            $addr = $peer->getRemoteAddr();
+            $this->notifier->send('peer.outbound.new', ['peer' =>['ip'=>$addr->getIp(), 'port' => $addr->getPort()]]);
+
+            $this->peersOutbound->add($peer);
+
+            $chain = $this->chain();
+            $height = $chain->getChain()->getIndex()->getHeight();
+            $height = ($height != 0) ? $height - 1 : $height;
+            $peer->getheaders($chain->getLocator($height));
+        });
+
+        $manager->on('inbound', function (Peer $peer) {
+            $this->peersInbound->add($peer);
         });
 
         $locator
             ->queryDnsSeeds(1)
             ->then(function (Locator $locator) use ($manager, $handler) {
-                for ($i = 0; $i < 1 ; $i++) {
-                    $manager
-                        ->connectNextPeer($locator)
-                        ->then(function (Peer $peer) {
-                            $chain = $this->chain();
-                            $height = $chain->getChain()->getIndex()->getHeight();
-                            echo "height $height\n";
-                            if ($height !== 0) {
-                                $height--;
-                            }
-                            $peer->getheaders($chain->getLocator($height));
-                        });
+                for ($i = 0; $i < 1; $i++) {
+                    $manager->connectNextPeer($locator);
                 }
-            }, function () {
-                echo 'ERROR';
             });
     }
-
 }

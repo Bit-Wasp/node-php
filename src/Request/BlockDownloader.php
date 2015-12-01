@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Request;
 
-
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\ChainCache;
@@ -65,7 +64,7 @@ class BlockDownloader
         $lastUnknown = null;
         foreach ($items as $inv) {
             $hash = $inv->getHash();
-            if ($chain->containsHash($hash) ){
+            if ($chain->containsHash($hash)) {
                 if (!$chainView->containsHash($hash)) {
                     $fetch[] = $inv;
                 }
@@ -100,5 +99,4 @@ class BlockDownloader
 
         $this->request->requestNextBlocks($bestChain, $peer);
     }
-
 }

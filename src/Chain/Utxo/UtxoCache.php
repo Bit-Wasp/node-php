@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain\Utxo;
 
-
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;

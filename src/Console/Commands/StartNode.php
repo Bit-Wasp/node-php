@@ -2,8 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
-
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Chain\Params;

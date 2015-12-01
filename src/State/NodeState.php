@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\State;
 
-
 class NodeState extends AbstractState
 {
     /**

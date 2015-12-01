@@ -2,8 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
-
 use BitWasp\Buffertools\Buffer;
 
 class ChainCache

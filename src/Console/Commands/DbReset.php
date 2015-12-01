@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
-
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
 use Symfony\Component\Console\Input\InputInterface;
