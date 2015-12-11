@@ -74,6 +74,41 @@ class Db
     private $debug;
 
     /**
+     * @var string
+     */
+    private $tblIndex = 'iindex';
+
+    /**
+     * @var string
+     */
+    private $tblHeaders = 'headerIndex';
+
+    /**
+     * @var string
+     */
+    private $tblBlocks = 'blockIndex';
+
+    /**
+     * @var string
+     */
+    private $tblBlockTxs = 'block_transactions';
+
+    /**
+     * @var string
+     */
+    private $tblTransactions = 'transactions';
+
+    /**
+     * @var string
+     */
+    private $tblTxIn = 'transaction_input';
+
+    /**
+     * @var string
+     */
+    private $tblTxOut = 'transaction_output';
+
+    /**
      * @param ConfigProviderInterface $config
      * @param bool|false $debug
      */
@@ -103,13 +138,13 @@ class Db
     {
         /** @var \PDOStatement[] $stmt */
         $stmt = [];
-        $stmt[] = $this->dbh->prepare("TRUNCATE iindex");
-        $stmt[] = $this->dbh->prepare("TRUNCATE headerIndex");
-        $stmt[] = $this->dbh->prepare("TRUNCATE blockIndex");
-        $stmt[] = $this->dbh->prepare("TRUNCATE transactions");
-        $stmt[] = $this->dbh->prepare("TRUNCATE block_transactions");
-        $stmt[] = $this->dbh->prepare("TRUNCATE transaction_output");
-        $stmt[] = $this->dbh->prepare("TRUNCATE transaction_input");
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblIndex);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblHeaders);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlocks);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlockTxs);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTransactions);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxOut);
+        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxIn);
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -122,22 +157,22 @@ class Db
      */
     public function createIndexGenesis(BlockHeaderInterface $header)
     {
-        $stmtIndex = $this->dbh->prepare("INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)");
+        $stmtIndex = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . ' (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
 
-        $stmtHeader = $this->dbh->prepare("INSERT INTO headerIndex (
+        $stmtHeader = $this->dbh->prepare('INSERT INTO ' . $this->tblHeaders . ' (
             hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
           ) VALUES (
             :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce
           )
-        ");
+        ');
 
         if ($stmtHeader->execute(array(
             'hash' => $header->getHash()->getHex(),
             'height' => 0,
             'work' => 0,
             'version' => $header->getVersion(),
-            'prevBlock' => $header->getPrevBlock(),
-            'merkleRoot' => $header->getMerkleRoot(),
+            'prevBlock' => hex2bin($header->getPrevBlock()),
+            'merkleRoot' => hex2bin($header->getMerkleRoot()),
             'nBits' => $header->getBits()->getInt(),
             'nTimestamp' => $header->getTimestamp(),
             'nNonce' => $header->getNonce()
@@ -160,7 +195,7 @@ class Db
      */
     public function createBlockIndexGenesis(BlockIndex $index)
     {
-        $stmt = $this->dbh->prepare("INSERT INTO blockIndex (hash) VALUES (:hash)");
+        $stmt = $this->dbh->prepare("INSERT INTO ' . $this->tblBlocks . ' (hash) VALUES (:hash)");
         $stmt->bindValue(':hash', $index->getHash());
         $stmt->execute();
     }
@@ -236,19 +271,19 @@ class Db
 
             // Finish & prepare each statement
             // Insert the blocks hash
-            $blockInsert = $this->dbh->prepare("INSERT INTO blockIndex ( hash ) VALUES ( :hash )");
+            $blockInsert = $this->dbh->prepare('INSERT INTO '.$this->tblBlocks.' ( hash ) VALUES ( :hash )');
             $blockInsert->bindValue(':hash', $blockHash);
 
-            $insertTx = $this->dbh->prepare("INSERT INTO transactions (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES " . implode(", ", $txBind));
+            $insertTx = $this->dbh->prepare('INSERT INTO '.$this->tblTransactions.'  (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
             unset($txBind);
 
-            $insertTxList = $this->dbh->prepare("INSERT INTO block_transactions (block_hash, transaction_hash) VALUES " . implode(", ", $txListBind));
+            $insertTxList = $this->dbh->prepare('INSERT INTO '.$this->tblBlockTxs.'  (block_hash, transaction_hash) VALUES ' . implode(', ', $txListBind));
             unset($txListBind);
 
-            $insertInputs = $this->dbh->prepare("INSERT INTO transaction_input (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES " . implode(", ", $inBind));
+            $insertInputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxIn.'  (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ' . implode(', ', $inBind));
             unset($inBind);
 
-            $insertOutputs = $this->dbh->prepare("INSERT INTO transaction_output (parent_tx, nOutput, value, scriptPubKey) VALUES " . implode(", ", $outBind));
+            $insertOutputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxOut.'  (parent_tx, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $outBind));
             unset($outBind);
 
             $blockInsert->execute();
@@ -276,10 +311,10 @@ class Db
     public function insertIndexBatch(BlockIndex $startIndex, array $index)
     {
         if (null === $this->fetchLftStmt) {
-            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
+            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
             $this->updateIndicesStmt = $this->dbh->prepare('
-                UPDATE iindex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
-                UPDATE iindex SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
+                UPDATE ' . $this->tblIndex . '  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
+                UPDATE ' . $this->tblIndex . '  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         }
 
@@ -325,8 +360,8 @@ class Db
 
                     $header = $i->getHeader();
                     $headerValues['version' . $c] = $header->getVersion();
-                    $headerValues['prevBlock' . $c] = $header->getPrevBlock();
-                    $headerValues['merkleRoot' . $c] = $header->getMerkleRoot();
+                    $headerValues['prevBlock' . $c] = hex2bin($header->getPrevBlock());
+                    $headerValues['merkleRoot' . $c] = hex2bin($header->getMerkleRoot());
                     $headerValues['nBits' . $c] = $header->getBits()->getInt();
                     $headerValues['nTimestamp' . $c] = $header->getTimestamp();
                     $headerValues['nNonce' . $c] = $header->getNonce();
@@ -337,9 +372,9 @@ class Db
                     $c++;
                 }
 
-                $insertHeaders = $this->dbh->prepare("
-                  INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
-                  VALUES " . implode(', ', $headerQuery));
+                $insertHeaders = $this->dbh->prepare('
+                  INSERT INTO ' . $this->tblHeaders . '  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+                  VALUES ' . implode(', ', $headerQuery));
                 $insertHeaders->execute($headerValues);
 
                 $lastId = (int)$this->dbh->lastInsertId();
@@ -349,7 +384,7 @@ class Db
                     $indexValues['header_id' . $i] = $rowId;
                 }
 
-                $insertIndices = $this->dbh->prepare("INSERT INTO iindex (header_id, lft, rgt) VALUES ".implode(', ', $indexQuery));
+                $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
                 $insertIndices->execute($indexValues);
 
                 $this->dbh->commit();
@@ -374,7 +409,7 @@ class Db
         if (null === $this->haveHeaderStmt) {
             $this->haveHeaderStmt = $this->dbh->prepare('
               SELECT    COUNT(*) as count
-              FROM      headerIndex
+              FROM      ' . $this->tblHeaders . '
               WHERE     hash = :hash
             ');
         }
@@ -404,7 +439,7 @@ class Db
         if (null == $this->fetchIndexStmt) {
             $this->fetchIndexStmt = $this->dbh->prepare('
                SELECT     i.*
-               FROM       headerIndex i
+               FROM       ' . $this->tblHeaders . '  i
                WHERE      i.hash = :hash
             ');
         }
@@ -422,8 +457,8 @@ class Db
                     $row['work'],
                     new BlockHeader(
                         $row['version'],
-                        $row['prevBlock'],
-                        $row['merkleRoot'],
+                        bin2hex($row['prevBlock']),
+                        bin2hex($row['merkleRoot']),
                         $row['nTimestamp'],
                         Buffer::int((string)$row['nBits'], 4),
                         $row['nNonce']
@@ -445,7 +480,7 @@ class Db
         if (null == $this->fetchIndexIdStmt) {
             $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
-               FROM       headerIndex i
+               FROM       ' . $this->tblHeaders . '  i
                WHERE      i.id = :id
             ');
         }
@@ -483,15 +518,15 @@ class Db
         if (null === $this->txsStmt) {
             $this->txsStmt = $this->dbh->prepare('
                 SELECT t.hash, t.version, t.nLockTime
-                FROM transactions t
-                JOIN block_transactions bt ON bt.transaction_hash = t.hash
+                FROM ' . $this->tblTransactions . '  t
+                JOIN ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = t.hash
                 WHERE bt.block_hash = :hash
             ');
 
             $this->txInStmt = $this->dbh->prepare('
                 SELECT txIn.parent_tx, txIn.hashPrevOut, txIn.nPrevOut, txIn.scriptSig, txIn.nSequence
-                FROM transaction_input txIn
-                JOIN block_transactions bt ON bt.transaction_hash = txIn.parent_tx
+                FROM ' . $this->tblTxIn . '  txIn
+                JOIN ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = txIn.parent_tx
                 WHERE bt.block_hash = :hash
                 GROUP BY txIn.parent_tx
                 ORDER BY txIn.nInput
@@ -499,8 +534,8 @@ class Db
 
             $this->txOutStmt = $this->dbh->prepare('
               SELECT    txOut.parent_tx, txOut.value, txOut.scriptPubKey
-              FROM      transaction_output txOut
-              JOIN      block_transactions bt ON bt.transaction_hash = txOut.parent_tx
+              FROM      ' . $this->tblTxOut . '  txOut
+              JOIN      ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = txOut.parent_tx
               WHERE     bt.block_hash = :hash
               GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
@@ -549,8 +584,8 @@ class Db
 
         $stmt = $this->dbh->prepare('
            SELECT     h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
-           FROM       blockIndex b
-           JOIN       headerIndex h ON b.hash = h.hash
+           FROM       ' . $this->tblBlocks . '  b
+           JOIN       ' . $this->tblHeaders . '  h ON b.hash = h.hash
            WHERE      b.hash = :hash
         ');
 
@@ -563,8 +598,8 @@ class Db
                     Bitcoin::getMath(),
                     new BlockHeader(
                         $r['version'],
-                        $r['prevBlock'],
-                        $r['merkleRoot'],
+                        bin2hex($r['prevBlock']),
+                        bin2hex($r['merkleRoot']),
                         $r['nTimestamp'],
                         Buffer::int($r['nBits'], 4),
                         $r['nNonce']
@@ -588,10 +623,10 @@ class Db
         $stmt = $this->dbh->prepare('
 SELECT * FROM (
      SELECT tipI.header_id as tip, tipP.header_id as lastBlock
-     from `iindex` as tipI, `iindex` as tipP
-     JOIN headerIndex h on h.id = tipP.header_id
-     left JOIN headerIndex AS next ON next.prevBlock = h.hash
-     left join blockIndex AS b ON b.hash = next.hash
+     from ' . $this->tblIndex . '  as tipI, ' . $this->tblIndex . '  as tipP
+     JOIN ' . $this->tblHeaders . '  h on h.id = tipP.header_id
+     left JOIN ' . $this->tblHeaders . '  AS next ON next.prevBlock = h.hash
+     left join ' . $this->tblBlocks . '  AS b ON b.hash = next.hash
      WHERE tipI.rgt = tipI.lft + 1 and b.hash IS NULL
      ORDER BY tipP.lft
  ) as r
@@ -599,13 +634,13 @@ SELECT * FROM (
 ');
 
         if ($stmt->execute()) {
-            $chainPathStmt = $this->dbh->prepare("
+            $chainPathStmt = $this->dbh->prepare('
                SELECT   h.hash
-               FROM     iindex AS node,
-                        iindex AS parent
-               JOIN     headerIndex h on h.id = parent.header_id
+               FROM     ' . $this->tblIndex . ' AS node,
+                        ' . $this->tblIndex . ' AS parent
+               JOIN     ' . $this->tblHeaders . '  h on h.id = parent.header_id
                WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
-            ");
+            ');
 
             $states = [];
             $math = Bitcoin::getMath();
@@ -658,13 +693,13 @@ SELECT * FROM (
         }
 
         $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
-        $stmt = $this->dbh->prepare("
+        $stmt = $this->dbh->prepare('
             SELECT    node.hash
-            FROM      headerIndex AS node,
-                      headerIndex AS parent
-            WHERE     parent.hash = ? AND node.hash in ($placeholders)
+            FROM      ' . $this->tblHeaders . ' AS node,
+                      ' . $this->tblHeaders . ' AS parent
+            WHERE     parent.hash = ? AND node.hash in (' . $placeholders . ')
             ORDER BY  node.rgt LIMIT 1
-        ");
+        ');
 
         if ($stmt->execute($hashes)) {
             $column = $stmt->fetch();
@@ -684,14 +719,14 @@ SELECT * FROM (
     public function fetchNextHeaders($hash)
     {
 
-        $stmt = $this->dbh->prepare("
+        $stmt = $this->dbh->prepare('
             SELECT    child.version, child.prevBlock, child.merkleRoot,
                       child.nTimestamp, child.nBits, child.nNonce, child.height
-            FROM      headerIndex AS child, headerIndex AS parent
+            FROM      ' . $this->tblHeaders . ' AS child, ' . $this->tblHeaders . '  AS parent
             WHERE     child.rgt < parent.rgt
             AND       parent.hash = :hash
             LIMIT     2000
-        ");
+        ');
 
         $stmt->bindParam(':hash', $hash);
         if ($stmt->execute()) {
@@ -791,22 +826,22 @@ SELECT * FROM (
             $queryValues["txidx$i"] = $txidx;
         }
 
-        $sql = "
+        $sql = '
               SELECT    listed.hashParent as txid, listed.nOut as vout,
                         o.value, o.scriptPubKey,
                         allowed_block.height, listed.txidx
-              FROM      transaction_output o
+              FROM      ' . $this->tblTxOut . '  o
               INNER JOIN (
                 $joinList
               ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
-              INNER JOIN block_transactions as bt on listed.hashParent = bt.transaction_hash
+              INNER JOIN ' . $this->tblBlockTxs . '  as bt on listed.hashParent = bt.transaction_hash
               JOIN (
                     SELECT    parent.hash, parent.height
-                    FROM      headerIndex AS tip,
-                              headerIndex AS parent
+                    FROM      ' . $this->tblHeaders . '  AS tip,
+                              ' . $this->tblHeaders . '  AS parent
                     WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
               ) as allowed_block on bt.block_hash = allowed_block.hash
-              ";
+              ';
 
         $stmt = $this->dbh->prepare($sql);
         $stmt->execute($queryValues);
@@ -845,22 +880,22 @@ SELECT * FROM (
             $queryValues["txidx$i"] = $txidx;
         }
 
-        $sql = "
+        $sql = '
               SELECT    listed.hashParent as txid, listed.nOut as vout,
                         o.value, o.scriptPubKey,
                         allowed_block.height, listed.txidx
-              FROM      transaction_output o
+              FROM      ' . $this->tblTxOut . '  o
               INNER JOIN (
                 $joinList
               ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
-              INNER JOIN block_transactions as bt on listed.hashParent = bt.transaction_hash
+              INNER JOIN ' . $this->tblBlockTxs . '  as bt on listed.hashParent = bt.transaction_hash
               JOIN (
                     SELECT    parent.hash, parent.height
-                    FROM      headerIndex AS tip,
-                              headerIndex AS parent
+                    FROM      ' . $this->tblHeaders . '  AS tip,
+                              ' . $this->tblHeaders . ' AS parent
                     WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
               ) as allowed_block on bt.block_hash = allowed_block.hash
-              ";
+              ';
 
         $outputSet = [];
         $stmt = $this->dbh->prepare($sql);
