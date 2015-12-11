@@ -54,6 +54,16 @@ class BitcoinNode extends EventEmitter
     private $headers;
 
     /**
+     * @var Chains
+     */
+    private $chains;
+
+    /**
+     * @var Notifier
+     */
+    private $notifier;
+
+    /**
      * @var \BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface
      */
     private $adapter;
@@ -72,6 +82,11 @@ class BitcoinNode extends EventEmitter
      * @var ParamsInterface
      */
     private $params;
+
+    /**
+     * @var Index\UtxoIdx
+     */
+    private $utxo;
 
     /**
      * @var BlockDownloader
@@ -227,6 +242,7 @@ class BitcoinNode extends EventEmitter
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
         if ($count > 0) {
+
             $this->headers->acceptBatch($state, $vHeaders);
             $this->chains->checkTips();
 

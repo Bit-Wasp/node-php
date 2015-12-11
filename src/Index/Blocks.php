@@ -58,10 +58,13 @@ class Blocks
      */
     public function init(BlockInterface $genesisBlock)
     {
+        $hash = $genesisBlock->getHeader()->getHash();
+        $index = $this->db->fetchIndex($hash);
+
         try {
-            $this->db->fetchBlock($genesisBlock->getHeader()->getHash());
+            $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
-            $this->db->insertBlockGenesis($genesisBlock);
+            $this->db->createBlockIndexGenesis($index);
         }
     }
 

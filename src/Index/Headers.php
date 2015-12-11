@@ -62,7 +62,7 @@ class Headers
         try {
             $this->db->fetchIndex($hash);
         } catch (\Exception $e) {
-            $this->db->insertIndexGenesis(new BlockIndex($hash->getHex(), 0, 0, $header));
+            $this->db->createIndexGenesis($header);
         }
     }
 

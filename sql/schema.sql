@@ -1,3 +1,11 @@
+-- phpMyAdmin SQL Dump
+-- version 4.4.13.1deb1
+-- http://www.phpmyadmin.net
+--
+-- Host: localhost
+-- Generation Time: Dec 11, 2015 at 10:35 PM
+-- Server version: 5.6.27-0ubuntu1
+-- PHP Version: 5.6.11-1ubuntu3.1
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
@@ -6,10 +14,10 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8 */;
+/*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `db`
+-- Database: `coin`
 --
 
 -- --------------------------------------------------------
@@ -22,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `blockIndex` (
   `id` int(9) NOT NULL,
   `hash` varchar(64) NOT NULL,
   `flags` int(32) NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=63523 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -34,7 +42,7 @@ CREATE TABLE IF NOT EXISTS `block_transactions` (
   `id` int(11) NOT NULL,
   `block_hash` varchar(64) NOT NULL,
   `transaction_hash` varchar(64) NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=71382 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -55,7 +63,19 @@ CREATE TABLE IF NOT EXISTS `headerIndex` (
   `hash` varchar(64) NOT NULL,
   `lft` int(9) NOT NULL,
   `rgt` int(9) NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=379020 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `iindex`
+--
+
+CREATE TABLE IF NOT EXISTS `iindex` (
+  `header_id` int(9) NOT NULL,
+  `lft` int(9) NOT NULL,
+  `rgt` int(9) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -73,7 +93,7 @@ CREATE TABLE IF NOT EXISTS `transactions` (
   `version` int(11) NOT NULL,
   `nLockTime` int(11) NOT NULL,
   `isCoinbase` tinyint(1) NOT NULL DEFAULT '0'
-) ENGINE=InnoDB AUTO_INCREMENT=71382 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -89,7 +109,7 @@ CREATE TABLE IF NOT EXISTS `transaction_input` (
   `nSequence` int(15) NOT NULL,
   `parent_tx` varchar(64) CHARACTER SET utf8 NOT NULL,
   `nInput` int(11) NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=90008 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -103,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
   `scriptPubKey` blob NOT NULL,
   `parent_tx` varchar(64) CHARACTER SET utf8mb4 NOT NULL,
   `nOutput` int(11) NOT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=75452 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 --
 -- Indexes for dumped tables
@@ -113,37 +133,53 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 -- Indexes for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
-ADD PRIMARY KEY (`id`), ADD UNIQUE KEY `hash_2` (`hash`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `hash_2` (`hash`);
 
 --
 -- Indexes for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-ADD PRIMARY KEY (`id`), ADD KEY `idx` (`block_hash`,`transaction_hash`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx` (`block_hash`,`transaction_hash`);
 
 --
 -- Indexes for table `headerIndex`
 --
 ALTER TABLE `headerIndex`
-ADD PRIMARY KEY (`id`), ADD KEY `coord` (`lft`,`rgt`,`hash`), ADD KEY `hash` (`hash`), ADD KEY `prevBlock` (`prevBlock`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `coord` (`lft`,`rgt`,`hash`),
+  ADD KEY `hash` (`hash`),
+  ADD KEY `prevBlock` (`prevBlock`);
+
+--
+-- Indexes for table `iindex`
+--
+ALTER TABLE `iindex`
+  ADD UNIQUE KEY `header_id` (`header_id`),
+  ADD KEY `lft` (`lft`,`rgt`);
 
 --
 -- Indexes for table `transactions`
 --
 ALTER TABLE `transactions`
-ADD PRIMARY KEY (`id`), ADD KEY `hash` (`hash`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `hash` (`hash`);
 
 --
 -- Indexes for table `transaction_input`
 --
 ALTER TABLE `transaction_input`
-ADD PRIMARY KEY (`id`), ADD KEY `parent_tx` (`parent_tx`), ADD KEY `prevout` (`hashPrevOut`,`nPrevOut`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `parent_tx` (`parent_tx`),
+  ADD KEY `prevout` (`hashPrevOut`,`nPrevOut`);
 
 --
 -- Indexes for table `transaction_output`
 --
 ALTER TABLE `transaction_output`
-ADD PRIMARY KEY (`id`), ADD KEY `parent_tx` (`parent_tx`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `parent_tx` (`parent_tx`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -153,32 +189,32 @@ ADD PRIMARY KEY (`id`), ADD KEY `parent_tx` (`parent_tx`);
 -- AUTO_INCREMENT for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
-MODIFY `id` int(9) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=63523;
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-MODIFY `id` int(11) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=71382;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `headerIndex`
 --
 ALTER TABLE `headerIndex`
-MODIFY `id` int(9) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=379020;
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-MODIFY `id` int(9) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=71382;
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transaction_input`
 --
 ALTER TABLE `transaction_input`
-MODIFY `id` int(9) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=90008;
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transaction_output`
 --
 ALTER TABLE `transaction_output`
-MODIFY `id` int(9) NOT NULL AUTO_INCREMENT,AUTO_INCREMENT=75452;
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

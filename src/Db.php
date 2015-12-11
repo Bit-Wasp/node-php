@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
+use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
@@ -31,6 +32,11 @@ class Db
      * @var \PDOStatement
      */
     private $fetchIndexStmt;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $fetchIndexIdStmt;
 
     /**
      * @var \PDOStatement
@@ -97,6 +103,7 @@ class Db
     {
         /** @var \PDOStatement[] $stmt */
         $stmt = [];
+        $stmt[] = $this->dbh->prepare("TRUNCATE iindex");
         $stmt[] = $this->dbh->prepare("TRUNCATE headerIndex");
         $stmt[] = $this->dbh->prepare("TRUNCATE blockIndex");
         $stmt[] = $this->dbh->prepare("TRUNCATE transactions");
@@ -110,50 +117,51 @@ class Db
     }
 
     /**
-     * @param BlockIndex $index
+     * @param BlockHeaderInterface $header
      * @return bool
      */
-    public function insertIndexGenesis(BlockIndex $index)
+    public function createIndexGenesis(BlockHeaderInterface $header)
     {
+        $stmtIndex = $this->dbh->prepare("INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)");
 
-        $stmt = $this->dbh->prepare("
-          INSERT INTO headerIndex (
-            hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt
+        $stmtHeader = $this->dbh->prepare("INSERT INTO headerIndex (
+            hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
           ) VALUES (
-            :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce, :lft, :rgt
+            :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce
           )
         ");
 
-        $header = $index->getHeader();
-
-        if ($stmt->execute(array(
-            'hash' => $index->getHash(),
-            'height' => $index->getHeight(),
-            'work' => $index->getWork(),
+        if ($stmtHeader->execute(array(
+            'hash' => $header->getHash()->getHex(),
+            'height' => 0,
+            'work' => 0,
             'version' => $header->getVersion(),
             'prevBlock' => $header->getPrevBlock(),
             'merkleRoot' => $header->getMerkleRoot(),
             'nBits' => $header->getBits()->getInt(),
             'nTimestamp' => $header->getTimestamp(),
-            'nNonce' => $header->getNonce(),
-            'lft' => 1,
-            'rgt' => 2
+            'nNonce' => $header->getNonce()
         ))) {
-            return true;
+
+            if ($stmtIndex->execute([
+                'headerId' => $this->dbh->lastInsertId(),
+                'lft' => 1,
+                'rgt' => 2
+            ])) {
+                return true;
+            }
         }
 
-        throw new \RuntimeException('Failed to update insert Genesis block!');
+        throw new \RuntimeException('Failed to update insert Genesis block index!');
     }
 
     /**
-     * @param BlockInterface $block
+     * @param BlockIndex $index
      */
-    public function insertBlockGenesis(BlockInterface $block)
+    public function createBlockIndexGenesis(BlockIndex $index)
     {
-
         $stmt = $this->dbh->prepare("INSERT INTO blockIndex (hash) VALUES (:hash)");
-
-        $stmt->bindValue(':hash', $block->getHeader()->getHash()->getHex());
+        $stmt->bindValue(':hash', $index->getHash());
         $stmt->execute();
     }
 
@@ -164,6 +172,7 @@ class Db
      */
     public function insertBlock(BlockInterface $block)
     {
+
         $blockHash = $block->getHeader()->getHash()->getHex();
 
         try {
@@ -267,15 +276,15 @@ class Db
     public function insertIndexBatch(BlockIndex $startIndex, array $index)
     {
         if (null === $this->fetchLftStmt) {
-            $this->fetchLftStmt = $this->dbh->prepare('SELECT lft FROM headerIndex WHERE hash = :prevBlock');
+            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
             $this->updateIndicesStmt = $this->dbh->prepare('
-                UPDATE headerIndex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
-                UPDATE headerIndex SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
+                UPDATE iindex SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
+                UPDATE iindex SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         }
 
         $fetchParent = $this->fetchLftStmt;
-        $updateIndices = $this->updateIndicesStmt;
+        $resizeIndex = $this->updateIndicesStmt;
 
         $fetchParent->bindParam(':prevBlock', $startIndex->getHash());
         if ($fetchParent->execute()) {
@@ -295,38 +304,54 @@ class Db
 
         $this->dbh->beginTransaction();
         try {
-            if ($updateIndices->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
-                $updateIndices->closeCursor();
+            if ($resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
+                $resizeIndex->closeCursor();
 
-                $values = [];
-                $query = [];
-                foreach ($index as $c => $i) {
-                    $query[] = "(:hash$c , :height$c , :work$c ,
+                $headerValues = [];
+                $headerQuery = [];
+
+                $indexValues = [];
+                $indexQuery = [];
+
+                $c = 0;
+                foreach ($index as $i) {
+                    $headerQuery[] = "(:hash$c , :height$c , :work$c ,
                     :version$c , :prevBlock$c , :merkleRoot$c ,
-                    :nBits$c , :nTimestamp$c , :nNonce$c ,
-                    :lft$c , :rgt$c )";
+                    :nBits$c , :nTimestamp$c , :nNonce$c  )";
 
-                    $values['hash' . $c] = $i->getHash();
-                    $values['height' . $c] = $i->getHeight();
-                    $values['work' . $c] = $i->getWork();
+                    $headerValues['hash' . $c] = $i->getHash();
+                    $headerValues['height' . $c] = $i->getHeight();
+                    $headerValues['work' . $c] = $i->getWork();
 
                     $header = $i->getHeader();
-                    $values['version' . $c] = $header->getVersion();
-                    $values['prevBlock' . $c] = $header->getPrevBlock();
-                    $values['merkleRoot' . $c] = $header->getMerkleRoot();
-                    $values['nBits' . $c] = $header->getBits()->getInt();
-                    $values['nTimestamp' . $c] = $header->getTimestamp();
-                    $values['nNonce' . $c] = $header->getNonce();
+                    $headerValues['version' . $c] = $header->getVersion();
+                    $headerValues['prevBlock' . $c] = $header->getPrevBlock();
+                    $headerValues['merkleRoot' . $c] = $header->getMerkleRoot();
+                    $headerValues['nBits' . $c] = $header->getBits()->getInt();
+                    $headerValues['nTimestamp' . $c] = $header->getTimestamp();
+                    $headerValues['nNonce' . $c] = $header->getNonce();
 
-                    $values['lft' . $c] = $leftOffset + 1 + $c;
-                    $values['rgt' . $c] = $rightOffset - $c;
+                    $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
+                    $indexValues['lft' . $c] = $leftOffset + 1 + $c;
+                    $indexValues['rgt' . $c] = $rightOffset - $c;
+                    $c++;
                 }
 
-                $stmt = $this->dbh->prepare("
-                  INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce, lft, rgt )
-                  VALUES " . implode(', ', $query));
+                $insertHeaders = $this->dbh->prepare("
+                  INSERT INTO headerIndex (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+                  VALUES " . implode(', ', $headerQuery));
+                $insertHeaders->execute($headerValues);
 
-                $stmt->execute($values);
+                $lastId = (int)$this->dbh->lastInsertId();
+                $count = count($index);
+                for ($i = 0; $i < $count; $i++) {
+                    $rowId = $i + $lastId;
+                    $indexValues['header_id' . $i] = $rowId;
+                }
+
+                $insertIndices = $this->dbh->prepare("INSERT INTO iindex (header_id, lft, rgt) VALUES ".implode(', ', $indexQuery));
+                $insertIndices->execute($indexValues);
+
                 $this->dbh->commit();
 
                 return true;
@@ -408,6 +433,44 @@ class Db
         }
 
         throw new \RuntimeException('Index by that hash not found');
+    }
+
+    /**
+     * @param int $id
+     * @return BlockIndex
+     */
+    public function fetchIndexById($id)
+    {
+
+        if (null == $this->fetchIndexIdStmt) {
+            $this->fetchIndexIdStmt = $this->dbh->prepare('
+               SELECT     i.*
+               FROM       headerIndex i
+               WHERE      i.id = :id
+            ');
+        }
+
+        if ($this->fetchIndexIdStmt->execute([':id' => $id])) {
+            $row = $this->fetchIndexIdStmt->fetchAll();
+            if (count($row) == 1) {
+                $row = $row[0];
+                return new BlockIndex(
+                    $row['hash'],
+                    $row['height'],
+                    $row['work'],
+                    new BlockHeader(
+                        $row['version'],
+                        $row['prevBlock'],
+                        $row['merkleRoot'],
+                        $row['nTimestamp'],
+                        Buffer::int((string)$row['nBits'], 4),
+                        $row['nNonce']
+                    )
+                );
+            }
+        }
+
+        throw new \RuntimeException('Index by that ID not found');
     }
 
     /**
@@ -522,73 +585,43 @@ class Db
      */
     public function fetchChainState(Headers $headers)
     {
-
         $stmt = $this->dbh->prepare('
 SELECT * FROM (
-            SELECT
-                parent.hash as last_hash, parent.work as last_work, parent.height as last_height
-              , parent.version as last_version, parent.prevBlock as last_prevBlock, parent.merkleRoot as last_merkleRoot
-              , parent.nBits as last_nBits, parent.nTimestamp as last_nTimestamp, parent.nNonce as last_nNonce
-
-              , tip.hash as tip_hash, tip.height as tip_height, tip.work as tip_work
-              , tip.version as tip_version, tip.prevBlock tip_prevBlock, tip.merkleRoot as tip_merkleRoot
-              , tip.nBits as tip_nBits, tip.nTimestamp as tip_nTimestamp, tip.nNonce as tip_nNonce
-
-FROM headerIndex AS tip, headerIndex AS parent
-LEFT JOIN headerIndex AS next ON next.prevBlock = parent.hash
-LEFT JOIN blockIndex AS b ON b.hash = next.hash
-WHERE tip.rgt = tip.lft + 1 and b.hash IS NULL
-) as r
-GROUP BY r.tip_hash;');
+     SELECT tipI.header_id as tip, tipP.header_id as lastBlock
+     from `iindex` as tipI, `iindex` as tipP
+     JOIN headerIndex h on h.id = tipP.header_id
+     left JOIN headerIndex AS next ON next.prevBlock = h.hash
+     left join blockIndex AS b ON b.hash = next.hash
+     WHERE tipI.rgt = tipI.lft + 1 and b.hash IS NULL
+     ORDER BY tipP.lft
+ ) as r
+ GROUP BY r.tip
+');
 
         if ($stmt->execute()) {
             $chainPathStmt = $this->dbh->prepare("
-               SELECT   node.hash, parent.hash
-               FROM     headerIndex AS node,
-                        headerIndex AS parent
-               WHERE    node.rgt = node.lft + 1
-               AND      node.lft BETWEEN parent.lft AND parent.rgt
+               SELECT   h.hash
+               FROM     iindex AS node,
+                        iindex AS parent
+               JOIN     headerIndex h on h.id = parent.header_id
+               WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
             ");
-            $chainPathStmt->execute();
-            $fetch = $chainPathStmt->fetchAll(\PDO::FETCH_GROUP | \PDO::FETCH_COLUMN);
 
             $states = [];
             $math = Bitcoin::getMath();
 
             foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                $map = $fetch[$row['tip_hash']];
+                $chainPathStmt->bindValue('id', $row['tip']);
+                $chainPathStmt->execute();
+                $map = $chainPathStmt->fetchAll(\PDO::FETCH_COLUMN);
+
                 foreach ($map as &$m) {
                     $m = hex2bin($m);
                 }
                 unset($m);
 
-                $bestHeader = new BlockIndex(
-                    $row['tip_hash'],
-                    $row['tip_height'],
-                    $row['tip_work'],
-                    new BlockHeader(
-                        $row['tip_version'],
-                        $row['tip_prevBlock'],
-                        $row['tip_merkleRoot'],
-                        $row['tip_nTimestamp'],
-                        Buffer::int($row['tip_nBits'], 4),
-                        $row['tip_nNonce']
-                    )
-                );
-
-                $lastBlock = new BlockIndex(
-                    $row['last_hash'],
-                    $row['last_height'],
-                    $row['last_work'],
-                    new BlockHeader(
-                        $row['last_version'],
-                        $row['last_prevBlock'],
-                        $row['last_merkleRoot'],
-                        $row['last_nTimestamp'],
-                        Buffer::int($row['last_nBits'], 4),
-                        $row['last_nNonce']
-                    )
-                );
+                $bestHeader = $this->fetchIndexById($row['tip']);
+                $lastBlock = $this->fetchIndexById($row['lastBlock']);
 
                 $states[] = new ChainState(
                     $math,
