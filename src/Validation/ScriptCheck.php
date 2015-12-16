@@ -45,6 +45,6 @@ class ScriptCheck implements ScriptCheckInterface
             );
         }
 
-        return $result;
+        return (bool) $result;
     }
 }

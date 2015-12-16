@@ -14,9 +14,15 @@ use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Locktime;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use BitWasp\Buffertools\Buffer;
 
 class BlockCheck implements BlockCheckInterface
 {
+    /**
+     * @var Consensus
+     */
+    private $consensus;
+
     /**
      * @var \BitWasp\Bitcoin\Math\Math
      */
@@ -168,7 +174,8 @@ class BlockCheck implements BlockCheckInterface
         // Avoid duplicate inputs
         $ins = array();
         foreach ($inputs as $input) {
-            $ins[] = $input->getTransactionId() . $input->getVout();
+            $outpoint = $input->getOutPoint();
+            $ins[] = $outpoint->getTxId()->getBinary() . $outpoint->getVout();
         }
 
         $truncated = array_keys(array_flip($ins));
@@ -231,7 +238,7 @@ class BlockCheck implements BlockCheckInterface
     public function check(BlockInterface $block)
     {
         $header = $block->getHeader();
-        if ($block->getMerkleRoot() !== $header->getMerkleRoot()) {
+        if ($block->getMerkleRoot() != $header->getMerkleRoot()) {
             throw new \RuntimeException('Blocks::check(): failed to verify merkle root');
         }
 
@@ -349,11 +356,9 @@ class BlockCheck implements BlockCheckInterface
     {
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
-
-            if ($checkScripts) {
-                if (!$this->scriptCheck->check($view, $tx, $flags)) {
-                    throw new \RuntimeException('Script verification failed');
-                }
+            
+            if ($checkScripts && !$this->scriptCheck->check($view, $tx, $flags)) {
+                throw new \RuntimeException('Script verification failed');
             }
         }
 

@@ -90,14 +90,14 @@ class Consensus
 
         $negative = false;
         $overflow = false;
-        $target = $math->compact()->set($header->getBits()->getInt(), $negative, $overflow);
-        $limit = $this->math->compact()->set($this->params->powBitsLimit(), $negative, $overflow);
+        $target = $math->writeCompact($header->getBits()->getInt(), $negative, $overflow);
+        $limit = $this->math->writeCompact($this->params->powBitsLimit(), $negative, $overflow);
         $new = bcdiv(bcmul($target, $timespan), $this->params->powTargetTimespan());
         if ($math->cmp($new, $limit) > 0) {
             $new = $limit;
         }
 
-        return $math->compact()->read($new, false);
+        return $math->parseCompact($new, false);
 
     }
 
@@ -109,7 +109,7 @@ class Consensus
     {
         $math = $this->math;
         $index = $state->getChain()->getIndex();
-        if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) != 0) {
+        if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) !== 0) {
             // No change in difficulty
             return $index->getHeader()->getBits()->getInt();
         }
@@ -129,42 +129,5 @@ class Consensus
     public function scriptVerifyPayToScriptHash($currentTime)
     {
         return $this->math->cmp($currentTime, $this->params->p2shActivateTime()) >= 0;
-    }
-
-    /**
-     * @param Index\Blocks $blocks
-     * @param int $currentHeight
-     * @param BlockHeaderInterface $header
-     * @return bool
-     */
-    public function scriptVerifyDerSig(Index\Blocks $blocks, $currentHeight, BlockHeaderInterface $header)
-    {
-        if ($this->math->cmp($header->getVersion(), 3)
-            && $this->isSuperMajority(3, $currentHeight - 1, $blocks, $this->params->majorityEnforceBlockUpgrade())
-        ) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param int $minVersion
-     * @param int $startHeight
-     * @param int $nRequired
-     * @param Index\Blocks $blocks
-     * @return bool
-     */
-    public function isSuperMajority($minVersion, $startHeight, Index\Blocks $blocks, $nRequired)
-    {
-        $nFound = 0;
-        $window = $this->params->majorityWindow();
-        for ($i = 0; $i < $window && $nFound < $nRequired && $index = $blocks->fetchByHeight($startHeight - $i); $i++) {
-            if ($this->math->cmp($index->getHeader()->getVersion(), $minVersion)) {
-                $nFound++;
-            }
-        }
-
-        return $nFound >= $nRequired;
     }
 }

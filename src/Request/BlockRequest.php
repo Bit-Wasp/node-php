@@ -27,7 +27,7 @@ class BlockRequest
      * @param Buffer $startHash
      * @throws \RuntimeException
      * @throws \Exception
-     * @return array
+     * @return Inventory[]
      */
     private function relativeNextInventory(ChainState $state, Buffer $startHash)
     {
@@ -51,13 +51,13 @@ class BlockRequest
 
     /**
      * @param ChainState $state
-     * @return array
+     * @return Inventory[]
      * @throws \RuntimeException
      * @throws \Exception
      */
     public function nextInventory(ChainState $state)
     {
-        return $this->relativeNextInventory($state, Buffer::hex($state->getLastBlock()->getHash()));
+        return $this->relativeNextInventory($state, $state->getLastBlock()->getHash());
     }
 
     /**
@@ -68,14 +68,12 @@ class BlockRequest
      */
     public function requestNextBlocks(ChainState $state, Peer $peer)
     {
-        /** @var Inventory[] $nextData */
         if (null === $this->lastRequested) {
             $nextData = $this->nextInventory($state);
         } else {
             $nextData = $this->relativeNextInventory($state, $this->lastRequested);
         }
 
-        echo "Request blocks: " . count($nextData) . "\n";
         if (count($nextData) > 0) {
             $last = null;
             foreach ($nextData as $inv) {

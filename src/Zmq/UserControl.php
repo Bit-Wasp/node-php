@@ -73,18 +73,18 @@ class UserControl
             'work' => $bestHeaderIdx->getWork(),
             'best_header' => [
                 'height' => $bestHeaderIdx->getHeight(),
-                'hash' => $bestHeaderIdx->getHash(),
-                'prevBlock' => $bestHeader->getPrevBlock(),
-                'merkleRoot' => $bestHeader->getMerkleRoot(),
+                'hash' => $bestHeaderIdx->getHash()->getHex(),
+                'prevBlock' => $bestHeader->getPrevBlock()->getHex(),
+                'merkleRoot' => $bestHeader->getMerkleRoot()->getHex(),
                 'nBits' => $bestHeader->getBits()->getInt(),
                 'nTimestamp' => $bestHeader->getTimestamp(),
                 'nNonce' => $bestHeader->getNonce()
             ],
             'best_block' => [
                 'height' => $bestBlockIdx->getHeight(),
-                'hash' => $bestBlockIdx->getHash(),
-                'prevBlock' => $bestBlockHeader->getPrevBlock(),
-                'merkleRoot' => $bestBlockHeader->getMerkleRoot(),
+                'hash' => $bestBlockIdx->getHash()->getHex(),
+                'prevBlock' => $bestBlockHeader->getPrevBlock()->getHex(),
+                'merkleRoot' => $bestBlockHeader->getMerkleRoot()->getHex(),
                 'nBits' => $bestBlockHeader->getBits()->getInt(),
                 'nTimestamp' => $bestBlockHeader->getTimestamp(),
                 'nNonce' => $bestBlockHeader->getNonce()

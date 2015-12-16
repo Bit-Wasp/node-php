@@ -87,7 +87,7 @@ class Blocks
     public function accept(ChainState $state, BlockInterface $block, Headers $headers, UtxoIdx $utxoIdx)
     {
         $bestBlock = $state->getLastBlock();
-        if ($bestBlock->getHash() !== $block->getHeader()->getPrevBlock()) {
+        if ($bestBlock->getHash() != $block->getHeader()->getPrevBlock()) {
             throw new \RuntimeException('Blocks:accept() Block does not extend this chain!');
         }
 

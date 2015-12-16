@@ -67,11 +67,11 @@ class ChainCache
      */
     public function add(BlockIndex $index)
     {
-        if ($index->getHeader()->getPrevBlock() !== $this->getHash($index->getHeight() - 1)->getHex()) {
+        if ($index->getHeader()->getPrevBlock() != $this->getHash($index->getHeight() - 1)) {
             throw new \RuntimeException('ChainCache: New BlockIndex does not refer to last');
         }
 
-        $binary = hex2bin($index->getHash());
+        $binary = $index->getHash()->getBinary();
         $this->hashByHeight[] = $binary;
         $this->heightByHash[$binary] = $index->getHeight();
     }

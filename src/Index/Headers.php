@@ -120,7 +120,7 @@ class Headers
             }
 
             $prevIndex = $tip->getIndex();
-            if ($prevIndex->getHash() !== $header->getPrevBlock()) {
+            if ($prevIndex->getHash() != $header->getPrevBlock()) {
                 throw new \RuntimeException('Header mismatch, header.prevBlock does not refer to tip');
             }
 
