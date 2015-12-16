@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS `blockIndex` (
 
 CREATE TABLE IF NOT EXISTS `block_transactions` (
   `id` int(11) NOT NULL,
-  `block_hash` varchar(64) NOT NULL,
-  `transaction_hash` varchar(64) NOT NULL
+  `block_hash` varchar(32) NOT NULL,
+  `transaction_hash` varchar(32) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -51,18 +51,16 @@ CREATE TABLE IF NOT EXISTS `block_transactions` (
 --
 
 CREATE TABLE IF NOT EXISTS `headerIndex` (
+  `id` int(9) NOT NULL,
+  `hash` varchar(32) NOT NULL,
   `height` bigint(20) NOT NULL,
   `work` varchar(64) NOT NULL,
-  `id` int(9) NOT NULL,
   `version` varchar(20) NOT NULL,
   `prevBlock` varchar(64) NOT NULL,
   `merkleRoot` varchar(64) NOT NULL,
   `nBits` varchar(11) NOT NULL,
   `nTimestamp` varchar(11) NOT NULL,
-  `nNonce` varchar(11) NOT NULL,
-  `hash` varchar(64) NOT NULL,
-  `lft` int(9) NOT NULL,
-  `rgt` int(9) NOT NULL
+  `nNonce` varchar(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -85,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `iindex` (
 
 CREATE TABLE IF NOT EXISTS `transactions` (
   `id` int(9) NOT NULL,
-  `hash` varchar(64) NOT NULL,
+  `hash` varchar(32) NOT NULL,
   `transaction` text NOT NULL,
   `nOut` int(9) NOT NULL,
   `valueOut` bigint(32) NOT NULL,
@@ -103,11 +101,11 @@ CREATE TABLE IF NOT EXISTS `transactions` (
 
 CREATE TABLE IF NOT EXISTS `transaction_input` (
   `id` int(9) NOT NULL,
-  `hashPrevOut` varchar(64) CHARACTER SET utf8 NOT NULL,
+  `hashPrevOut` varchar(32) CHARACTER SET utf8 NOT NULL,
   `nPrevOut` int(32) NOT NULL,
   `scriptSig` blob NOT NULL,
   `nSequence` int(15) NOT NULL,
-  `parent_tx` varchar(64) CHARACTER SET utf8 NOT NULL,
+  `parent_tx` varchar(32) CHARACTER SET utf8 NOT NULL,
   `nInput` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -121,7 +119,7 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
   `id` int(9) NOT NULL,
   `value` bigint(21) NOT NULL,
   `scriptPubKey` blob NOT NULL,
-  `parent_tx` varchar(64) CHARACTER SET utf8mb4 NOT NULL,
+  `parent_tx` varchar(32) CHARACTER SET utf8mb4 NOT NULL,
   `nOutput` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

@@ -75,11 +75,12 @@ class BlockRequest
             $nextData = $this->relativeNextInventory($state, $this->lastRequested);
         }
 
+        echo "Request blocks: " . count($nextData) . "\n";
         if (count($nextData) > 0) {
             $last = null;
             foreach ($nextData as $inv) {
                 $last = $inv->getHash();
-                $this->inFlight[$last->getHex()] = 1;
+                $this->inFlight[$last->getBinary()] = 1;
             }
             $this->lastRequested = $last;
             $peer->getdata($nextData);
@@ -92,7 +93,7 @@ class BlockRequest
      */
     public function isInFlight(Buffer $hash)
     {
-        return array_key_exists($hash->getHex(), $this->inFlight);
+        return array_key_exists($hash->getBinary(), $this->inFlight);
     }
 
     /**
@@ -101,7 +102,7 @@ class BlockRequest
      */
     public function markReceived(Buffer $hash)
     {
-        unset($this->inFlight[$hash->getHex()]);
+        unset($this->inFlight[$hash->getBinary()]);
         return $this;
     }
 }

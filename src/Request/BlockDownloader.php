@@ -74,13 +74,11 @@ class BlockDownloader
         }
 
         if (null !== $lastUnknown) {
-            echo "send headers\n";
             $peer->getheaders($state->getHeadersLocator($lastUnknown));
             $this->peerState->fetch($peer)->updateBlockAvailability($state, $lastUnknown);
         }
 
         if (count($fetch) > 0) {
-            echo 'SEND GETDATA:' . count($fetch) . '\n';
             $peer->getdata($fetch);
         }
 

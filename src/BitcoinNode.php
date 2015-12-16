@@ -11,6 +11,7 @@ use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
 use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
+use BitWasp\Bitcoin\Networking\NetworkMessage;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\Chain\Chains;
@@ -19,6 +20,7 @@ use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
+use BitWasp\Bitcoin\Node\Validation\ScriptCheck;
 use BitWasp\Bitcoin\Node\Validation\ZmqScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
@@ -46,17 +48,17 @@ class BitcoinNode extends EventEmitter
     /**
      * @var Index\Blocks
      */
-    private $blocks;
+    public $blocks;
 
     /**
      * @var Index\Headers
      */
-    private $headers;
+    public $headers;
 
     /**
      * @var Chains
      */
-    private $chains;
+    public $chains;
 
     /**
      * @var Notifier
@@ -86,7 +88,7 @@ class BitcoinNode extends EventEmitter
     /**
      * @var Index\UtxoIdx
      */
-    private $utxo;
+    public $utxo;
 
     /**
      * @var BlockDownloader
@@ -138,7 +140,7 @@ class BitcoinNode extends EventEmitter
         $this->db = new Db($this->config, false);
         $consensus = new Consensus($math, $params);
 
-        $zmqScript = new ZmqScriptCheck(new \ZMQContext());
+        $zmqScript = new ScriptCheck($adapter);
         $this->headers = new Index\Headers($this->db, $consensus, $math, new HeaderCheck($consensus, $adapter, new ProofOfWork($math, $params)));
         $this->blocks = new Index\Blocks($this->db, $adapter, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
 
@@ -146,8 +148,10 @@ class BitcoinNode extends EventEmitter
         $this->headers->init($genesis->getHeader());
         $this->blocks->init($genesis);
         $this->initChainState();
+
         $this->utxo = new Index\UtxoIdx($this->chains, $this->db);
         $this->blockDownload = new BlockDownloader($this->chains, $this->peerState, $this->peersOutbound);
+
 
         $this->on('blocks.syncing', function () {
             echo ' [App] ... BLOCKS: syncing' . PHP_EOL;
@@ -242,8 +246,8 @@ class BitcoinNode extends EventEmitter
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
         if ($count > 0) {
-
             $this->headers->acceptBatch($state, $vHeaders);
+
             $this->chains->checkTips();
 
             $last = end($vHeaders);

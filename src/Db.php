@@ -36,12 +36,22 @@ class Db
     /**
      * @var \PDOStatement
      */
-    private $fetchIndexIdStmt;
+    private $fetchChainStmt;
 
     /**
      * @var \PDOStatement
      */
-    private $haveHeaderStmt;
+    private $loadTipStmt;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $loadLastBlockStmt;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $fetchIndexIdStmt;
 
     /**
      * @var \PDOStatement
@@ -127,6 +137,26 @@ class Db
     }
 
     /**
+     * Converts binary data to hexadecimal, padded to 32 bytes
+     * @param string $bin
+     * @return string
+     */
+    private function bin2hex($bin)
+    {
+        return str_pad(bin2hex($bin), 64, "0", STR_PAD_LEFT);
+    }
+
+    /**
+     * Converts hexadecimal data to binary, padded to 32 bytes
+     * @param string $hex
+     * @return string
+     */
+    private function hex2bin($hex)
+    {
+        return str_pad(hex2bin($hex), 32, "\x00", STR_PAD_LEFT);
+    }
+
+    /**
      *
      */
     public function stop()
@@ -134,6 +164,9 @@ class Db
         $this->dbh = null;
     }
 
+    /**
+     * @return bool
+     */
     public function reset()
     {
         /** @var \PDOStatement[] $stmt */
@@ -149,9 +182,12 @@ class Db
         foreach ($stmt as $st) {
             $st->execute();
         }
+
+        return true;
     }
 
     /**
+     * Creates the Genesis block index
      * @param BlockHeaderInterface $header
      * @return bool
      */
@@ -167,12 +203,12 @@ class Db
         ');
 
         if ($stmtHeader->execute(array(
-            'hash' => $header->getHash()->getHex(),
+            'hash' => $header->getHash()->getBinary(),
             'height' => 0,
             'work' => 0,
             'version' => $header->getVersion(),
-            'prevBlock' => hex2bin($header->getPrevBlock()),
-            'merkleRoot' => hex2bin($header->getMerkleRoot()),
+            'prevBlock' => $this->hex2bin($header->getPrevBlock()),
+            'merkleRoot' => $this->hex2bin($header->getMerkleRoot()),
             'nBits' => $header->getBits()->getInt(),
             'nTimestamp' => $header->getTimestamp(),
             'nNonce' => $header->getNonce()
@@ -195,8 +231,8 @@ class Db
      */
     public function createBlockIndexGenesis(BlockIndex $index)
     {
-        $stmt = $this->dbh->prepare("INSERT INTO ' . $this->tblBlocks . ' (hash) VALUES (:hash)");
-        $stmt->bindValue(':hash', $index->getHash());
+        $stmt = $this->dbh->prepare('INSERT INTO ' . $this->tblBlocks . ' (hash) VALUES (:hash)');
+        $stmt->bindValue(':hash', $this->hex2bin($index->getHash()));
         $stmt->execute();
     }
 
@@ -207,8 +243,7 @@ class Db
      */
     public function insertBlock(BlockInterface $block)
     {
-
-        $blockHash = $block->getHeader()->getHash()->getHex();
+        $blockHash = $block->getHeader()->getHash()->getBinary();
 
         try {
             $this->dbh->beginTransaction();
@@ -230,7 +265,7 @@ class Db
 
             $transactions = $block->getTransactions();
             foreach ($transactions as $i => $tx) {
-                $hash = $tx->getTxId()->getHex();
+                $hash = $tx->getTxId()->getBinary();
                 $valueOut = $tx->getValueOut();
                 $nOut = count($tx->getOutputs());
                 $nIn = count($tx->getInputs());
@@ -253,7 +288,7 @@ class Db
                     $input = $tx->getInput($j);
                     $inBind[] = " ( :parenthash$i , :nInput$i$j, :hashPrevOut$i$j, :nPrevOut$i$j, :scriptSig$i$j, :nSequence$i$j ) ";
                     $inData["nInput$i$j"] = $j;
-                    $inData["hashPrevOut$i$j"] = $input->getTransactionId();
+                    $inData["hashPrevOut$i$j"] = $this->hex2bin($input->getTransactionId());
                     $inData["nPrevOut$i$j"] = $input->getVout();
                     $inData["scriptSig$i$j"] = $input->getScript()->getBinary();
                     $inData["nSequence$i$j"] = $input->getSequence();
@@ -299,7 +334,7 @@ class Db
             $this->dbh->rollBack();
         }
 
-        throw new \RuntimeException('MySqlDb: ');
+        throw new \RuntimeException('MySqlDb: Failed executing Block insert transaction');
     }
 
     /**
@@ -321,7 +356,7 @@ class Db
         $fetchParent = $this->fetchLftStmt;
         $resizeIndex = $this->updateIndicesStmt;
 
-        $fetchParent->bindParam(':prevBlock', $startIndex->getHash());
+        $fetchParent->bindParam(':prevBlock', $this->hex2bin($startIndex->getHash()));
         if ($fetchParent->execute()) {
             foreach ($fetchParent->fetchAll() as $record) {
                 $myLeft = $record['lft'];
@@ -354,14 +389,14 @@ class Db
                     :version$c , :prevBlock$c , :merkleRoot$c ,
                     :nBits$c , :nTimestamp$c , :nNonce$c  )";
 
-                    $headerValues['hash' . $c] = $i->getHash();
+                    $headerValues['hash' . $c] = $this->hex2bin($i->getHash());
                     $headerValues['height' . $c] = $i->getHeight();
                     $headerValues['work' . $c] = $i->getWork();
 
                     $header = $i->getHeader();
                     $headerValues['version' . $c] = $header->getVersion();
-                    $headerValues['prevBlock' . $c] = hex2bin($header->getPrevBlock());
-                    $headerValues['merkleRoot' . $c] = hex2bin($header->getMerkleRoot());
+                    $headerValues['prevBlock' . $c] = $this->hex2bin($header->getPrevBlock());
+                    $headerValues['merkleRoot' . $c] = $this->hex2bin($header->getMerkleRoot());
                     $headerValues['nBits' . $c] = $header->getBits()->getInt();
                     $headerValues['nTimestamp' . $c] = $header->getTimestamp();
                     $headerValues['nNonce' . $c] = $header->getNonce();
@@ -386,7 +421,6 @@ class Db
 
                 $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
                 $insertIndices->execute($indexValues);
-
                 $this->dbh->commit();
 
                 return true;
@@ -401,41 +435,11 @@ class Db
     }
 
     /**
-     * @param string $hash
-     * @return bool
-     */
-    public function haveHeader($hash)
-    {
-        if (null === $this->haveHeaderStmt) {
-            $this->haveHeaderStmt = $this->dbh->prepare('
-              SELECT    COUNT(*) as count
-              FROM      ' . $this->tblHeaders . '
-              WHERE     hash = :hash
-            ');
-        }
-
-        $stmt = $this->haveHeaderStmt;
-        $stmt->bindParam(':hash', $hash);
-
-        if ($stmt->execute()) {
-            $fetch = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            if ($fetch[0]['count'] == 1) {
-                return true;
-            }
-
-            return false;
-        }
-
-        throw new \RuntimeException('Failed to execute haveHeader query');
-    }
-
-    /**
      * @param Buffer $hash
      * @return BlockIndex
      */
     public function fetchIndex(Buffer $hash)
     {
-
         if (null == $this->fetchIndexStmt) {
             $this->fetchIndexStmt = $this->dbh->prepare('
                SELECT     i.*
@@ -445,20 +449,20 @@ class Db
         }
 
         $stmt = $this->fetchIndexStmt;
-        $stmt->bindParam(':hash', $hash->getHex());
+        $stmt->bindParam(':hash', $hash->getBinary());
 
         if ($stmt->execute()) {
             $row = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             if (count($row) == 1) {
                 $row = $row[0];
                 return new BlockIndex(
-                    $row['hash'],
+                    $this->bin2hex($row['hash']),
                     $row['height'],
                     $row['work'],
                     new BlockHeader(
                         $row['version'],
-                        bin2hex($row['prevBlock']),
-                        bin2hex($row['merkleRoot']),
+                        $this->bin2hex($row['prevBlock']),
+                        $this->bin2hex($row['merkleRoot']),
                         $row['nTimestamp'],
                         Buffer::int((string)$row['nBits'], 4),
                         $row['nNonce']
@@ -490,13 +494,13 @@ class Db
             if (count($row) == 1) {
                 $row = $row[0];
                 return new BlockIndex(
-                    $row['hash'],
+                    $this->bin2hex($row['hash']),
                     $row['height'],
                     $row['work'],
                     new BlockHeader(
                         $row['version'],
-                        $row['prevBlock'],
-                        $row['merkleRoot'],
+                        $this->bin2hex($row['prevBlock']),
+                        $this->bin2hex($row['merkleRoot']),
                         $row['nTimestamp'],
                         Buffer::int((string)$row['nBits'], 4),
                         $row['nNonce']
@@ -542,9 +546,9 @@ class Db
             ');
         }
 
-        $hexHash = $blockHash->getHex();
+        $binHash = $blockHash->getBinary();
         // We pass a callback instead of looping
-        $this->txsStmt->bindValue(':hash', $hexHash);
+        $this->txsStmt->bindValue(':hash', $binHash);
         $this->txsStmt->execute();
         /** @var TxBuilder[] $builder */
         $builder = [];
@@ -554,13 +558,13 @@ class Db
                 ->locktime($locktime);
         });
 
-        $this->txInStmt->bindParam(':hash', $hexHash);
+        $this->txInStmt->bindParam(':hash', $binHash);
         $this->txInStmt->execute();
         $this->txInStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $hashPrevOut, $nPrevOut, $scriptSig, $nSequence) use (&$builder) {
-            $builder[$parent_tx]->input($hashPrevOut, $nPrevOut, new Script(new Buffer($scriptSig)), $nSequence);
+            $builder[$parent_tx]->input($this->bin2hex($hashPrevOut), $nPrevOut, new Script(new Buffer($scriptSig)), $nSequence);
         });
 
-        $this->txOutStmt->bindParam(':hash', $hexHash);
+        $this->txOutStmt->bindParam(':hash', $binHash);
         $this->txOutStmt->execute();
         $this->txOutStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $value, $scriptPubKey) use (&$builder) {
             $builder[$parent_tx]->output($value, new Script(new Buffer($scriptPubKey)));
@@ -589,7 +593,7 @@ class Db
            WHERE      b.hash = :hash
         ');
 
-        $stmt->bindValue(':hash', $hash->getHex());
+        $stmt->bindValue(':hash', $hash->getBinary());
         if ($stmt->execute()) {
             $r = $stmt->fetch();
             $stmt->closeCursor();
@@ -598,8 +602,8 @@ class Db
                     Bitcoin::getMath(),
                     new BlockHeader(
                         $r['version'],
-                        bin2hex($r['prevBlock']),
-                        bin2hex($r['merkleRoot']),
+                        $this->bin2hex($r['prevBlock']),
+                        $this->bin2hex($r['merkleRoot']),
                         $r['nTimestamp'],
                         Buffer::int($r['nBits'], 4),
                         $r['nNonce']
@@ -613,50 +617,64 @@ class Db
     }
 
     /**
-     * Query for headers/blocks chain state - populates Chains.
-     *
      * @param Headers $headers
-     * @return ChainState[]
+     * @return array
      */
     public function fetchChainState(Headers $headers)
     {
-        $stmt = $this->dbh->prepare('
-SELECT * FROM (
-     SELECT tipI.header_id as tip, tipP.header_id as lastBlock
-     from ' . $this->tblIndex . '  as tipI, ' . $this->tblIndex . '  as tipP
-     JOIN ' . $this->tblHeaders . '  h on h.id = tipP.header_id
-     left JOIN ' . $this->tblHeaders . '  AS next ON next.prevBlock = h.hash
-     left join ' . $this->tblBlocks . '  AS b ON b.hash = next.hash
-     WHERE tipI.rgt = tipI.lft + 1 and b.hash IS NULL
-     ORDER BY tipP.lft
- ) as r
- GROUP BY r.tip
-');
-
-        if ($stmt->execute()) {
-            $chainPathStmt = $this->dbh->prepare('
-               SELECT   h.hash
+        if ($this->fetchChainStmt === null) {
+            $this->loadTipStmt = $this->dbh->prepare('SELECT i.header_id, h.* from '.$this->tblIndex . ' i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+            $this->fetchChainStmt = $this->dbh->prepare('
+               SELECT h.hash
                FROM     ' . $this->tblIndex . ' AS node,
                         ' . $this->tblIndex . ' AS parent
                JOIN     ' . $this->tblHeaders . '  h on h.id = parent.header_id
-               WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
-            ');
+               WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
+            $this->loadLastBlockStmt = $this->dbh->prepare('
+            SELECT p.id from iindex as node,
+                             iindex as parent
+            JOIN headerIndex p on p.id = parent.header_id
+            JOIN headerIndex n on n.prevBlock = p.hash
+            LEFT JOIN blockIndex b on b.hash = n.hash
+            WHERE node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt AND b.hash IS NULL
+            LIMIT 1');
+        }
 
+        $loadTip = $this->loadTipStmt;
+        $fetchTipChain = $this->fetchChainStmt;
+        $loadLast = $this->loadLastBlockStmt;
+
+        $math = Bitcoin::getMath();
+
+        if ($loadTip->execute()) {
             $states = [];
-            $math = Bitcoin::getMath();
+            foreach ($loadTip->fetchAll(\PDO::FETCH_ASSOC) as $index) {
+                $bestHeader = new BlockIndex(
+                    $this->bin2hex($index['hash']),
+                    $index['height'],
+                    $index['work'],
+                    new BlockHeader(
+                        $index['version'],
+                        $this->bin2hex($index['prevBlock']),
+                        $this->bin2hex($index['merkleRoot']),
+                        $index['nTimestamp'],
+                        Buffer::int($index['nBits'], 4, $math),
+                        $index['nNonce']
+                    )
+                );
 
-            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                $chainPathStmt->bindValue('id', $row['tip']);
-                $chainPathStmt->execute();
-                $map = $chainPathStmt->fetchAll(\PDO::FETCH_COLUMN);
+                $fetchTipChain->bindValue(':id', $index['id']);
+                $fetchTipChain->execute();
+                $map = $fetchTipChain->fetchAll(\PDO::FETCH_COLUMN);
 
-                foreach ($map as &$m) {
-                    $m = hex2bin($m);
+                $loadLast->bindValue(':id', $index['id']);
+                $loadLast->execute();
+                $lastBlockId = $loadLast->fetchAll(\PDO::FETCH_COLUMN);
+                if (count($lastBlockId) !== 1) {
+                    $lastBlock = $bestHeader;
+                } else {
+                    $lastBlock = $this->fetchIndexById($lastBlockId[0]);
                 }
-                unset($m);
-
-                $bestHeader = $this->fetchIndexById($row['tip']);
-                $lastBlock = $this->fetchIndexById($row['lastBlock']);
 
                 $states[] = new ChainState(
                     $math,
@@ -674,6 +692,7 @@ SELECT * FROM (
         }
 
         throw new \RuntimeException('Failed to fetch block progress');
+
     }
 
     /**
@@ -686,7 +705,6 @@ SELECT * FROM (
      */
     public function findFork(Chain $activeChain, BlockLocator $locator)
     {
-
         $hashes = [$activeChain->getIndex()->getHash()];
         foreach ($locator->getHashes() as $hash) {
             $hashes[] = $hash->getHex();
@@ -718,7 +736,6 @@ SELECT * FROM (
      */
     public function fetchNextHeaders($hash)
     {
-
         $stmt = $this->dbh->prepare('
             SELECT    child.version, child.prevBlock, child.merkleRoot,
                       child.nTimestamp, child.nBits, child.nNonce, child.height
@@ -734,8 +751,8 @@ SELECT * FROM (
             foreach ($stmt->fetchAll() as $row) {
                 $results[] = new BlockHeader(
                     $row['version'],
-                    $row['prevBlock'],
-                    $row['merkleRoot'],
+                    $this->bin2hex($row['prevBlock']),
+                    $this->bin2hex($row['merkleRoot']),
                     $row['nTimestamp'],
                     Buffer::int($row['nBits'], 4),
                     $row['nNonce']
@@ -767,16 +784,16 @@ SELECT * FROM (
         for ($i = count($vTx) - 1; $i > 0; $i--) {
             $tx = $vTx[$i];
             foreach ($tx->getInputs() as $in) {
-                $txid = $in->getTransactionId();
-                $vout = $in->getVout();
-                $need[$txid.$vout] = $i;
+                $lookup = $in->getTransactionId() . $in->getVout();
+                $need[$lookup] = $i;
             }
 
             $hash = $tx->getTxId()->getHex();
             foreach ($tx->getOutputs() as $v => $out) {
-                if (isset($need[$hash.$v])) {
+                $lookup = $hash . $v;
+                if (isset($need[$lookup])) {
                     $utxos[] = new Utxo($hash, $v, $out);
-                    unset($need[$hash.$v]);
+                    unset($need[$lookup]);
                 }
             }
         }
@@ -796,34 +813,33 @@ SELECT * FROM (
     public function fetchUtxoView(BlockInterface $block)
     {
         $txs = $block->getTransactions();
-        $txCount = count($txs);
-        if (1 == $txCount) {
+        if (1 === count($txs)) {
             return new UtxoView([]);
         }
 
         list ($required, $outputSet) = $this->filterUtxoRequest($block);
 
+        $joinList = '';
+        $queryValues = ['hash' => $this->hex2bin($block->getHeader()->getPrevBlock())];
         $requiredCount = count($required);
         $initialCount = count($outputSet);
 
-        $joinList = '';
-        $queryValues = ['hash' => $block->getHeader()->getPrevBlock()];
-        for ($i = 0, $c = count($required), $last = $c - 1; $i < $c; $i++) {
+        for ($i = 0, $last = $requiredCount - 1; $i < $requiredCount; $i++) {
             list ($txid, $vout, $txidx) = $required[$i];
 
-            if (0 == $i) {
-                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :txidx$i as txidx\n";
+            if (0 === $i) {
+                $joinList .= 'SELECT :hashParent' . $i . ' as hashParent, :noutparent' . $i . ' as nOut, :txidx' . $i . ' as txidx ' . PHP_EOL;
             } else {
-                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :txidx$i \n";
+                $joinList .= '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i . PHP_EOL;
             }
 
             if ($i < $last) {
-                $joinList .= "  UNION ALL\n";
+                $joinList .= '  UNION ALL ' . PHP_EOL;
             }
 
-            $queryValues["hashParent$i"] = $txid;
-            $queryValues["noutparent$i"] = $vout;
-            $queryValues["txidx$i"] = $txidx;
+            $queryValues['hashParent' . $i ] = $this->hex2bin($txid);
+            $queryValues['noutparent' . $i ] = $vout;
+            $queryValues['txidx' . $i] = $txidx;
         }
 
         $sql = '
@@ -832,9 +848,9 @@ SELECT * FROM (
                         allowed_block.height, listed.txidx
               FROM      ' . $this->tblTxOut . '  o
               INNER JOIN (
-                $joinList
+                ' . $joinList . '
               ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
-              INNER JOIN ' . $this->tblBlockTxs . '  as bt on listed.hashParent = bt.transaction_hash
+              INNER JOIN ' . $this->tblBlockTxs . ' as bt on listed.hashParent = bt.transaction_hash
               JOIN (
                     SELECT    parent.hash, parent.height
                     FROM      ' . $this->tblHeaders . '  AS tip,
@@ -845,8 +861,9 @@ SELECT * FROM (
 
         $stmt = $this->dbh->prepare($sql);
         $stmt->execute($queryValues);
+
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
-            $outputSet[] = new Utxo($utxo['txid'], $utxo['vout'], new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[] = new Utxo($this->bin2hex($utxo['txid']), $utxo['vout'], new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) !== ($initialCount + $requiredCount)) {
