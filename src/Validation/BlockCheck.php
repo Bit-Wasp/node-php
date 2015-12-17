@@ -14,7 +14,6 @@ use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Locktime;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
-use BitWasp\Buffertools\Buffer;
 
 class BlockCheck implements BlockCheckInterface
 {
@@ -356,7 +355,7 @@ class BlockCheck implements BlockCheckInterface
     {
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
-            
+
             if ($checkScripts && !$this->scriptCheck->check($view, $tx, $flags)) {
                 throw new \RuntimeException('Script verification failed');
             }

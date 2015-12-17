@@ -797,6 +797,8 @@ class Db
                     )
                 );
 
+                $info = $this->findSuperMajorityInfo($index['id'], [2, 3, 4]);
+
                 $fetchTipChain->bindValue(':id', $index['id']);
                 $fetchTipChain->execute();
                 $map = $fetchTipChain->fetchAll(\PDO::FETCH_COLUMN);
@@ -806,7 +808,6 @@ class Db
                 $block = $loadLast->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (count($block) === 1) {
-                    echo "HAVE!!!!!\n";
                     $block = $block[0];
                     $lastBlock = new BlockIndex(
                         new Buffer($block['hash'], 32),
@@ -822,7 +823,6 @@ class Db
                         )
                     );
                 } else {
-                    echo "HAVENT\n";
                     $lastBlock = $bestHeader;
                 }
 
@@ -957,36 +957,6 @@ class Db
         return [$required, $utxos];
     }
 
-    public function test()
-    {
-
-        $sql = '
-            SELECT o.* FROM transactions t
-            INNER JOIN (
-                    SELECT :hashPrevOut as hashParent, :nPrevOut as nOut, 1 as txidx
-            ) as listed on (t.hash = listed.hashParent)
-            INNER JOIN transaction_output o on (o.parent_tx = t.hash AND o.nOutput = listed.nOut)
-            INNER JOIN ' . $this->tblBlockTxs . ' as bt on listed.hashParent = bt.transaction_hash
-            JOIN (
-                SELECT    parent.hash, parent.height
-                FROM      ' . $this->tblHeaders . '  AS tip,
-                          ' . $this->tblHeaders . '  AS parent
-                WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
-            ) as allowed_block on bt.block_hash = allowed_block.hash
-';
-
-
-        $stmt = $this->dbh->prepare($sql);
-        $stmt->execute([
-            'hashPrevOut' => hex2bin('f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16'),
-            'nPrevOut' => 0,
-            'hash' => hex2bin('0000000000000000052fbf378bd25edd4001bf0a2b6da00bd383c0f8e5cc6704')
-        ]);
-
-        return $stmt;
-
-    }
-
     /**
      * @param BlockInterface $block
      * @return UtxoView
@@ -1000,7 +970,7 @@ class Db
 
         list ($required, $outputSet) = $this->filterUtxoRequest($block);
 
-        $joinList = '';
+        $joinList = [];
         $queryValues = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
         $requiredCount = count($required);
         $initialCount = count($outputSet);
@@ -1013,30 +983,27 @@ class Db
             list ($outpoint, $txidx) = $required[$i];
 
             if (0 === $i) {
-                $joinList .= 'SELECT :hashParent' . $i . ' as hashParent, :noutparent' . $i . ' as nOut, :txidx' . $i . ' as txidx ' . PHP_EOL;
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashParent, :noutparent' . $i . ' as nOut, :txidx' . $i . ' as txidx ';
             } else {
-                $joinList .= '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i . PHP_EOL;
-            }
-
-            if ($i < $last) {
-                $joinList .= '  UNION ALL ' . PHP_EOL;
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i;
             }
 
             $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
             $queryValues['noutparent' . $i ] = $outpoint->getVout();
             $queryValues['txidx' . $i] = $txidx;
         }
+        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
 
         $sql = '
             SELECT listed.hashParent as txid, listed.nOut as vout,
                    o.value, o.scriptPubKey,
                    listed.txidx
             FROM   transactions t
-            INNER JOIN (
-                '.$joinList.'
+            JOIN (
+                '.$innerJoin.'
             ) as listed on (t.hash = listed.hashParent)
-            INNER JOIN transaction_output o on (o.parent_tx = t.id AND o.nOutput = listed.nOut)
-            INNER JOIN ' . $this->tblBlockTxs . ' as bt on t.id = bt.transaction_hash
+            JOIN transaction_output o on (o.parent_tx = t.id AND o.nOutput = listed.nOut)
+            JOIN ' . $this->tblBlockTxs . ' as bt on t.id = bt.transaction_hash
             JOIN (
                 SELECT parent.header_id from iindex as tip,
                   iindex as parent
@@ -1044,12 +1011,16 @@ class Db
             ) as allowed_block on bt.block_hash = allowed_block.header_id
 ';
 
+        echo "\nExtract utxos\n";
+        $m1 = microtime(true);
         $stmt = $this->dbh->prepare($sql);
         $stmt->execute($queryValues);
+        echo (microtime(true) - $m1) . " - seconds \n";
 
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
             $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
+        echo "Just got " . count($outputSet) . "\n\n";
 
         if (count($outputSet) !== ($initialCount + $requiredCount)) {
             throw new \RuntimeException('Utxo was not found');
@@ -1111,5 +1082,48 @@ class Db
         }
 
         return $outputSet;
+    }
+
+    public function findSuperMajorityInfo($headerId, array $versions)
+    {
+        $fragment = implode(", ", array_map(
+            function ($version) {
+                return "sum(case when h.version = $version then 1 else 0 end) v$version";
+            },
+            $versions
+        ));
+
+        $stmt = $this->dbh->prepare('
+            SELECT COUNT(h.id) total,
+                   '.$fragment.'
+            FROM '.$this->tblIndex.' as tip,
+                    '.$this->tblIndex.' as parent
+            JOIN    '.$this->tblHeaders.' h on (h.id = parent.header_id)
+            WHERE   tip.header_id = :id
+                AND parent.header_id > :id - 1250
+                AND tip.lft between parent.lft AND parent.rgt');
+
+        $stmt->bindValue(':id', $headerId);
+        if ($stmt->execute()) {
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
+
+        throw new \RuntimeException('Failed to query supermajority info');
+    }
+
+    /**
+     * @param Buffer $hash
+     * @param array $versions
+     * @return array
+     */
+    public function findSuperMajorityInfoByHash(Buffer $hash, array $versions)
+    {
+        $stmt = $this->dbh->prepare('SELECT id from '.$this->tblHeaders.' where hash = :hash');
+        if ($stmt->execute(['hash' => $hash->getBinary()])) {
+            $id = $stmt->fetch(\PDO::FETCH_COLUMN);
+            return $this->findSuperMajorityInfo($id, $versions);
+        }
+
+        throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');
     }
 }

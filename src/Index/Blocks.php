@@ -86,6 +86,7 @@ class Blocks
      */
     public function accept(ChainState $state, BlockInterface $block, Headers $headers, UtxoIdx $utxoIdx)
     {
+        echo "Blocks::ACCEPT START\n";
         $bestBlock = $state->getLastBlock();
         if ($bestBlock->getHash() != $block->getHeader()->getPrevBlock()) {
             throw new \RuntimeException('Blocks:accept() Block does not extend this chain!');
@@ -93,21 +94,33 @@ class Blocks
 
         $index = $headers->accept($state, $block->getHeader());
 
+        $m1 = microtime(true);
         $this
             ->blockCheck
             ->check($block)
             ->checkContextual($block, $bestBlock);
+        echo "Validation took " . (microtime(true) - $m1) . " seconds\n";
 
         $view = $this->db->fetchUtxoView($block);
 
-        $flagP2sh = $this->consensus->scriptVerifyPayToScriptHash($bestBlock->getHeader()->getTimestamp());
+        $header = $block->getHeader();
+        $flagP2sh =  $this->math->cmp($header->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0;
+
         $flags = new Flags($flagP2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
+
+        if ($this->math->cmp($header->getVersion(), 3) >= 0) {
+
+        }
+
+        if ($this->math->cmp($header->getVersion(), 4) >= 0) {
+
+        }
 
         $nInputs = 0;
         $nFees = 0;
         $nSigOps = 0;
         $txs = $block->getTransactions();
-
+        $m1 = microtime(true);
         foreach ($block->getTransactions() as $tx) {
             $nInputs += count($tx->getInputs());
 
@@ -130,13 +143,14 @@ class Blocks
                 $this->blockCheck->checkInputs($view, $tx, $index->getHeight(), $flags);
             }
         }
+        echo "Other checks " . (microtime(true) - $m1) . " - seconds \n";
 
         $this->blockCheck->checkCoinbaseSubsidy($txs[0], $nFees, $index->getHeight());
 
         $this->db->insertBlock($block);
 
         $state->updateLastBlock($index);
-
+        echo "Blocks::ACCEPT END\n";
         return $index;
     }
 }
