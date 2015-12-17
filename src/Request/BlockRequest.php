@@ -27,7 +27,7 @@ class BlockRequest
      * @param Buffer $startHash
      * @throws \RuntimeException
      * @throws \Exception
-     * @return array
+     * @return Inventory[]
      */
     private function relativeNextInventory(ChainState $state, Buffer $startHash)
     {
@@ -51,13 +51,13 @@ class BlockRequest
 
     /**
      * @param ChainState $state
-     * @return array
+     * @return Inventory[]
      * @throws \RuntimeException
      * @throws \Exception
      */
     public function nextInventory(ChainState $state)
     {
-        return $this->relativeNextInventory($state, Buffer::hex($state->getLastBlock()->getHash()));
+        return $this->relativeNextInventory($state, $state->getLastBlock()->getHash());
     }
 
     /**
@@ -68,7 +68,6 @@ class BlockRequest
      */
     public function requestNextBlocks(ChainState $state, Peer $peer)
     {
-        /** @var Inventory[] $nextData */
         if (null === $this->lastRequested) {
             $nextData = $this->nextInventory($state);
         } else {
@@ -79,7 +78,7 @@ class BlockRequest
             $last = null;
             foreach ($nextData as $inv) {
                 $last = $inv->getHash();
-                $this->inFlight[$last->getHex()] = 1;
+                $this->inFlight[$last->getBinary()] = 1;
             }
             $this->lastRequested = $last;
             $peer->getdata($nextData);
@@ -92,7 +91,7 @@ class BlockRequest
      */
     public function isInFlight(Buffer $hash)
     {
-        return array_key_exists($hash->getHex(), $this->inFlight);
+        return array_key_exists($hash->getBinary(), $this->inFlight);
     }
 
     /**
@@ -101,7 +100,7 @@ class BlockRequest
      */
     public function markReceived(Buffer $hash)
     {
-        unset($this->inFlight[$hash->getHex()]);
+        unset($this->inFlight[$hash->getBinary()]);
         return $this;
     }
 }

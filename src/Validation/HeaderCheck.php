@@ -13,6 +13,21 @@ class HeaderCheck implements HeaderCheckInterface
 {
 
     /**
+     * @var Consensus
+     */
+    private $consensus;
+
+    /**
+     * @var \BitWasp\Bitcoin\Math\Math
+     */
+    private $math;
+
+    /**
+     * @var ProofOfWork
+     */
+    private $pow;
+
+    /**
      * @param Consensus $consensus
      * @param EcAdapterInterface $ecAdapter
      * @param ProofOfWork $proofOfWork
@@ -72,7 +87,7 @@ class HeaderCheck implements HeaderCheckInterface
     public function makeIndex(BlockIndex $prevIndex, BlockHeaderInterface $header)
     {
         return new BlockIndex(
-            $header->getHash()->getHex(),
+            $header->getHash(),
             $this->math->add($prevIndex->getHeight(), 1),
             $this->math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork()),
             $header

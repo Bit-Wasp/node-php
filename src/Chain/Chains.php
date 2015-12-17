@@ -63,46 +63,6 @@ class Chains extends EventEmitter
     }
 
     /**
-     * @param string $hash
-     * @param callable|null $then
-     * @return bool
-     */
-    public function isTip($hash, callable $then = null)
-    {
-        foreach ($this->states as $state) {
-            $tip = $state->getChain();
-            if ($tip->getIndex()->getHash() == $hash) {
-                return is_null($then)
-                    ? true
-                    : $then($tip);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param BlockHeaderInterface $header
-     * @return Chain
-     */
-    public function findTipForNext(BlockHeaderInterface $header)
-    {
-        foreach ($this->states as $state) {
-            $tTip = $state->getChain();
-            $tipHash = $tTip->getIndex()->getHash();
-            if ($header->getPrevBlock() == $tipHash) {
-                $tip = $tTip;
-            }
-        }
-
-        if (!isset($tip)) {
-            throw new \RuntimeException('No tip found for this Header');
-        }
-
-        return $tip;
-    }
-
-    /**
      * @param ChainState $state
      */
     public function trackChain(ChainState $state)

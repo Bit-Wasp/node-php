@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain\Utxo;
 
 use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;
@@ -37,42 +38,37 @@ class UtxoView implements \Countable
      */
     private function addUtxo(Utxo $utxo)
     {
-        if (!isset($this->utxo[$utxo->getTransactionId()])) {
-            $this->utxo[$utxo->getTransactionId()] = [$utxo->getVout() => $utxo];
+        $outpoint = $utxo->getOutPoint();
+        if (!isset($this->utxo[$outpoint->getTxId()->getBinary()])) {
+            $this->utxo[$outpoint->getTxId()->getBinary()] = [$outpoint->getVout() => $utxo];
         } else {
-            $this->utxo[$utxo->getTransactionId()][$utxo->getVout()] = $utxo;
+            $this->utxo[$outpoint->getTxId()->getBinary()][$outpoint->getVout()] = $utxo;
         }
     }
 
     /**
-     * @param string $txid
-     * @param int $vout
+     * @param OutPointInterface $outpoint
      * @return bool
      */
-    public function have($txid, $vout)
+    public function have(OutPointInterface $outpoint)
     {
-        if (isset($this->utxo[$txid])) {
-            if (isset($this->utxo[$txid][$vout])) {
-                return true;
-            }
-        }
-
-        return false;
+        $txid = $outpoint->getTxId()->getBinary();
+        $vout = $outpoint->getVout();
+        return array_key_exists($txid, $this->utxo)
+            && array_key_exists($vout, $this->utxo[$txid]);
     }
 
     /**
-     * @param string $txid
-     * @param int $vout
-     * @return Utxo
+     * @param OutPointInterface $outpoint
+     * @return mixed
      */
-    public function fetch($txid, $vout)
+    public function fetch(OutPointInterface $outpoint)
     {
-        if (!$this->have($txid, $vout)) {
-            echo "[$txid, $vout]\n";
+        if (!$this->have($outpoint)) {
             throw new \RuntimeException('Utxo not found in this UtxoView');
         }
 
-        return $this->utxo[$txid][$vout];
+        return $this->utxo[$outpoint->getTxId()->getBinary()][$outpoint->getVout()];
     }
 
     /**
@@ -81,7 +77,7 @@ class UtxoView implements \Countable
      */
     public function fetchByInput(TransactionInputInterface $input)
     {
-        return $this->fetch($input->getTransactionId(), $input->getVout());
+        return $this->fetch($input->getOutPoint());
     }
 
     /**

@@ -42,7 +42,7 @@ class ChainState
      */
     public function updateLastBlock(BlockIndex $index)
     {
-        if ($this->lastBlock->getHash() !== $index->getHeader()->getPrevBlock()) {
+        if ($this->lastBlock->getHash() != $index->getHeader()->getPrevBlock()) {
             throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
         }
 
