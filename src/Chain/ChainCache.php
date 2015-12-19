@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Buffertools\Buffer;
 
-class ChainCache
+class ChainCache implements ChainCacheInterface
 {
     /**
      * @var string[]
@@ -63,9 +63,9 @@ class ChainCache
     }
 
     /**
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      */
-    public function add(BlockIndex $index)
+    public function add(BlockIndexInterface $index)
     {
         if ($index->getHeader()->getPrevBlock() != $this->getHash($index->getHeight() - 1)) {
             throw new \RuntimeException('ChainCache: New BlockIndex does not refer to last');

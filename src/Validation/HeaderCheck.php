@@ -6,8 +6,10 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
+use BitWasp\Buffertools\Buffer;
 
 class HeaderCheck implements HeaderCheckInterface
 {
@@ -43,18 +45,19 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
+     * @param Buffer $hash
      * @param BlockHeaderInterface $header
-     * @param bool|true $checkPow
+     * @param bool $checkPow
      * @return $this
      */
-    public function check(BlockHeaderInterface $header, $checkPow = true)
+    public function check(Buffer $hash, BlockHeaderInterface $header, $checkPow = true)
     {
         try {
             if ($checkPow) {
-                $this->pow->checkHeader($header);
+                $this->pow->check($hash, $header->getBits()->getInt());
             }
         } catch (\Exception $e) {
-            throw new \RuntimeException('Headers::check() - failed validating the header');
+            throw new \RuntimeException('Headers::check() - failed validating header proof-of-work');
         }
 
         return $this;
@@ -80,14 +83,15 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param BlockIndex $prevIndex
+     * @param BlockIndexInterface $prevIndex
+     * @param Buffer $hash
      * @param BlockHeaderInterface $header
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
-    public function makeIndex(BlockIndex $prevIndex, BlockHeaderInterface $header)
+    public function makeIndex(BlockIndexInterface $prevIndex, Buffer $hash, BlockHeaderInterface $header)
     {
         return new BlockIndex(
-            $header->getHash(),
+            $hash,
             $this->math->add($prevIndex->getHeight(), 1),
             $this->math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork()),
             $header

@@ -3,17 +3,19 @@
 namespace BitWasp\Bitcoin\Node\Validation;
 
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Buffertools\Buffer;
 
 interface HeaderCheckInterface
 {
     /**
+     * @param Buffer $hash
      * @param BlockHeaderInterface $header
-     * @param bool|true $checkPow
+     * @param bool $checkPow
      * @return $this
      */
-    public function check(BlockHeaderInterface $header, $checkPow = true);
+    public function check(Buffer $hash, BlockHeaderInterface $header, $checkPow = true);
 
     /**
      * @param ChainState $state
@@ -23,9 +25,10 @@ interface HeaderCheckInterface
     public function checkContextual(ChainState $state, BlockHeaderInterface $header);
 
     /**
-     * @param BlockIndex $prevIndex
+     * @param BlockIndexInterface $prevIndex
+     * @param Buffer $hash
      * @param BlockHeaderInterface $header
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
-    public function makeIndex(BlockIndex $prevIndex, BlockHeaderInterface $header);
+    public function makeIndex(BlockIndexInterface $prevIndex, Buffer $hash, BlockHeaderInterface $header);
 }

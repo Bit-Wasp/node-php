@@ -10,7 +10,7 @@ use BitWasp\Buffertools\Buffer;
 class BlockRequest
 {
     const DOWNLOAD_AMOUNT = 500;
-    const MAX_IN_FLIGHT = 500;
+    const MAX_IN_FLIGHT = 32;
 
     /**
      * @var array

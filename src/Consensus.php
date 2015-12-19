@@ -111,9 +111,11 @@ class Consensus
         $index = $state->getChain()->getIndex();
         if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) !== 0) {
             // No change in difficulty
+            echo "no change\n";
             return $index->getHeader()->getBits()->getInt();
         }
 
+        echo "retarget\n";
         // Retarget
         $heightLastRetarget = $math->sub($index->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
 

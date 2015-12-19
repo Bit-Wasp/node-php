@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Zmq;
 
 use BitWasp\Bitcoin\Node\BitcoinNode;
+use BitWasp\Bitcoin\Node\NodeInterface;
 use \React\ZMQ\Context;
 
 class Notifier
@@ -12,6 +13,9 @@ class Notifier
      */
     private $socket;
 
+    /**
+     * @var array
+     */
     private $subscribe = [
         'headers.syncing',
         'blocks.syncing',
@@ -23,10 +27,10 @@ class Notifier
 
     /**
      * @param Context $context
-     * @param BitcoinNode $node
+     * @param NodeInterface $node
      * @param ScriptThreadControl $threadControl
      */
-    public function __construct(Context $context, BitcoinNode $node)
+    public function __construct(Context $context, NodeInterface $node)
     {
         $this->socket = $context->getSocket(\ZMQ::SOCKET_PUB);
         $this->socket->bind('tcp://127.0.0.1:5566');

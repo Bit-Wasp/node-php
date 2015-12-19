@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
@@ -362,9 +363,9 @@ class Db
      * @return bool
      * @throws \Exception
      */
-    public function insertBlock(BlockInterface $block)
+    public function insertBlock(Buffer $blockHash, BlockInterface $block)
     {
-        $blockHash = $block->getHeader()->getHash()->getBinary();
+        $blockHash = $blockHash->getBinary();
 
         try {
             $this->dbh->beginTransaction();
@@ -475,12 +476,12 @@ class Db
     }
 
     /**
-     * @param BlockIndex $startIndex
-     * @param BlockIndex[] $index
+     * @param BlockIndexInterface $startIndex
+     * @param BlockIndexInterface[] $index
      * @return bool
      * @throws \Exception
      */
-    public function insertIndexBatch(BlockIndex $startIndex, array $index)
+    public function insertIndexBatch(BlockIndexInterface $startIndex, array $index)
     {
         if (null === $this->fetchLftStmt) {
             $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
@@ -574,7 +575,7 @@ class Db
 
     /**
      * @param Buffer $hash
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchIndex(Buffer $hash)
     {
@@ -614,7 +615,7 @@ class Db
 
     /**
      * @param int $id
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchIndexById($id)
     {
@@ -752,7 +753,94 @@ class Db
 
     /**
      * @param Headers $headers
-     * @return array
+     * @param Buffer $hash
+     * @return ChainState
+     */
+    public function fetchHistoricChain(Headers $headers, Buffer $hash)
+    {
+        $math = Bitcoin::getMath();
+        $fetchChainStmt = $this->dbh->prepare('
+           SELECT h.hash
+           FROM     ' . $this->tblIndex . ' AS node,
+                    ' . $this->tblIndex . ' AS parent
+           JOIN     ' . $this->tblHeaders . '  h on h.id = parent.header_id
+           WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
+        $loadLastBlockStmt = $this->dbh->prepare('
+        SELECT h.* from iindex as node,
+                         iindex as parent
+        INNER JOIN blockIndex b on b.hash = parent.header_id
+        JOIN headerIndex h on h.id = parent.header_id
+        WHERE node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
+        ORDER BY parent.rgt
+        LIMIT 1');
+        $stmt = $this->fetchIndexStmt;
+        $stmt->bindParam(':hash', $hash->getBinary());
+
+        if ($stmt->execute()) {
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (empty($row)) {
+                throw new \RuntimeException('Not found');
+            }
+
+            $index = new BlockIndex(
+                new Buffer($row['hash'], 32),
+                $row['height'],
+                $row['work'],
+                new BlockHeader(
+                    $row['version'],
+                    new Buffer($row['prevBlock'], 32),
+                    new Buffer($row['merkleRoot'], 32),
+                    $row['nTimestamp'],
+                    Buffer::int((string)$row['nBits'], 4),
+                    $row['nNonce']
+                )
+            );
+
+            $fetchChainStmt->bindValue(':id', $row['id']);
+            $fetchChainStmt->execute();
+            $map = $fetchChainStmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            $loadLastBlockStmt->bindValue(':id', $row['id']);
+            $loadLastBlockStmt->execute();
+            $block = $loadLastBlockStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            if (count($block) === 1) {
+                $block = $block[0];
+                $lastBlock = new BlockIndex(
+                    new Buffer($block['hash'], 32),
+                    $block['height'],
+                    $block['work'],
+                    new BlockHeader(
+                        $block['version'],
+                        new Buffer($block['prevBlock'], 32),
+                        new Buffer($block['merkleRoot'], 32),
+                        $block['nTimestamp'],
+                        Buffer::int($block['nBits'], 4, $math),
+                        $block['nNonce']
+                    )
+                );
+            } else {
+                $lastBlock = $index;
+            }
+
+            return new ChainState(
+                new Chain(
+                    $map,
+                    $index,
+                    $headers,
+                    $math
+                ),
+                $lastBlock
+            );
+
+        }
+
+        throw new \RuntimeException('Failed to load historic chain?');
+    }
+
+    /**
+     * @param Headers $headers
+     * @return ChainState[]
      */
     public function fetchChainState(Headers $headers)
     {
@@ -797,8 +885,6 @@ class Db
                     )
                 );
 
-                $info = $this->findSuperMajorityInfo($index['id'], [2, 3, 4]);
-
                 $fetchTipChain->bindValue(':id', $index['id']);
                 $fetchTipChain->execute();
                 $map = $fetchTipChain->fetchAll(\PDO::FETCH_COLUMN);
@@ -827,7 +913,6 @@ class Db
                 }
 
                 $states[] = new ChainState(
-                    $math,
                     new Chain(
                         $map,
                         $bestHeader,
@@ -882,7 +967,7 @@ class Db
      * Here, we return max 2000 headers following $hash.
      * Useful for helping other nodes sync.
      * @param string $hash
-     * @return array
+     * @return BlockHeaderInterface[]
      */
     public function fetchNextHeaders($hash)
     {
@@ -975,7 +1060,7 @@ class Db
         $requiredCount = count($required);
         $initialCount = count($outputSet);
 
-        for ($i = 0, $last = $requiredCount - 1; $i < $requiredCount; $i++) {
+        for ($i = 0; $i < $requiredCount; $i++) {
             /**
              * @var OutPointInterface $outpoint
              * @var integer $txidx
@@ -1011,16 +1096,12 @@ class Db
             ) as allowed_block on bt.block_hash = allowed_block.header_id
 ';
 
-        echo "\nExtract utxos\n";
-        $m1 = microtime(true);
         $stmt = $this->dbh->prepare($sql);
         $stmt->execute($queryValues);
-        echo (microtime(true) - $m1) . " - seconds \n";
 
         foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
             $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
-        echo "Just got " . count($outputSet) . "\n\n";
 
         if (count($outputSet) !== ($initialCount + $requiredCount)) {
             throw new \RuntimeException('Utxo was not found');
@@ -1084,6 +1165,26 @@ class Db
         return $outputSet;
     }
 
+    public function fetchActiveSuperMajority($headerId, array $versions)
+    {
+        $stmt = $this->dbh->prepare('
+            SELECT
+                   h.version
+            FROM '.$this->tblIndex.' as tip,
+                    '.$this->tblIndex.' as parent
+            JOIN    active_fork f on (f.header_id = parent.header_id)
+            JOIN    header h on (h.id = f.header_id)
+            WHERE   tip.header_id = :id AND tip.lft between parent.lft AND parent.rgt');
+
+        $stmt->bindValue(':id', $headerId);
+
+        if ($stmt->execute()) {
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
+
+        throw new \RuntimeException('Failed to query supermajority info');
+    }
+
     public function findSuperMajorityInfo($headerId, array $versions)
     {
         $fragment = implode(", ", array_map(
@@ -1094,7 +1195,7 @@ class Db
         ));
 
         $stmt = $this->dbh->prepare('
-            SELECT COUNT(h.id) total,
+            SELECT
                    '.$fragment.'
             FROM '.$this->tblIndex.' as tip,
                     '.$this->tblIndex.' as parent
@@ -1105,7 +1206,7 @@ class Db
 
         $stmt->bindValue(':id', $headerId);
         if ($stmt->execute()) {
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            return $stmt->fetch(\PDO::FETCH_ASSOC);
         }
 
         throw new \RuntimeException('Failed to query supermajority info');
@@ -1113,7 +1214,7 @@ class Db
 
     /**
      * @param Buffer $hash
-     * @param array $versions
+     * @param int[] $versions
      * @return array
      */
     public function findSuperMajorityInfoByHash(Buffer $hash, array $versions)

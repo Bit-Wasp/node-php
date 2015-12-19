@@ -1,8 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands;
+namespace BitWasp\Bitcoin\Node\Console\Commands\Db;
 
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use BitWasp\Bitcoin\Node\Db;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;

@@ -18,7 +18,8 @@
   to the shutdown command. This is to avoid people using CTRL-C, 
   which can cause corruption. Instead, ReactPHP's ZMQ bindings 
   will deliver the message to the application. 
-  
+
+
   ### Peer-to-Peer connectivity
   
   The default means of connecting to the p2p network is using DNS seeds. 
@@ -27,13 +28,18 @@
     
   The library leverages https://github.com/Bit-Wasp/bitcoin-p2p-php 
   which ultimately uses ReactPHP's event loop and networking libraries. 
-  
+
+
   ### Block Index
   
    A `BlockIndex` instance represents a header as a member of a chain. 
    It captures the height, chain-work-to-date, the `BlockHeader`, and 
    the hash. It can be loaded from the Headers index. 
-   
+
+  ### ChainCache
+
+   A `ChainCache` is used to hold a map of height-to-hash, and vice versa.
+
   ### Chain
    
    A `Chain` instance represents a chain tip, ie, a BlockIndex which 
@@ -41,12 +47,12 @@
    (in memory), to allow for getHashByHeight(), and getHeightByHash(). 
    
    Chain instances will be useful throughout the project, as they
-   also expose methods for querying for `BlockIndex`'s by a given height. 
-  
-  ### Header chain
+   retain enough knowledge about the chain to avoid heavy DB calls.
+
+  ### Header Index
   
    The 'Headers' index provides raw access to the headers storage,
-   (lookups by a hash), and has other methods for maintaing this dataset.
+   (lookups by a hash), and has other methods for maintaining this dataset.
    
    It initializes by loading querying for known tips (Chain instances)
    and adding the best valid, and greatest-work chain into Chain::$activeTip.
