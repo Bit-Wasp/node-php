@@ -2,7 +2,7 @@
   "name": "bitwasp/bitcoin-node",
   "description": "A bitcoin node",
   "type": "library",
-  "homepage": "https://github.com/bit-wasp/bitcoin-php",
+  "homepage": "https://github.com/Bit-Wasp/node-php",
   "license": "Unlicence",
   "authors": [
     {
