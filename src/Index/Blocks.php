@@ -6,6 +6,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
+use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
@@ -20,7 +21,7 @@ class Blocks
     private $blockCheck;
 
     /**
-     * @var Chains
+     * @var ChainsInterface
      */
     private $chains;
 
@@ -40,15 +41,17 @@ class Blocks
     private $math;
 
     /**
+     * Blocks constructor.
      * @param Db $db
      * @param EcAdapterInterface $ecAdapter
+     * @param ChainsInterface $chains
      * @param Consensus $consensus
      * @param BlockCheckInterface $blockCheck
      */
     public function __construct(
         Db $db,
         EcAdapterInterface $ecAdapter,
-        Chains $chains,
+        ChainsInterface $chains,
         Consensus $consensus,
         BlockCheckInterface $blockCheck
     ) {

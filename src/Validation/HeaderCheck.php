@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Buffertools\Buffer;
 
@@ -64,11 +65,11 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param BlockHeaderInterface $header
      * @return $this
      */
-    public function checkContextual(ChainState $state, BlockHeaderInterface $header)
+    public function checkContextual(ChainStateInterface $state, BlockHeaderInterface $header)
     {
         $work = $this->consensus->getWorkRequired($state);
         if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {

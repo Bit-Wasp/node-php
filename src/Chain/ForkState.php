@@ -8,7 +8,7 @@ use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 
-class ForkState
+class ForkState implements ForkStateInterface
 {
     /**
      * @var Flags

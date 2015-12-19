@@ -9,8 +9,9 @@ use BitWasp\Bitcoin\Block\MerkleRoot;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
-use BitWasp\Bitcoin\Node\Chain\Chains;
+use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\TransactionFactory;
 use BitWasp\Buffertools\Buffer;
@@ -35,7 +36,7 @@ class SelfTestNode extends BitcoinNode
     public $headers;
 
     /**
-     * @var Chains
+     * @var ChainsInterface
      */
     public $chains;
 
@@ -64,7 +65,7 @@ class SelfTestNode extends BitcoinNode
     }
 
    /**
-     * @var ChainState
+     * @var ChainStateInterface
      */
     private $forkState;
     private $i = 0;

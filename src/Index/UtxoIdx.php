@@ -95,7 +95,7 @@ class UtxoIdx
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param BlockInterface $block
      * @return UtxoView
      */

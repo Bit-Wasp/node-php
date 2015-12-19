@@ -4,8 +4,9 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\Chains;
+use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
@@ -39,14 +40,14 @@ class Headers
      * @param Db $db
      * @param Consensus $consensus
      * @param Math $math
-     * @param Chains $chains
+     * @param ChainsInterface $chains
      * @param HeaderCheckInterface $headerCheck
      */
     public function __construct(
         Db $db,
         Consensus $consensus,
         Math $math,
-        Chains $chains,
+        ChainsInterface $chains,
         HeaderCheckInterface $headerCheck
     ) {
         $this->db = $db;
@@ -107,7 +108,7 @@ class Headers
             return $this->db->fetchIndex($hash);
         }
 
-        /* @var ChainState $state */
+        /* @var ChainStateInterface $state */
         list ($isTip, $state) = $this->fetchChain($hash);
 
         $chain = $state->getChain();
@@ -126,7 +127,7 @@ class Headers
         $this->db->insertIndexBatch($startIndex, [$index]);
 
         if (!$isTip) {
-            $this->chains->trackChain($state);
+            $this->chains->trackState($state);
         }
 
         return $index;
@@ -134,12 +135,12 @@ class Headers
 
     /**
      * @param BlockHeaderInterface[] $headers
-     * @param ChainState|null $state
+     * @param ChainStateInterface|null $state
      * @param BlockIndexInterface|null $prevIndex
-     * @return ChainState
+     * @return ChainStateInterface
      * @throws \Exception
      */
-    public function acceptBatch(array $headers, ChainState &$state = null, BlockIndexInterface &$prevIndex = null)
+    public function acceptBatch(array $headers, ChainStateInterface &$state = null, BlockIndexInterface &$prevIndex = null)
     {
         $countHeaders = count($headers);
         $bestPrev = null;
@@ -170,7 +171,6 @@ class Headers
             $batch = [];
             for ($i = $firstUnknown; $i < $countHeaders; $i++) {
                 list ($hash, $header) = $headers[$i];
-                echo ".";
 
                 $index = $this
                     ->headerCheck
@@ -191,7 +191,7 @@ class Headers
             }
 
             if (!$isTip) {
-                $this->chains->trackChain($chainState);
+                $this->chains->trackState($chainState);
             }
         }
 

@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Validation;
 
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Buffertools\Buffer;
 
 interface HeaderCheckInterface
@@ -18,11 +18,11 @@ interface HeaderCheckInterface
     public function check(Buffer $hash, BlockHeaderInterface $header, $checkPow = true);
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param BlockHeaderInterface $header
      * @return $this
      */
-    public function checkContextual(ChainState $state, BlockHeaderInterface $header);
+    public function checkContextual(ChainStateInterface $state, BlockHeaderInterface $header);
 
     /**
      * @param BlockIndexInterface $prevIndex

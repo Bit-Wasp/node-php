@@ -6,9 +6,9 @@ use BitWasp\Bitcoin\Amount;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
-class Consensus
+class Consensus implements ConsensusInterface
 {
 
     /**
@@ -101,34 +101,24 @@ class Consensus
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @return int|string
      */
-    public function getWorkRequired(ChainState $state)
+    public function getWorkRequired(ChainStateInterface $state)
     {
         $math = $this->math;
         $index = $state->getChain()->getIndex();
+
         if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) !== 0) {
             // No change in difficulty
-            echo "no change\n";
             return $index->getHeader()->getBits()->getInt();
         }
 
-        echo "retarget\n";
         // Retarget
         $heightLastRetarget = $math->sub($index->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
 
         $lastTime = $state->getChain()->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
 
         return $this->calculateNextWorkRequired($index, $lastTime);
-    }
-
-    /**
-     * @param int|string $currentTime
-     * @return bool
-     */
-    public function scriptVerifyPayToScriptHash($currentTime)
-    {
-        return $this->math->cmp($currentTime, $this->params->p2shActivateTime()) >= 0;
     }
 }

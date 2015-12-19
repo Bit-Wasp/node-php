@@ -1,19 +1,15 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: tk
- * Date: 19/12/15
- * Time: 18:25
- */
-namespace BitWasp\Bitcoin\Node\Chain;
-use BitWasp\Buffertools\Buffer;
 
+namespace BitWasp\Bitcoin\Node\Chain;
+
+use BitWasp\Buffertools\Buffer;
+use Evenement\EventEmitterInterface;
 
 /**
  * This class retains all of this in memory. It must be
  * rebuilt on startup.
  */
-interface ChainInterface
+interface ChainInterface extends EventEmitterInterface
 {
     /**
      * @param Buffer $hash

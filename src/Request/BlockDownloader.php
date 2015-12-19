@@ -7,6 +7,7 @@ use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\ChainCacheInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Buffertools\Buffer;
@@ -43,21 +44,21 @@ class BlockDownloader
     }
 
     /**
-     * @param ChainState $bestChain
+     * @param ChainStateInterface $bestChain
      * @param Peer $peer
      */
-    public function start(ChainState $bestChain, Peer $peer)
+    public function start(ChainStateInterface $bestChain, Peer $peer)
     {
         $this->request->requestNextBlocks($bestChain, $peer);
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param ChainCacheInterface $chainView
      * @param Peer $peer
      * @param Inventory[] $items
      */
-    public function advertised(ChainState $state, ChainCacheInterface $chainView, Peer $peer, array $items)
+    public function advertised(ChainStateInterface $state, ChainCacheInterface $chainView, Peer $peer, array $items)
     {
         $chain = $state->getChain();
         $fetch = [];
@@ -85,11 +86,11 @@ class BlockDownloader
     }
 
     /**
-     * @param ChainState $bestChain
+     * @param ChainStateInterface $bestChain
      * @param Peer $peer
      * @param Buffer $hash
      */
-    public function received(ChainState $bestChain, Peer $peer, Buffer $hash)
+    public function received(ChainStateInterface $bestChain, Peer $peer, Buffer $hash)
     {
         if ($this->request->isInFlight($hash)) {
             $this->request->markReceived($hash);

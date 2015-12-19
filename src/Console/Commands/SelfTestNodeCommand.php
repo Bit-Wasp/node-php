@@ -5,7 +5,7 @@ namespace BitWasp\Bitcoin\Node\Console\Commands;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Chain\Params;
-use BitWasp\Bitcoin\Node\RegtestParams;
+use BitWasp\Bitcoin\Node\Params\RegtestParams;
 use BitWasp\Bitcoin\Node\SelfTestNode;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;

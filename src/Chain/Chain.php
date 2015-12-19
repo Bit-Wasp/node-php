@@ -5,12 +5,13 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Index;
 use BitWasp\Buffertools\Buffer;
+use Evenement\EventEmitter;
 
 /**
  * This class retains all of this in memory. It must be
  * rebuilt on startup.
  */
-class Chain implements ChainInterface
+class Chain extends EventEmitter implements ChainInterface
 {
     /**
      * @var Index\Headers
@@ -126,5 +127,6 @@ class Chain implements ChainInterface
 
         $this->chainCache->add($index);
         $this->index = $index;
+        $this->emit('tip', [$index]);
     }
 }

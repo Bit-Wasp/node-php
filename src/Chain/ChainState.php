@@ -5,7 +5,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Buffertools\Buffer;
 
-class ChainState
+class ChainState implements ChainStateInterface
 {
     /**
      * @var ChainInterface

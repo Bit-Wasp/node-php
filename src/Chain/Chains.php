@@ -2,11 +2,12 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
+use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
 
-class Chains extends EventEmitter
+class Chains extends EventEmitter implements ChainsInterface
 {
     /**
      * @var EcAdapterInterface
@@ -14,12 +15,17 @@ class Chains extends EventEmitter
     private $adapter;
 
     /**
-     * @var ChainState[]
+     * @var ParamsInterface
+     */
+    private $params;
+
+    /**
+     * @var ChainStateInterface[]
      */
     private $states = [];
 
     /**
-     * @var ChainState
+     * @var ChainStateInterface
      */
     private $best;
 
@@ -30,18 +36,42 @@ class Chains extends EventEmitter
 
     /**
      * @param EcAdapterInterface $adapter
+     * @param ParamsInterface $params
      */
-    public function __construct(EcAdapterInterface $adapter)
+    public function __construct(EcAdapterInterface $adapter, ParamsInterface $params)
     {
         $this->adapter = $adapter;
+        $this->params = $params;
     }
 
     /**
-     * @param ChainState $a
-     * @param ChainState $b
+     * @return ChainStateInterface[]
+     */
+    public function getStates()
+    {
+        return $this->states;
+    }
+
+    /**
+     * @return ChainInterface[]
+     */
+    public function getChains()
+    {
+        /** @var ChainInterface[] $chains */
+        $chains = [];
+        foreach ($this->states as $state) {
+            $chains[] = $state->getChain();
+        }
+
+        return $chains;
+    }
+
+    /**
+     * @param ChainStateInterface $a
+     * @param ChainStateInterface $b
      * @return int
      */
-    public function compareChainStateWork(ChainState $a, ChainState $b)
+    public function compareChainStateWork(ChainStateInterface $a, ChainStateInterface $b)
     {
         return $this->adapter->getMath()->cmp(
             $a->getChain()->getIndex()->getWork(),
@@ -67,37 +97,23 @@ class Chains extends EventEmitter
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      */
-    public function trackChain(ChainState $state)
+    public function trackState(ChainStateInterface $state)
     {
         $this->states[] = $state;
+
+        // Implement
+        /*$state->getChain()->on('tip', function (BlockIndexInterface $index) use ($state) {
+            $math = $this->adapter->getMath();
+            if ($math->cmp($math->mod($index->getHeight(), $this->params->powRetargetInterval()), 0) === 0) {
+                $this->emit('retarget', [$state, $index]);
+            }
+        });*/
     }
 
     /**
-     * @return ChainState[]
-     */
-    public function getStates()
-    {
-        return $this->states;
-    }
-
-    /**
-     * @return ChainInterface[]
-     */
-    public function getChains()
-    {
-        /** @var ChainInterface[] $chains */
-        $chains = [];
-        foreach ($this->states as $state) {
-            $chains[] = $state->getChain();
-        }
-
-        return $chains;
-    }
-
-    /**
-     * @return ChainState
+     * @return ChainStateInterface
      */
     public function best()
     {
@@ -110,7 +126,7 @@ class Chains extends EventEmitter
 
     /**
      * @param Buffer $hash
-     * @return false|ChainState
+     * @return false|ChainStateInterface
      */
     public function isKnownHeader(Buffer $hash)
     {
@@ -129,7 +145,7 @@ class Chains extends EventEmitter
 
     /**
      * @param Buffer $hash
-     * @return false|ChainState
+     * @return false|ChainStateInterface
      */
     public function isTip(Buffer $hash)
     {

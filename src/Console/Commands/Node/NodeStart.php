@@ -3,9 +3,10 @@
 namespace BitWasp\Bitcoin\Node\Console\Commands\Node;
 
 use BitWasp\Bitcoin\Bitcoin;
-use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Chain\Params;
+use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
+use BitWasp\Bitcoin\Node\HeadersNode;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;

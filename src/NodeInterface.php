@@ -9,7 +9,7 @@ use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\Chain\Chains;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use Evenement\EventEmitterInterface;
 
 interface NodeInterface extends EventEmitterInterface
@@ -18,7 +18,7 @@ interface NodeInterface extends EventEmitterInterface
     public function stop();
 
     /**
-     * @return ChainState
+     * @return ChainStateInterface
      */
     public function chain();
 

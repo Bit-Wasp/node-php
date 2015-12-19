@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
@@ -25,8 +26,13 @@ use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use Packaged\Config\ConfigProviderInterface;
 
-class Db
+class Db implements DbInterface
 {
+    /**
+     * @var string
+     */
+    private $database;
+
     /**
      * @var \PDO
      */
@@ -755,7 +761,7 @@ class Db
     /**
      * @param Headers $headers
      * @param Buffer $hash
-     * @return ChainState
+     * @return ChainStateInterface
      */
     public function fetchHistoricChain(Headers $headers, Buffer $hash)
     {
@@ -841,7 +847,7 @@ class Db
 
     /**
      * @param Headers $headers
-     * @return ChainState[]
+     * @return ChainStateInterface[]
      */
     public function fetchChainState(Headers $headers)
     {

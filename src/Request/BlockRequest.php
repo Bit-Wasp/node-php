@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Request;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Buffertools\Buffer;
 
 class BlockRequest
@@ -23,13 +24,13 @@ class BlockRequest
     private $lastRequested;
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param Buffer $startHash
      * @throws \RuntimeException
      * @throws \Exception
      * @return Inventory[]
      */
-    private function relativeNextInventory(ChainState $state, Buffer $startHash)
+    private function relativeNextInventory(ChainStateInterface $state, Buffer $startHash)
     {
         $best = $state->getChain();
         if (!$best->containsHash($startHash)) {
@@ -50,23 +51,23 @@ class BlockRequest
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @return Inventory[]
      * @throws \RuntimeException
      * @throws \Exception
      */
-    public function nextInventory(ChainState $state)
+    public function nextInventory(ChainStateInterface $state)
     {
         return $this->relativeNextInventory($state, $state->getLastBlock()->getHash());
     }
 
     /**
-     * @param ChainState $state
+     * @param ChainStateInterface $state
      * @param Peer $peer
      * @throws \RuntimeException
      * @throws \Exception
      */
-    public function requestNextBlocks(ChainState $state, Peer $peer)
+    public function requestNextBlocks(ChainStateInterface $state, Peer $peer)
     {
         if (null === $this->lastRequested) {
             $nextData = $this->nextInventory($state);

@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
@@ -31,7 +32,7 @@ use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\ZMQ\Context as ZMQContext;
 
-class BitcoinNode extends EventEmitter implements NodeInterface
+class HeadersNode extends EventEmitter implements NodeInterface
 {
 
     /**
@@ -130,9 +131,23 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $this->ecAdapter = $adapter;
         $this->notifier = new Notifier($zmq, $this);
         $this->chains = new Chains($adapter, $this->params);
-        $this->chains->on('newtip', function (ChainStateInterface $state) {
+        $this->chains->on('retarget', function (ChainState $state, BlockIndexInterface $index) {
+            $this->notifier->send('chain.retarget', [
+                'tip' => $index->getHash()->getHex(),
+                'height' => $index->getHeight(),
+                'nBits' => $index->getHeader()->getBits()->getHex()
+            ]);
+        });
+
+        $this->chains->on('newtip', function (ChainState $state) use ($math) {
             $index = $state->getChainIndex();
-            $this->notifier->send('chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work' => $index->getWork()]);
+            $hash = $index->getHash()->getHex();
+            $height = $index->getHeight();
+            $this->notifier->send('chain.newtip', [
+                'hash' => $hash,
+                'height' => $height,
+                'work' => $index->getWork()
+            ]);
         });
 
         $this->inventory = new KnownInventory();
@@ -253,7 +268,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
             $indexLast = null;
             $this->headers->acceptBatch($vHeaders, $state, $indexLast);
             /**
-             * @var ChainStateInterface $state
+             * @var ChainState $state
              * @var BlockIndexInterface $indexLast
              */
 
@@ -280,27 +295,19 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function onInv(Peer $peer, Inv $inv)
     {
-        $best = $this->chain();
+        $state = $this->chain();
+        $best = $state->getChain();
 
-        $vFetch = [];
-        $txs = [];
-        $blocks = [];
+        $lastUnknown = null;
         foreach ($inv->getItems() as $item) {
-            if ($item->isBlock()) {
-                $blocks[] = $item;
-            } elseif ($item->isTx()) {
-                $txs[] = $item;
+            if ($item->isBlock() && $lastUnknown == null && !$best->containsHash($item->getHash())) {
+                $lastUnknown = $item->getHash();
             }
         }
-        $this->notifier->send('p2p.inv', ['blocks' => count($blocks), 'txs' => count($txs)]);
 
-        if (count($blocks) !== 0) {
-            $blockView = $best->bestBlocksCache();
-            $this->blockDownload->advertised($best, $blockView, $peer, $blocks);
-        }
-
-        if (count($vFetch) !== 0) {
-            $peer->getdata($vFetch);
+        if (null !== $lastUnknown) {
+            $peer->getheaders($state->getHeadersLocator($lastUnknown));
+            $this->peerState->fetch($peer)->updateBlockAvailability($state, $lastUnknown);
         }
     }
 
@@ -310,35 +317,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function onBlock(Peer $peer, Block $blockMsg)
     {
-        $best = $this->chain();
-        $block = $blockMsg->getBlock();
-
-        try {
-            $index = $this->blocks->accept($block, $this->headers);
-            $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
-
-            $this->chains->checkTips();
-            $this->blockDownload->received($best, $peer, $index->getHash());
-
-        } catch (\Exception $e) {
-            $header = $block->getHeader();
-            echo 'Failed to accept block' . PHP_EOL;
-
-            echo $e->getMessage() . PHP_EOL;
-
-            if ($best->getChain()->containsHash($block->getHeader()->getPrevBlock())) {
-                if ($header->getPrevBlock() === $best->getLastBlock()->getHash()) {
-                    echo $block->getHeader()->getHash()->getHex() . PHP_EOL;
-                    echo $block->getHex() . PHP_EOL;
-                    echo 'We have prevblockIndex, so this is weird.';
-                    echo $e->getTraceAsString() . PHP_EOL;
-                    echo $e->getMessage() . PHP_EOL;
-                } else {
-                    echo 'Didn\'t elongate the chain, probably from the future..' . PHP_EOL;
-                }
-            }
-            echo $e->getTraceAsString() . PHP_EOL;
-        }
 
     }
 
@@ -400,7 +378,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $locator
             ->queryDnsSeeds(1)
             ->then(function (Locator $locator) use ($manager, $handler) {
-                for ($i = 0; $i < 1; $i++) {
+                for ($i = 0; $i < 8; $i++) {
                     $manager->connectNextPeer($locator);
                 }
             });
