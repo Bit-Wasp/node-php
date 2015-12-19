@@ -13,6 +13,7 @@ use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
@@ -25,18 +26,17 @@ use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Bitcoin\Node\Zmq\Notifier;
 use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
-use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\ZMQ\Context as ZMQContext;
 
-class BitcoinNode extends EventEmitter
+class BitcoinNode extends EventEmitter implements NodeInterface
 {
 
     /**
-     * @var \Packaged\Config\ConfigProviderInterface
+     * @var \BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface
      */
-    public $config;
+    private $ecAdapter;
 
     /**
      * @var Db
@@ -44,29 +44,9 @@ class BitcoinNode extends EventEmitter
     private $db;
 
     /**
-     * @var Index\Blocks
-     */
-    public $blocks;
-
-    /**
-     * @var Index\Headers
-     */
-    public $headers;
-
-    /**
-     * @var Chains
-     */
-    public $chains;
-
-    /**
      * @var Notifier
      */
     private $notifier;
-
-    /**
-     * @var \BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface
-     */
-    private $adapter;
 
     /**
      * @var PeerStateCollection
@@ -74,9 +54,29 @@ class BitcoinNode extends EventEmitter
     private $peerState;
 
     /**
+     * @var \Packaged\Config\ConfigProviderInterface
+     */
+    protected $config;
+
+    /**
+     * @var Index\Blocks
+     */
+    protected $blocks;
+
+    /**
+     * @var Index\Headers
+     */
+    protected $headers;
+
+    /**
+     * @var Chains
+     */
+    protected $chains;
+
+    /**
      * @var LoopInterface
      */
-    private $loop;
+    protected $loop;
 
     /**
      * @var ParamsInterface
@@ -86,7 +86,7 @@ class BitcoinNode extends EventEmitter
     /**
      * @var Index\UtxoIdx
      */
-    public $utxo;
+    protected $utxo;
 
     /**
      * @var BlockDownloader
@@ -102,6 +102,11 @@ class BitcoinNode extends EventEmitter
      * @var Peers
      */
     private $peersOutbound;
+
+    /**
+     * @var ProofOfWork
+     */
+    protected $pow;
 
     /**
      * @param ParamsInterface $params
@@ -121,7 +126,7 @@ class BitcoinNode extends EventEmitter
 
         $this->loop = $loop;
         $this->params = $params;
-        $this->adapter = $adapter;
+        $this->ecAdapter = $adapter;
         $this->notifier = new Notifier($zmq, $this);
         $this->chains = new Chains($adapter);
         $this->chains->on('newtip', function (ChainState $state) {
@@ -138,8 +143,9 @@ class BitcoinNode extends EventEmitter
         $consensus = new Consensus($math, $params);
 
         $zmqScript = new ScriptCheck($adapter);
-        $this->headers = new Index\Headers($this->db, $consensus, $math, new HeaderCheck($consensus, $adapter, new ProofOfWork($math, $params)));
-        $this->blocks = new Index\Blocks($this->db, $adapter, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
+        $this->pow = new ProofOfWork($math, $params);
+        $this->headers = new Index\Headers($this->db, $consensus, $math, $this->chains, new HeaderCheck($consensus, $adapter, $this->pow));
+        $this->blocks = new Index\Blocks($this->db, $adapter,$this->chains, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
 
         $genesis = $params->getGenesisBlock();
         $this->headers->init($genesis->getHeader());
@@ -152,6 +158,9 @@ class BitcoinNode extends EventEmitter
         echo ' [App] Startup took: ' . (microtime(true) - $start) . ' seconds ' . PHP_EOL;
     }
 
+    /**
+     * @return void
+     */
     public function stop()
     {
         $this->peersInbound->close();
@@ -185,6 +194,7 @@ class BitcoinNode extends EventEmitter
     private function initChainState()
     {
         $states = $this->db->fetchChainState($this->headers);
+        echo count($states);
         foreach ($states as $state) {
             $this->chains->trackChain($state);
         }
@@ -198,6 +208,14 @@ class BitcoinNode extends EventEmitter
     public function chain()
     {
         return $this->chains->best();
+    }
+
+    /**
+     * @return Chains
+     */
+    public function chains()
+    {
+        return $this->chains;
     }
 
     /**
@@ -226,18 +244,23 @@ class BitcoinNode extends EventEmitter
      */
     public function onHeaders(Peer $peer, Headers $headers)
     {
-        try {
-            $state = $this->chain();
-            $vHeaders = $headers->getHeaders();
-            $count = count($vHeaders);
-            if ($count > 0) {
-                $this->headers->acceptBatch($state, $vHeaders);
+        echo "Headers\n";
+        $vHeaders = $headers->getHeaders();
+        $count = count($vHeaders);
 
-                $this->chains->checkTips();
+        if ($count > 0) {
 
-                $last = end($vHeaders);
-                $this->peerState->fetch($peer)->updateBlockAvailability($state, $last->getHash());
-            }
+            $state = null;
+            $indexLast = null;
+            $this->headers->acceptBatch($vHeaders, $state, $indexLast);
+            /**
+             * @var ChainState $state
+             * @var BlockIndexInterface $indexLast
+             */
+
+            $this->chains->checkTips();
+
+            $this->peerState->fetch($peer)->updateBlockAvailability($state, $indexLast->getHash());
 
             if (2000 === $count) {
                 $peer->getheaders($state->getHeadersLocator());
@@ -246,13 +269,10 @@ class BitcoinNode extends EventEmitter
             if ($count < 2000) {
                 $this->blockDownload->start($state, $peer);
             }
-
-            $this->notifier->send('p2p.headers', ['count' => count($vHeaders)]);
-        } catch (\Exception $e) {
-            echo "Failed to accept headers\n";
-            echo $e->getMessage() . "\n";
-            die();
         }
+
+        $this->notifier->send('p2p.headers', ['count' => $count]);
+
     }
 
     /**
@@ -295,7 +315,7 @@ class BitcoinNode extends EventEmitter
         $block = $blockMsg->getBlock();
 
         try {
-            $index = $this->blocks->accept($best, $block, $this->headers, $this->utxo);
+            $index = $this->blocks->accept( $block, $this->headers, $this->utxo);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $this->chains->checkTips();
@@ -323,6 +343,15 @@ class BitcoinNode extends EventEmitter
     }
 
     /**
+     * @param Peer $peer
+     * @param Ping $ping
+     */
+    public function onPing(Peer $peer, Ping $ping)
+    {
+        $peer->pong($ping);
+    }
+
+    /**
      *
      */
     public function start()
@@ -333,9 +362,7 @@ class BitcoinNode extends EventEmitter
         $dns = $netFactory->getDns();
         $peerFactory = $netFactory->getPeerFactory($dns);
         $handler = $peerFactory->getPacketHandler();
-        $handler->on('ping', function (Peer $peer, Ping $ping) {
-            $peer->pong($ping);
-        });
+        $handler->on('ping', array($this, 'onPing'));
 
         $locator = $peerFactory->getLocator();
         $manager = $peerFactory->getManager($txRelay);

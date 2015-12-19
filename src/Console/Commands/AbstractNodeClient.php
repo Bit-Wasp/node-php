@@ -18,15 +18,6 @@ abstract class AbstractNodeClient extends AbstractCommand
     abstract public function getNodeCommand();
 
     /**
-     * @param InputInterface $input
-     * @return array
-     */
-    public function getArguments(InputInterface $input)
-    {
-        return [];
-    }
-
-    /**
      *
      */
     protected function configure()

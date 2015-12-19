@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
@@ -34,19 +35,23 @@ class Headers
     private $headerCheck;
 
     /**
+     * Headers constructor.
      * @param Db $db
      * @param Consensus $consensus
      * @param Math $math
+     * @param Chains $chains
      * @param HeaderCheckInterface $headerCheck
      */
     public function __construct(
         Db $db,
         Consensus $consensus,
         Math $math,
+        Chains $chains,
         HeaderCheckInterface $headerCheck
     ) {
         $this->db = $db;
         $this->math = $math;
+        $this->chains = $chains;
         $this->consensus = $consensus;
         $this->headerCheck = $headerCheck;
     }
@@ -76,70 +81,119 @@ class Headers
     }
 
     /**
-     * @param ChainState $state
-     * @param BlockHeaderInterface $header
-     * @return BlockIndex
+     * @param Buffer $hash
+     * @return array
      */
-    public function accept(ChainState $state, BlockHeaderInterface $header)
+    private function fetchChain(Buffer $hash)
+    {
+        $isTip = $this->chains->isTip($hash);
+        if ($isTip instanceof ChainState) {
+            return [true, $isTip];
+        } else {
+            return [false, $this->db->fetchHistoricChain($this, $hash)];
+        }
+    }
+
+    /**
+     * @param BlockHeaderInterface $header
+     * @return BlockIndex|\BitWasp\Bitcoin\Node\Chain\Chain
+     * @throws \Exception
+     */
+    public function accept(BlockHeaderInterface $header)
     {
         $hash = $header->getHash();
-        if ($state->getChain()->containsHash($hash)) {
+        if ($this->chains->isKnownHeader($hash)) {
             // todo: check for rejected block
             return $this->db->fetchIndex($hash);
         }
 
-        $prevIndex = $state->getChain()->getIndex();
-        $index = $this->headerCheck
-            ->check($header)
-            ->checkContextual($state, $header)
-            ->makeIndex($prevIndex, $header);
+        /* @var ChainState $state */
+        list ($isTip, $state) = $this->fetchChain($hash);
 
-        $this->db->insertIndexBatch($prevIndex, [$index]);
+        $chain = $state->getChain();
+        $startIndex = $chain->getIndex();
 
-        $state->getChain()->updateTip($index);
+        $chain->updateTip(
+            $this
+                ->headerCheck
+                ->check($header)
+                ->checkContextual($state, $header)
+                ->makeIndex($startIndex, $header)
+        );
+
+        $index = $chain->getIndex();
+
+        $this->db->insertIndexBatch($startIndex, [$index]);
+
+        if (!$isTip) {
+            $this->chains->trackChain($state);
+        }
 
         return $index;
     }
 
     /**
-     * @param ChainState $state
      * @param BlockHeaderInterface[] $headers
-     * @return bool
+     * @param ChainState|null $state
+     * @param BlockIndex|null $prevIndex
+     * @return ChainState
      * @throws \Exception
      */
-    public function acceptBatch(ChainState $state, array $headers)
+    public function acceptBatch(array $headers, ChainState &$state = null, BlockIndex &$prevIndex = null)
     {
-        $tip = $state->getChain();
+        $countHeaders = count($headers);
+        $bestPrev = null;
+        $firstUnknown = null;
+        foreach ($headers as $i => $h) {
 
-        $batch = array();
-        $startIndex = $tip->getIndex();
-
-        foreach ($headers as $header) {
-            if ($tip->containsHash($header->getHash())) {
-                continue;
+            if ($this->chains->isKnownHeader($h->getPrevBlock())) {
+                $bestPrev = $h->getPrevBlock();
             }
 
-            $prevIndex = $tip->getIndex();
-            if ($prevIndex->getHash() != $header->getPrevBlock()) {
-                throw new \RuntimeException('Header mismatch, header.prevBlock does not refer to tip');
+            if ($firstUnknown === null && !$this->chains->isKnownHeader($h->getHash())) {
+                $firstUnknown = $i;
+            }
+        }
+
+        if (!$bestPrev instanceof Buffer) {
+            throw new \RuntimeException('Headers::accept(): Unknown start header');
+        }
+
+        /* @var ChainState $chainState */
+        list ($isTip, $chainState) = $this->fetchChain($bestPrev);
+        $tip = $chainState->getChain();
+        $prevIndex = $tip->getIndex();
+
+        if ($firstUnknown !== null) {
+            $batch = [];
+            for ($i = $firstUnknown; $i < $countHeaders; $i++) {
+                $header = $headers[$i];
+                echo ".";
+
+                $index = $this
+                    ->headerCheck
+                    ->check($header)
+                    ->checkContextual($chainState, $header)
+                    ->makeIndex($tip->getIndex(), $header);
+
+                // This function checks for continuity of headers
+                $tip->updateTip($index);
+
+                $batch[] = $tip->getIndex();
             }
 
-            $index = $this
-                ->headerCheck
-                ->check($header)
-                ->checkContextual($state, $header)
-                ->makeIndex($prevIndex, $header);
+            // Do a batch update of the chain
+            if (count($batch) > 0) {
+                $this->db->insertIndexBatch($prevIndex, $batch);
+                unset($batch);
+            }
 
-            $tip->updateTip($index);
-
-            $batch[] = $tip->getIndex();
+            if (!$isTip) {
+                $this->chains->trackChain($chainState);
+            }
         }
 
-        // Do a batch update of the chain
-        if (count($batch) > 0) {
-            $this->db->insertIndexBatch($startIndex, $batch);
-            unset($batch);
-        }
+        $state = $chainState;
 
         return true;
     }

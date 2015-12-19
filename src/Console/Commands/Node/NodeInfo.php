@@ -1,9 +1,8 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands;
+namespace BitWasp\Bitcoin\Node\Console\Commands\Node;
 
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractNodeClient;
 
 class NodeInfo extends AbstractNodeClient
 {

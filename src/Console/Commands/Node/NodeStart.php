@@ -1,15 +1,16 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands;
+namespace BitWasp\Bitcoin\Node\Console\Commands\Node;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Chain\Params;
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class StartNode extends AbstractCommand
+class NodeStart extends AbstractCommand
 {
     /**
      * @var string
@@ -22,7 +23,8 @@ class StartNode extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setName('start')
+            ->setName('node:start')
+            ->setAliases(['start'])
             ->setDescription('Start the bitcoin node')
             ->addOption($this->optConfig, 'c', InputOption::VALUE_OPTIONAL, 'Specify the location of a configuration file');
     }

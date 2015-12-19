@@ -2,16 +2,18 @@
 
 namespace BitWasp\Bitcoin\Node\Console;
 
-use BitWasp\Bitcoin\Node\Console\Commands\DbBlocksReset;
-use BitWasp\Bitcoin\Node\Console\Commands\DbReset;
-use BitWasp\Bitcoin\Node\Console\Commands\DbWipe;
-use BitWasp\Bitcoin\Node\Console\Commands\NodeInfo;
+use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlocksReset;
+use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
+use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeChains;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeInfo;
 use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
 use BitWasp\Bitcoin\Node\Console\Commands\ScriptWorker;
-use BitWasp\Bitcoin\Node\Console\Commands\StartNode;
-use BitWasp\Bitcoin\Node\Console\Commands\StopNode;
+use BitWasp\Bitcoin\Node\Console\Commands\SelfTestNodeCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeStart;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeStop;
 use BitWasp\Bitcoin\Node\Console\Commands\TestCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\WatchNode;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeWatch;
 use Symfony\Component\Console\Application as ConsoleApplication;
 
 class Application extends ConsoleApplication
@@ -19,15 +21,17 @@ class Application extends ConsoleApplication
     protected function getDefaultCommands()
     {
         $commands = parent::getDefaultCommands();
-        $commands[] = new StartNode();
-        $commands[] = new StopNode();
-        $commands[] = new NodeInfo();
-        $commands[] = new PrintConfig();
         $commands[] = new DbReset();
         $commands[] = new DbWipe();
         $commands[] = new DbBlocksReset();
+        $commands[] = new NodeStart();
+        $commands[] = new NodeStop();
+        $commands[] = new NodeWatch();
+        $commands[] = new NodeInfo();
+        $commands[] = new NodeChains();
+        $commands[] = new SelfTestNodeCommand();
+        $commands[] = new PrintConfig();
         $commands[] = new ScriptWorker();
-        $commands[] = new WatchNode();
         $commands[] = new TestCommand();
         return $commands;
     }

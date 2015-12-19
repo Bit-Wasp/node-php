@@ -1,17 +1,18 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands;
+namespace BitWasp\Bitcoin\Node\Console\Commands\Node;
 
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use React\ZMQ\Context;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class WatchNode extends AbstractCommand
+class NodeWatch extends AbstractCommand
 {
     protected function configure()
     {
         $this
-            ->setName('watch')
+            ->setName('node:watch')
             ->setDescription('Watch for messages from the bitcoin node');
     }
 

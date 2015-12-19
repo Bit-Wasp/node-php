@@ -1,19 +1,20 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands;
+namespace BitWasp\Bitcoin\Node\Console\Commands\Db;
 
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use BitWasp\Bitcoin\Node\Db;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class DbBlocksReset extends AbstractCommand
+class DbReset extends AbstractCommand
 {
     protected function configure()
     {
         $this
-            ->setName('db:blocks:reset')
-            ->setDescription('Wipe only block & transaction data, leaving header chain');
+            ->setName('db:reset')
+            ->setDescription('Wipe everything - careful now');
     }
 
     /**
@@ -26,6 +27,6 @@ class DbBlocksReset extends AbstractCommand
         $config = (new ConfigLoader())->load();
 
         $db = new Db($config);
-        $db->resetBlocksOnly();
+        $db->reset();
     }
 }

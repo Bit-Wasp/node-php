@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq;
 
-use BitWasp\Bitcoin\Node\BitcoinNode;
+use BitWasp\Bitcoin\Node\NodeInterface;
 use \React\ZMQ\Context;
 
 class UserControl
@@ -14,10 +14,10 @@ class UserControl
 
     /**
      * @param Context $context
-     * @param BitcoinNode $node
+     * @param NodeInterface $node
      * @param ScriptThreadControl $threadControl
      */
-    public function __construct(Context $context, BitcoinNode $node, ScriptThreadControl $threadControl)
+    public function __construct(Context $context, NodeInterface $node, ScriptThreadControl $threadControl)
     {
         $cmdControl = $context->getSocket(\ZMQ::SOCKET_REP);
         $cmdControl->bind('tcp://127.0.0.1:5560');
@@ -28,6 +28,8 @@ class UserControl
                 $result = $this->onShutdown($threadControl);
             } elseif ($e === 'info') {
                 $result = $this->onInfo($node);
+            } elseif ($e === 'chains') {
+                $result = $this->onChains($node);
             }
 
             $this->socket->send(json_encode($result, JSON_PRETTY_PRINT));
@@ -54,10 +56,10 @@ class UserControl
     }
 
     /**
-     * @param BitcoinNode $node
+     * @param NodeInterface $node
      * @return array
      */
-    public function onInfo(BitcoinNode $node)
+    public function onInfo(NodeInterface $node)
     {
         $chain = $node->chain();
         $bestHeaderIdx = $chain->getChain()->getIndex();
@@ -66,7 +68,7 @@ class UserControl
         $bestBlockIdx = $chain->getLastBlock();
         $bestBlockHeader = $bestBlockIdx->getHeader();
 
-        $nChain = count($node->chains->getChains());
+        $nChain = count($node->chains()->getChains());
 
         $info = [
             'height' => $bestHeaderIdx->getHeight(),
@@ -93,5 +95,46 @@ class UserControl
         ];
 
         return $info;
+    }
+
+    /**
+     * @param NodeInterface $node
+     * @return array
+     */
+    public function onChains(NodeInterface $node)
+    {
+        $chains = [];
+        foreach ($node->chains()->getStates() as $state) {
+            $chain = $state->getChain();
+            $bestHeaderIdx = $chain->getIndex();
+            $bestHeader = $bestHeaderIdx->getHeader();
+            $bestBlockIdx = $state->getLastBlock();
+            $bestBlockHeader = $bestBlockIdx->getHeader();
+
+            $chains[] = [
+                'height' => $bestHeaderIdx->getHeight(),
+                'work' => $bestHeaderIdx->getWork(),
+                'best_header' => [
+                    'height' => $bestHeaderIdx->getHeight(),
+                    'hash' => $bestHeaderIdx->getHash()->getHex(),
+                    'prevBlock' => $bestHeader->getPrevBlock()->getHex(),
+                    'merkleRoot' => $bestHeader->getMerkleRoot()->getHex(),
+                    'nBits' => $bestHeader->getBits()->getInt(),
+                    'nTimestamp' => $bestHeader->getTimestamp(),
+                    'nNonce' => $bestHeader->getNonce()
+                ],
+                'best_block' => [
+                    'height' => $bestBlockIdx->getHeight(),
+                    'hash' => $bestBlockIdx->getHash()->getHex(),
+                    'prevBlock' => $bestBlockHeader->getPrevBlock()->getHex(),
+                    'merkleRoot' => $bestBlockHeader->getMerkleRoot()->getHex(),
+                    'nBits' => $bestBlockHeader->getBits()->getInt(),
+                    'nTimestamp' => $bestBlockHeader->getTimestamp(),
+                    'nNonce' => $bestBlockHeader->getNonce()
+                ]
+            ];
+        }
+
+        return $chains;
     }
 }

@@ -27,5 +27,6 @@ interface HeaderCheckInterface
      * @param BlockHeaderInterface $header
      * @return BlockIndex
      */
-    public function makeIndex(BlockIndex $prevIndex, BlockHeaderInterface $header);
+    public function
+    makeIndex(BlockIndex $prevIndex, BlockHeaderInterface $header);
 }

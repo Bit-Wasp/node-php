@@ -2,8 +2,8 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use BitWasp\Buffertools\Buffer;
 use Evenement\EventEmitter;
 
 class Chains extends EventEmitter
@@ -102,5 +102,43 @@ class Chains extends EventEmitter
         }
 
         return $this->best;
+    }
+
+    /**
+     * @param Buffer $hash
+     * @return false|ChainState
+     */
+    public function isKnownHeader(Buffer $hash)
+    {
+        return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
+            if ($foundState instanceof ChainState) {
+                return $foundState;
+            }
+
+            if ($state->getChain()->containsHash($hash)) {
+                return $state;
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * @param Buffer $hash
+     * @return false|ChainState
+     */
+    public function isTip(Buffer $hash)
+    {
+        return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
+            if ($foundState instanceof ChainState) {
+                return $foundState;
+            }
+
+            if ($state->getChainIndex()->getHash() == $hash) {
+                return $state;
+            }
+
+            return false;
+        });
     }
 }
