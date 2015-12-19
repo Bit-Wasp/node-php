@@ -77,7 +77,7 @@ class ChainState
     }
 
     /**
-     * @return ChainCache
+     * @return ChainCacheInterface
      */
     public function bestBlocksCache()
     {

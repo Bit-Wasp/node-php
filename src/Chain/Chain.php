@@ -23,7 +23,7 @@ class Chain
     private $index;
 
     /**
-     * @var ChainCache
+     * @var ChainCacheInterface
      */
     private $chainCache;
 
@@ -55,7 +55,7 @@ class Chain
     }
 
     /**
-     * @return ChainCache
+     * @return ChainCacheInterface
      */
     public function getChainCache()
     {

@@ -78,7 +78,7 @@ class ChainCache implements ChainCacheInterface
 
     /**
      * @param int $endHeight
-     * @return ChainCache
+     * @return ChainCacheInterface
      */
     public function subset($endHeight)
     {

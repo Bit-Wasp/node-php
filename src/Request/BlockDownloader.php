@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Request;
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
-use BitWasp\Bitcoin\Node\Chain\ChainCache;
+use BitWasp\Bitcoin\Node\Chain\ChainCacheInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\State\Peers;
@@ -53,11 +53,11 @@ class BlockDownloader
 
     /**
      * @param ChainState $state
-     * @param ChainCache $chainView
+     * @param ChainCacheInterface $chainView
      * @param Peer $peer
      * @param Inventory[] $items
      */
-    public function advertised(ChainState $state, ChainCache $chainView, Peer $peer, array $items)
+    public function advertised(ChainState $state, ChainCacheInterface $chainView, Peer $peer, array $items)
     {
         $chain = $state->getChain();
         $fetch = [];
