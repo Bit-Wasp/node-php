@@ -93,12 +93,14 @@ class SelfTestNode extends BitcoinNode
                 echo "Induce by 3\n";
                 $testing = true;
                 $best = $this->forkState;
-                $index = $best->getChainIndex();;
-            } elseif ($math->cmp($this->i,14)>0 && $math->cmp($this->i,30)<0) {
+                $index = $best->getChainIndex();
+                ;
+            } elseif ($math->cmp($this->i, 14)>0 && $math->cmp($this->i, 30)<0) {
                 echo "Induce fork by 10\n";
                 $testing = true;
                 $best = $this->forkState;
-                $index = $best->getChainIndex();;
+                $index = $best->getChainIndex();
+                ;
             } else {
                 echo "Elongate tip\n";
                 $index = $best->getChainIndex();

@@ -36,6 +36,11 @@ class Chains extends EventEmitter
         $this->adapter = $adapter;
     }
 
+    /**
+     * @param ChainState $a
+     * @param ChainState $b
+     * @return int
+     */
     public function compareChainStateWork(ChainState $a, ChainState $b)
     {
         return $this->adapter->getMath()

@@ -7,7 +7,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Flags;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\ScriptFactory;
@@ -188,11 +188,11 @@ class BlockCheck implements BlockCheckInterface
     /**
      * @param TransactionInterface $transaction
      * @param bool|true $checkSize
-     * @return bool
+     * @return $this
      */
     public function checkTransaction(TransactionInterface $transaction, $checkSize = true)
     {
-        // Must be one txin, and one txout
+        // Must be at least one transaction input and output
         $inputs = $transaction->getInputs();
         $nInputs = count($inputs);
         if (0 === $nInputs) {
@@ -227,7 +227,7 @@ class BlockCheck implements BlockCheckInterface
             }
         }
 
-        return true;
+        return $this;
     }
 
     /**
@@ -278,7 +278,7 @@ class BlockCheck implements BlockCheckInterface
      * @param UtxoView $view
      * @param TransactionInterface $tx
      * @param $spendHeight
-     * @return bool
+     * @return $this
      */
     public function checkContextualInputs(UtxoView $view, TransactionInterface $tx, $spendHeight)
     {
@@ -321,15 +321,15 @@ class BlockCheck implements BlockCheckInterface
             throw new \RuntimeException('CheckAmount failed for fee');
         }
 
-        return true;
+        return $this;
     }
 
     /**
      * @param BlockInterface $block
-     * @param BlockIndex $prevBlockIndex
-     * @return bool
+     * @param BlockIndexInterface $prevBlockIndex
+     * @return $this
      */
-    public function checkContextual(BlockInterface $block, BlockIndex $prevBlockIndex)
+    public function checkContextual(BlockInterface $block, BlockIndexInterface $prevBlockIndex)
     {
         $newHeight = $prevBlockIndex->getHeight() + 1;
         $newTime = $block->getHeader()->getTimestamp();
@@ -349,7 +349,7 @@ class BlockCheck implements BlockCheckInterface
      * @param int $height
      * @param Flags $flags
      * @param bool|true $checkScripts
-     * @return bool
+     * @return $this
      */
     public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, $checkScripts = true)
     {
@@ -361,6 +361,6 @@ class BlockCheck implements BlockCheckInterface
             }
         }
 
-        return true;
+        return $this;
     }
 }

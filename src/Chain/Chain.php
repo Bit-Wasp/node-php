@@ -18,7 +18,7 @@ class Chain
     private $headers;
 
     /**
-     * @var BlockIndex
+     * @var BlockIndexInterface
      */
     private $index;
 
@@ -34,11 +34,11 @@ class Chain
 
     /**
      * @param string[] $map
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      * @param Index\Headers $headers
      * @param Math $math
      */
-    public function __construct(array $map, BlockIndex $index, Index\Headers $headers, Math $math)
+    public function __construct(array $map, BlockIndexInterface $index, Index\Headers $headers, Math $math)
     {
         $this->math = $math;
         $this->chainCache = new ChainCache($map);
@@ -47,7 +47,7 @@ class Chain
     }
 
     /**
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function getIndex()
     {
@@ -103,9 +103,9 @@ class Chain
     }
 
     /**
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      */
-    public function updateTip(BlockIndex $index)
+    public function updateTip(BlockIndexInterface $index)
     {
         if ($this->index->getHash() != $index->getHeader()->getPrevBlock()) {
             throw new \RuntimeException('Header: Header does not extend this chain');

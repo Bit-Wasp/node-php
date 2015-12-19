@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Chain\Params;

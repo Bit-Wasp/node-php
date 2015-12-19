@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
@@ -33,6 +32,4 @@ interface NodeInterface extends EventEmitterInterface
     public function onInv(Peer $peer, Inv $inv);
     public function onGetHeaders(Peer $peer, GetHeaders $getHeaders);
     public function onPing(Peer $peer, Ping $ping);
-
-
 }

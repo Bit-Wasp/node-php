@@ -3,7 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Buffertools\Buffer;
 
 class ChainState
@@ -14,33 +13,33 @@ class ChainState
     private $chain;
 
     /**
-     * @var BlockIndex
+     * @var BlockIndexInterface
      */
     private $lastBlock;
 
     /**
-     * @param Math $math
+     * ChainState constructor.
      * @param Chain $chain
-     * @param BlockIndex $lastBlock
+     * @param BlockIndexInterface $lastBlock
      */
-    public function __construct(Math $math, Chain $chain, BlockIndex $lastBlock)
+    public function __construct(Chain $chain, BlockIndexInterface $lastBlock)
     {
         $this->chain = $chain;
         $this->lastBlock = $lastBlock;
     }
 
     /**
-     * @param BlockIndex $blockIndex
+     * @param BlockIndexInterface $blockIndex
      */
-    public function updateTip(BlockIndex $blockIndex)
+    public function updateTip(BlockIndexInterface $blockIndex)
     {
         $this->chain->updateTip($blockIndex);
     }
 
     /**
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      */
-    public function updateLastBlock(BlockIndex $index)
+    public function updateLastBlock(BlockIndexInterface $index)
     {
         if ($this->lastBlock->getHash() != $index->getHeader()->getPrevBlock()) {
             throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
@@ -62,7 +61,7 @@ class ChainState
     }
 
     /**
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function getChainIndex()
     {
@@ -70,7 +69,7 @@ class ChainState
     }
 
     /**
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function getLastBlock()
     {

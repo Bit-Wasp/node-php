@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
@@ -362,9 +363,9 @@ class Db
      * @return bool
      * @throws \Exception
      */
-    public function insertBlock(BlockInterface $block)
+    public function insertBlock(Buffer $blockHash, BlockInterface $block)
     {
-        $blockHash = $block->getHeader()->getHash()->getBinary();
+        $blockHash = $blockHash->getBinary();
 
         try {
             $this->dbh->beginTransaction();
@@ -475,12 +476,12 @@ class Db
     }
 
     /**
-     * @param BlockIndex $startIndex
-     * @param BlockIndex[] $index
+     * @param BlockIndexInterface $startIndex
+     * @param BlockIndexInterface[] $index
      * @return bool
      * @throws \Exception
      */
-    public function insertIndexBatch(BlockIndex $startIndex, array $index)
+    public function insertIndexBatch(BlockIndexInterface $startIndex, array $index)
     {
         if (null === $this->fetchLftStmt) {
             $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
@@ -574,7 +575,7 @@ class Db
 
     /**
      * @param Buffer $hash
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchIndex(Buffer $hash)
     {
@@ -614,7 +615,7 @@ class Db
 
     /**
      * @param int $id
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchIndexById($id)
     {
@@ -750,6 +751,11 @@ class Db
         throw new \RuntimeException('Failed to fetch block');
     }
 
+    /**
+     * @param Headers $headers
+     * @param Buffer $hash
+     * @return ChainState
+     */
     public function fetchHistoricChain(Headers $headers, Buffer $hash)
     {
         $math = Bitcoin::getMath();
@@ -818,7 +824,6 @@ class Db
             }
 
             return new ChainState(
-                $math,
                 new Chain(
                     $map,
                     $index,
@@ -835,7 +840,7 @@ class Db
 
     /**
      * @param Headers $headers
-     * @return array
+     * @return ChainState[]
      */
     public function fetchChainState(Headers $headers)
     {
@@ -880,8 +885,6 @@ class Db
                     )
                 );
 
-                $info = $this->findSuperMajorityInfo($index['id'], [2, 3, 4]);
-
                 $fetchTipChain->bindValue(':id', $index['id']);
                 $fetchTipChain->execute();
                 $map = $fetchTipChain->fetchAll(\PDO::FETCH_COLUMN);
@@ -910,7 +913,6 @@ class Db
                 }
 
                 $states[] = new ChainState(
-                    $math,
                     new Chain(
                         $map,
                         $bestHeader,
@@ -965,7 +967,7 @@ class Db
      * Here, we return max 2000 headers following $hash.
      * Useful for helping other nodes sync.
      * @param string $hash
-     * @return array
+     * @return BlockHeaderInterface[]
      */
     public function fetchNextHeaders($hash)
     {
@@ -1058,7 +1060,7 @@ class Db
         $requiredCount = count($required);
         $initialCount = count($outputSet);
 
-        for ($i = 0, $last = $requiredCount - 1; $i < $requiredCount; $i++) {
+        for ($i = 0; $i < $requiredCount; $i++) {
             /**
              * @var OutPointInterface $outpoint
              * @var integer $txidx
@@ -1212,7 +1214,7 @@ class Db
 
     /**
      * @param Buffer $hash
-     * @param array $versions
+     * @param int[] $versions
      * @return array
      */
     public function findSuperMajorityInfoByHash(Buffer $hash, array $versions)

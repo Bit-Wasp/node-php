@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Flags;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
@@ -56,16 +56,16 @@ interface BlockCheckInterface
      * @param UtxoView $view
      * @param TransactionInterface $tx
      * @param $spendHeight
-     * @return bool
+     * @return $this
      */
     public function checkContextualInputs(UtxoView $view, TransactionInterface $tx, $spendHeight);
 
     /**
      * @param BlockInterface $block
-     * @param BlockIndex $prevBlockIndex
-     * @return bool
+     * @param BlockIndexInterface $prevBlockIndex
+     * @return $this
      */
-    public function checkContextual(BlockInterface $block, BlockIndex $prevBlockIndex);
+    public function checkContextual(BlockInterface $block, BlockIndexInterface $prevBlockIndex);
 
     /**
      * @param UtxoView $view

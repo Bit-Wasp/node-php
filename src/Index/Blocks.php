@@ -93,7 +93,8 @@ class Blocks
     {
         $state = $this->chains->best();
 
-        $index = $headers->accept($block->getHeader());
+        $hash = $block->getHeader()->getHash();
+        $index = $headers->accept($hash, $block->getHeader());
 
         $this
             ->blockCheck
@@ -119,7 +120,7 @@ class Blocks
 
             if (!$tx->isCoinbase()) {
                 if ($flags->checkFlags(InterpreterInterface::VERIFY_P2SH)) {
-                    $nSigOps = $this->blockCheck->getP2shSigOps ($view, $tx);
+                    $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
                     if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');
                     }
@@ -134,7 +135,7 @@ class Blocks
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
         $state->updateLastBlock($index);
-        $this->db->insertBlock($block);
+        $this->db->insertBlock($hash, $block);
 
         return $index;
     }

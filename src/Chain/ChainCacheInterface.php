@@ -31,9 +31,9 @@ interface ChainCacheInterface
     public function getHash($height);
 
     /**
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      */
-    public function add(BlockIndex $index);
+    public function add(BlockIndexInterface $index);
 
     /**
      * @param int $endHeight

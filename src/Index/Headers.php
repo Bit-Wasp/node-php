@@ -95,13 +95,13 @@ class Headers
     }
 
     /**
+     * @param Buffer $hash
      * @param BlockHeaderInterface $header
-     * @return BlockIndex|\BitWasp\Bitcoin\Node\Chain\Chain
+     * @return BlockIndexInterface
      * @throws \Exception
      */
-    public function accept(BlockHeaderInterface $header)
+    public function accept(Buffer $hash, BlockHeaderInterface $header)
     {
-        $hash = $header->getHash();
         if ($this->chains->isKnownHeader($hash)) {
             // todo: check for rejected block
             return $this->db->fetchIndex($hash);
@@ -116,9 +116,9 @@ class Headers
         $chain->updateTip(
             $this
                 ->headerCheck
-                ->check($header)
+                ->check($hash, $header)
                 ->checkContextual($state, $header)
-                ->makeIndex($startIndex, $header)
+                ->makeIndex($startIndex, $hash, $header)
         );
 
         $index = $chain->getIndex();
@@ -144,15 +144,17 @@ class Headers
         $countHeaders = count($headers);
         $bestPrev = null;
         $firstUnknown = null;
-        foreach ($headers as $i => $h) {
-
-            if ($this->chains->isKnownHeader($h->getPrevBlock())) {
-                $bestPrev = $h->getPrevBlock();
+        foreach ($headers as $i => &$head) {
+            if ($this->chains->isKnownHeader($head->getPrevBlock())) {
+                $bestPrev = $head->getPrevBlock();
             }
 
-            if ($firstUnknown === null && !$this->chains->isKnownHeader($h->getHash())) {
+            $hash = $head->getHash();
+            if ($firstUnknown === null && !$this->chains->isKnownHeader($hash)) {
                 $firstUnknown = $i;
             }
+
+            $head = [$hash, $head];
         }
 
         if (!$bestPrev instanceof Buffer) {
@@ -167,14 +169,14 @@ class Headers
         if ($firstUnknown !== null) {
             $batch = [];
             for ($i = $firstUnknown; $i < $countHeaders; $i++) {
-                $header = $headers[$i];
+                list ($hash, $header) = $headers[$i];
                 echo ".";
 
                 $index = $this
                     ->headerCheck
-                    ->check($header)
+                    ->check($hash, $header)
                     ->checkContextual($chainState, $header)
-                    ->makeIndex($tip->getIndex(), $header);
+                    ->makeIndex($tip->getIndex(), $hash, $header);
 
                 // This function checks for continuity of headers
                 $tip->updateTip($index);
@@ -193,6 +195,7 @@ class Headers
             }
         }
 
+        $prevIndex = $tip->getIndex();
         $state = $chainState;
 
         return true;

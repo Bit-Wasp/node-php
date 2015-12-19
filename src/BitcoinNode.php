@@ -145,7 +145,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $zmqScript = new ScriptCheck($adapter);
         $this->pow = new ProofOfWork($math, $params);
         $this->headers = new Index\Headers($this->db, $consensus, $math, $this->chains, new HeaderCheck($consensus, $adapter, $this->pow));
-        $this->blocks = new Index\Blocks($this->db, $adapter,$this->chains, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
+        $this->blocks = new Index\Blocks($this->db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
 
         $genesis = $params->getGenesisBlock();
         $this->headers->init($genesis->getHeader());
@@ -194,7 +194,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     private function initChainState()
     {
         $states = $this->db->fetchChainState($this->headers);
-        echo count($states);
         foreach ($states as $state) {
             $this->chains->trackChain($state);
         }
@@ -244,7 +243,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function onHeaders(Peer $peer, Headers $headers)
     {
-        echo "Headers\n";
         $vHeaders = $headers->getHeaders();
         $count = count($vHeaders);
 
@@ -315,7 +313,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $block = $blockMsg->getBlock();
 
         try {
-            $index = $this->blocks->accept( $block, $this->headers, $this->utxo);
+            $index = $this->blocks->accept($block, $this->headers, $this->utxo);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $this->chains->checkTips();
@@ -340,6 +338,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
             }
             echo $e->getTraceAsString() . PHP_EOL;
         }
+
     }
 
     /**
