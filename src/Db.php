@@ -243,9 +243,9 @@ class Db
     }
 
     /**
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      */
-    public function createBlockIndexGenesis(BlockIndex $index)
+    public function createBlockIndexGenesis(BlockIndexInterface $index)
     {
         $stmt = $this->dbh->prepare('INSERT INTO '.$this->tblBlocks.' ( hash ) SELECT id from headerIndex where hash = :hash ');
         $stmt->bindValue(':hash', $index->getHash()->getBinary());

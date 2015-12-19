@@ -24,7 +24,7 @@ class Chains extends EventEmitter
     private $best;
 
     /**
-     * @var BlockIndex
+     * @var BlockIndexInterface
      */
     private $bestIndex;
 

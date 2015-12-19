@@ -3,7 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Consensus;
@@ -73,7 +73,7 @@ class Headers
 
     /**
      * @param Buffer $hash
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetch(Buffer $hash)
     {
@@ -135,11 +135,11 @@ class Headers
     /**
      * @param BlockHeaderInterface[] $headers
      * @param ChainState|null $state
-     * @param BlockIndex|null $prevIndex
+     * @param BlockIndexInterface|null $prevIndex
      * @return ChainState
      * @throws \Exception
      */
-    public function acceptBatch(array $headers, ChainState &$state = null, BlockIndex &$prevIndex = null)
+    public function acceptBatch(array $headers, ChainState &$state = null, BlockIndexInterface &$prevIndex = null)
     {
         $countHeaders = count($headers);
         $bestPrev = null;

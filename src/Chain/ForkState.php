@@ -44,11 +44,11 @@ class ForkState
 
     /**
      * ForkState constructor.
-     * @param BlockIndex $index
+     * @param BlockIndexInterface $index
      * @param ParamsInterface $params
      * @param Db $db
      */
-    public function __construct(BlockIndex $index, ParamsInterface $params, Db $db)
+    public function __construct(BlockIndexInterface $index, ParamsInterface $params, Db $db)
     {
         $math = Bitcoin::getMath();
         $header = $index->getHeader();

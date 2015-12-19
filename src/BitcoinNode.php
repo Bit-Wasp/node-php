@@ -313,7 +313,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $block = $blockMsg->getBlock();
 
         try {
-            $index = $this->blocks->accept($block, $this->headers, $this->utxo);
+            $index = $this->blocks->accept($block, $this->headers);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $this->chains->checkTips();

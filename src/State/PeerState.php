@@ -79,7 +79,7 @@ class PeerState extends AbstractState
     }
 
     /**
-     * @return \BitWasp\Bitcoin\Node\Chain\BlockIndex
+     * @return \BitWasp\Bitcoin\Node\Chain\BlockIndexInterface
      */
     public function getIndexBestKnownBlock()
     {

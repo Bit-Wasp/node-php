@@ -3,10 +3,9 @@
 namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Amount;
-use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 
 class Consensus
@@ -67,11 +66,11 @@ class Consensus
     }
 
     /**
-     * @param BlockIndex $prevIndex
-     * @param $timeFirstBlock
+     * @param BlockIndexInterface $prevIndex
+     * @param int $timeFirstBlock
      * @return int|string
      */
-    public function calculateNextWorkRequired(BlockIndex $prevIndex, $timeFirstBlock)
+    public function calculateNextWorkRequired(BlockIndexInterface $prevIndex, $timeFirstBlock)
     {
         $header = $prevIndex->getHeader();
         $math = $this->math;

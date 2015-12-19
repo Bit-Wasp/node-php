@@ -91,7 +91,7 @@ class Chain
 
     /**
      * @param Buffer $hash
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchIndex(Buffer $hash)
     {
@@ -121,7 +121,7 @@ class Chain
 
     /**
      * @param int $height
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
     public function fetchAncestor($height)
     {

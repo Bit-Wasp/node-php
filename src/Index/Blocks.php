@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
@@ -86,10 +86,9 @@ class Blocks
     /**
      * @param BlockInterface $block
      * @param Headers $headers
-     * @param UtxoIdx $utxoIdx
-     * @return BlockIndex
+     * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers, UtxoIdx $utxoIdx)
+    public function accept(BlockInterface $block, Headers $headers)
     {
         $state = $this->chains->best();
 
