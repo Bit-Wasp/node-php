@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
+use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
@@ -934,11 +935,11 @@ class Db
      * We use this to help other nodes sync headers. Identify last common
      * hash in our chain
      *
-     * @param Chain $activeChain
+     * @param ChainInterface $activeChain
      * @param BlockLocator $locator
      * @return false|string
      */
-    public function findFork(Chain $activeChain, BlockLocator $locator)
+    public function findFork(ChainInterface $activeChain, BlockLocator $locator)
     {
         $hashes = [$activeChain->getIndex()->getHash()->getBinary()];
         foreach ($locator->getHashes() as $hash) {

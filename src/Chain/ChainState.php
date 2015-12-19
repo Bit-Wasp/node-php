@@ -8,7 +8,7 @@ use BitWasp\Buffertools\Buffer;
 class ChainState
 {
     /**
-     * @var Chain
+     * @var ChainInterface
      */
     private $chain;
 
@@ -19,10 +19,10 @@ class ChainState
 
     /**
      * ChainState constructor.
-     * @param Chain $chain
+     * @param ChainInterface $chain
      * @param BlockIndexInterface $lastBlock
      */
-    public function __construct(Chain $chain, BlockIndexInterface $lastBlock)
+    public function __construct(ChainInterface $chain, BlockIndexInterface $lastBlock)
     {
         $this->chain = $chain;
         $this->lastBlock = $lastBlock;
@@ -53,7 +53,7 @@ class ChainState
     }
 
     /**
-     * @return Chain
+     * @return ChainInterface
      */
     public function getChain()
     {

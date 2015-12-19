@@ -43,11 +43,10 @@ class Chains extends EventEmitter
      */
     public function compareChainStateWork(ChainState $a, ChainState $b)
     {
-        return $this->adapter->getMath()
-            ->cmp(
-                $a->getChain()->getIndex()->getWork(),
-                $b->getChain()->getIndex()->getWork()
-            );
+        return $this->adapter->getMath()->cmp(
+            $a->getChain()->getIndex()->getWork(),
+            $b->getChain()->getIndex()->getWork()
+        );
     }
 
     /**
@@ -84,11 +83,11 @@ class Chains extends EventEmitter
     }
 
     /**
-     * @return Chain[]
+     * @return ChainInterface[]
      */
     public function getChains()
     {
-        /** @var Chain[] $chains */
+        /** @var ChainInterface[] $chains */
         $chains = [];
         foreach ($this->states as $state) {
             $chains[] = $state->getChain();

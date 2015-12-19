@@ -10,7 +10,7 @@ use BitWasp\Buffertools\Buffer;
  * This class retains all of this in memory. It must be
  * rebuilt on startup.
  */
-class Chain
+class Chain implements ChainInterface
 {
     /**
      * @var Index\Headers
@@ -47,6 +47,37 @@ class Chain
     }
 
     /**
+     * @param Buffer $hash
+     * @return bool
+     */
+    public function containsHash(Buffer $hash)
+    {
+        return $this->chainCache->containsHash($hash);
+    }
+
+    /**
+     * @param Buffer $hash
+     * @return BlockIndexInterface
+     */
+    public function fetchIndex(Buffer $hash)
+    {
+        if (!$this->chainCache->containsHash($hash)) {
+            throw new \RuntimeException('Index by this hash not known');
+        }
+
+        return $this->headers->fetch($hash);
+    }
+
+    /**
+     * @param int $height
+     * @return BlockIndexInterface
+     */
+    public function fetchAncestor($height)
+    {
+        return $this->fetchIndex($this->getHashFromHeight($height));
+    }
+
+    /**
      * @return BlockIndexInterface
      */
     public function getIndex()
@@ -60,15 +91,6 @@ class Chain
     public function getChainCache()
     {
         return $this->chainCache;
-    }
-
-    /**
-     * @param Buffer $hash
-     * @return bool
-     */
-    public function containsHash(Buffer $hash)
-    {
-        return $this->chainCache->containsHash($hash);
     }
 
     /**
@@ -90,19 +112,6 @@ class Chain
     }
 
     /**
-     * @param Buffer $hash
-     * @return BlockIndexInterface
-     */
-    public function fetchIndex(Buffer $hash)
-    {
-        if (!$this->chainCache->containsHash($hash)) {
-            throw new \RuntimeException('Index by this hash not known');
-        }
-
-        return $this->headers->fetch($hash);
-    }
-
-    /**
      * @param BlockIndexInterface $index
      */
     public function updateTip(BlockIndexInterface $index)
@@ -117,14 +126,5 @@ class Chain
 
         $this->chainCache->add($index);
         $this->index = $index;
-    }
-
-    /**
-     * @param int $height
-     * @return BlockIndexInterface
-     */
-    public function fetchAncestor($height)
-    {
-        return $this->fetchIndex($this->getHashFromHeight($height));
     }
 }
