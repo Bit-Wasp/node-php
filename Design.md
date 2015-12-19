@@ -30,6 +30,17 @@ The library leverages https://github.com/Bit-Wasp/bitcoin-p2p-php
 which ultimately uses ReactPHP's event loop and networking libraries. 
 
 
+### Peer State
+
+The `PeerState` class is lacking love at the moment, as it's methods
+are for new nonexistant code. It can be used to store arbitrary values 
+(it extends Doctrines ArrayCache, and implements the native \ArrayAccess 
+interface)
+
+
+
+
+
 ### Block Index
 
 A `BlockIndex` instance represents a header as a member of a chain. 
@@ -82,28 +93,22 @@ It will only actively sync headers from one peer.
 
 The application will handle `Headers` network messages, and makes 
 certain assumptions: 
-- A header must follow it's parent. A header will not be saved
-  unless there exists a valid path from the Genesis block. 
 
+`Headers::accept()` - Accept a single header 
+`Headers::acceptBatch()` - Accept an array of headers 
 The usual situation is we will be elongating some chain tip, creating
 an index for each header, and updating the chain instance. (See Chain::updateTip())
+`Chain::updateTip` will ensure that the sequence of headers is continuous, 
+and if any headers were previously unknown, they are inserted as a batch. 
 
-Once finished this, we adjust the other records in the table, and commit
-the new section of the chain to the database. 
+### Block Downloader / Block Request
 
-Finally, we run Chain::checkActiveTip(), which recalculates the
-greatest work chain.
 
-### Peer State
+### Block Storage (Index\Blocks)
 
-The `PeerState` class is lacking love at the moment, as it's methods
-are for new nonexistant code. It can be used to store arbitrary values 
-(it extends Doctrines ArrayCache, and implements the native \ArrayAccess 
-interface)
+This class is used along with Index\Headers to re-trace a `Chain` whilst
+downloading it's blocks. 
 
-### Services / Modules
+Blocks::accept() will accept a block so long as the header is already in 
+the chain, or is an otherwise acceptable header. 
 
-It is intended to allow modules to be added to the application. 
-
-Likely they would be extensions added to the p2p packet handling, 
-or expose an API of some kind. As yet, the implementation is TBD.
