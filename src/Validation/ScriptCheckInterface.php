@@ -12,7 +12,7 @@ interface ScriptCheckInterface
      * @param UtxoView $view
      * @param TransactionInterface $tx
      * @param Flags $flags
-     * @return bool
+     * @param ScriptValidationState $scriptCheckState
      */
-    public function check(UtxoView $view, TransactionInterface $tx, Flags $flags);
+    public function check(UtxoView $view, TransactionInterface $tx, Flags $flags, ScriptValidationState $scriptCheckState);
 }

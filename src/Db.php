@@ -1063,7 +1063,9 @@ class Db implements DbInterface
         list ($required, $outputSet) = $this->filterUtxoRequest($block);
 
         $joinList = [];
-        $queryValues = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
+        $queryValues = [];
+
+        $queryV = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
         $requiredCount = count($required);
         $initialCount = count($outputSet);
 
@@ -1075,7 +1077,7 @@ class Db implements DbInterface
             list ($outpoint, $txidx) = $required[$i];
 
             if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashParent, :noutparent' . $i . ' as nOut, :txidx' . $i . ' as txidx ';
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput, :txidx' . $i . ' as txidx ';
             } else {
                 $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i;
             }
@@ -1086,27 +1088,36 @@ class Db implements DbInterface
         }
         $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
 
-        $sql = '
-            SELECT listed.hashParent as txid, listed.nOut as vout,
-                   o.value, o.scriptPubKey,
-                   listed.txidx
-            FROM   transactions t
-            JOIN (
-                '.$innerJoin.'
-            ) as listed on (t.hash = listed.hashParent)
-            JOIN transaction_output o on (o.parent_tx = t.id AND o.nOutput = listed.nOut)
-            JOIN ' . $this->tblBlockTxs . ' as bt on t.id = bt.transaction_hash
-            JOIN (
-                SELECT parent.header_id from iindex as tip,
-                  iindex as parent
-                    WHERE tip.header_id = (SELECT id FROM headerIndex WHERE hash = :hash) AND tip.lft BETWEEN parent.lft and parent.rgt
-            ) as allowed_block on bt.block_hash = allowed_block.header_id
-';
+        $this->dbh->beginTransaction();
+        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint
+    (INDEX idx (hashPrevOut, nOutput))
+    '.$innerJoin.';
+        ');
+        $initOutpoints->execute($queryValues);
 
-        $stmt = $this->dbh->prepare($sql);
-        $stmt->execute($queryValues);
 
-        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
+        $fetchUtxoStmt = $this->dbh->prepare('
+SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
+                   o.value, o.scriptPubKey
+
+FROM  outpoint,
+      iindex as tip
+JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
+JOIN block_transactions bt on (bt.block_hash = parent.header_id)
+JOIN transactions t on (bt.transaction_hash = t.id)
+JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
+WHERE tip.header_id = (
+	SELECT id FROM headerIndex WHERE hash = :hash
+) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
+        $fetchUtxoStmt->execute($queryV);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
+        $new->execute();
+
+        $this->dbh->commit();
+
+        foreach ($rows as $utxo) {
             $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 

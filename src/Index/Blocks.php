@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Validation\ScriptValidationState;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Buffertools\Buffer;
 
@@ -91,7 +92,7 @@ class Blocks
      * @param Headers $headers
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers)
+    public function accept(BlockInterface $block, Headers $headers, ScriptValidationState $scriptCheckState)
     {
         $state = $this->chains->best();
 
@@ -121,6 +122,7 @@ class Blocks
             }
 
             if (!$tx->isCoinbase()) {
+                echo ".";
                 if ($flags->checkFlags(InterpreterInterface::VERIFY_P2SH)) {
                     $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
                     if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
@@ -131,8 +133,12 @@ class Blocks
                 $fee = $this->math->sub($view->getValueIn($this->math, $tx), $tx->getValueOut());
                 $nFees = $this->math->add($nFees, $fee);
 
-                $this->blockCheck->checkInputs($view, $tx, $index->getHeight(), $flags);
+                $this->blockCheck->checkInputs($view, $tx, $index->getHeight(), $flags, $scriptCheckState);
             }
+        }
+
+        if ($scriptCheckState->active() && !$scriptCheckState->result()) {
+            throw new \RuntimeException('ScriptValidation failed!');
         }
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());

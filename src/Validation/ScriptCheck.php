@@ -7,6 +7,8 @@ use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use React\Promise\Deferred;
+use React\Promise\FulfilledPromise;
 
 class ScriptCheck implements ScriptCheckInterface
 {
@@ -28,14 +30,15 @@ class ScriptCheck implements ScriptCheckInterface
      * @param UtxoView $utxoView
      * @param TransactionInterface $tx
      * @param Flags $flags
-     * @return bool
+     * @param ScriptValidationState $checkState
      */
-    public function check(UtxoView $utxoView, TransactionInterface $tx, Flags $flags)
+    public function check(UtxoView $utxoView, TransactionInterface $tx, Flags $flags, ScriptValidationState $checkState)
     {
         $result = true;
         $consensus = ScriptFactory::consensus($flags);
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
-            $result &= $consensus->verify(
+            echo ";";
+            $result = $result && $consensus->verify(
                 $tx,
                 $utxoView
                     ->fetchByInput($tx->getInput($i))
@@ -43,8 +46,8 @@ class ScriptCheck implements ScriptCheckInterface
                     ->getScript(),
                 $i
             );
+            $promise = new FulfilledPromise($result);
+            $checkState->queue($promise);
         }
-
-        return (bool) $result;
     }
 }

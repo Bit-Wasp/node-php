@@ -17,7 +17,15 @@ The `BitcoinNode` class supports headers first download, and will then attempt t
 
 ## Installation
 
-`composer install`
+To run the software:
+
+    git clone https://github.com/Bit-Wasp/node-php.git
+    composer install
+
+To include in your projects:
+
+    composer require bitwasp/bitcoin-node
+
 
 You'll need a SQL database & credentials. Schema files are in ./sql
 Warning: these may be ruthlessly updated!

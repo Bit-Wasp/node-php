@@ -70,10 +70,10 @@ interface BlockCheckInterface
     /**
      * @param UtxoView $view
      * @param TransactionInterface $tx
-     * @param int $height
+     * @param $height
      * @param Flags $flags
-     * @param bool|true $checkScripts
-     * @return bool
+     * @param ScriptValidationState $state
+     * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, $checkScripts = true);
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationState $state);
 }

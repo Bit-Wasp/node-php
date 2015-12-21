@@ -348,16 +348,15 @@ class BlockCheck implements BlockCheckInterface
      * @param TransactionInterface $tx
      * @param int $height
      * @param Flags $flags
-     * @param bool|true $checkScripts
+     * @param ScriptValidationState $state
      * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, $checkScripts = true)
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationState $state)
     {
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
-
-            if ($checkScripts && !$this->scriptCheck->check($view, $tx, $flags)) {
-                throw new \RuntimeException('Script verification failed');
+            if ($state->active()) {
+                $this->scriptCheck->check($view, $tx, $flags, $state);
             }
         }
 
