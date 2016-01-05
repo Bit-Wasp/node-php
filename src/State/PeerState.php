@@ -103,10 +103,8 @@ class PeerState extends AbstractState
     {
         $chain = $state->getChain();
         if ($chain->containsHash($hash)) {
-            echo 'update peers BESTKNOWN block ('.$chain->getHeightFromHash($hash).')' . PHP_EOL;
             $this->save(self::INDEXBESTKNOWNBLOCK, $hash);
         } else {
-            echo 'update peers HASH UNKNOWN block' . PHP_EOL;
             $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);
         }
     }
