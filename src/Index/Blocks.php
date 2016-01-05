@@ -5,12 +5,11 @@ namespace BitWasp\Bitcoin\Node\Index;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
-use BitWasp\Bitcoin\Node\Validation\ScriptValidationState;
+use BitWasp\Bitcoin\Node\Validation\ScriptValidationInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Buffertools\Buffer;
 
@@ -90,9 +89,10 @@ class Blocks
     /**
      * @param BlockInterface $block
      * @param Headers $headers
+     * @param ScriptValidationInterface $scriptCheckState
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers, ScriptValidationState $scriptCheckState)
+    public function accept(BlockInterface $block, Headers $headers, ScriptValidationInterface $scriptCheckState)
     {
         $state = $this->chains->best();
 
@@ -122,7 +122,6 @@ class Blocks
             }
 
             if (!$tx->isCoinbase()) {
-                echo ".";
                 if ($flags->checkFlags(InterpreterInterface::VERIFY_P2SH)) {
                     $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
                     if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {

@@ -21,10 +21,9 @@ use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
-use BitWasp\Bitcoin\Node\Validation\ScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
-use BitWasp\Bitcoin\Node\Validation\ScriptValidationState;
+use BitWasp\Bitcoin\Node\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Zmq\Notifier;
 use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
@@ -116,6 +115,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function __construct(ParamsInterface $params, LoopInterface $loop)
     {
+
         $math = Bitcoin::getMath();
         $adapter = Bitcoin::getEcAdapter($math);
 
@@ -138,10 +138,9 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $db = new Db($this->config, false);
         $consensus = new Consensus($math, $params);
 
-        $zmqScript = new ScriptCheck($adapter);
         $this->pow = new ProofOfWork($math, $params);
         $this->headers = new Index\Headers($db, $consensus, $math, $this->chains, new HeaderCheck($consensus, $adapter, $this->pow));
-        $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter, $zmqScript));
+        $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter));
 
         $genesis = $params->getGenesisBlock();
         $this->headers->init($genesis->getHeader());
@@ -314,7 +313,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $block = $blockMsg->getBlock();
 
         try {
-            $state = new ScriptValidationState($this->loop, true);
+            $state = new ScriptValidation(true);
             $index = $this->blocks->accept($block, $this->headers, $state);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
@@ -339,6 +338,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
                 }
             }
             echo $e->getTraceAsString() . PHP_EOL;
+            die();
         }
     }
 
@@ -382,7 +382,10 @@ class BitcoinNode extends EventEmitter implements NodeInterface
             $peer->on('headers', array ($this, 'onHeaders'));
 
             $addr = $peer->getRemoteAddr();
-            $this->notifier->send('peer.outbound.new', ['peer' =>['ip'=>$addr->getIp(), 'port' => $addr->getPort()]]);
+            $this->notifier->send('peer.outbound.new', ['peer' =>[
+                'ip' => $addr->getIp(),
+                'port' => $addr->getPort()
+            ]]);
 
             $this->peersOutbound->add($peer);
 

@@ -72,8 +72,8 @@ interface BlockCheckInterface
      * @param TransactionInterface $tx
      * @param $height
      * @param Flags $flags
-     * @param ScriptValidationState $state
+     * @param ScriptValidationInterface $state
      * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationState $state);
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationInterface $state);
 }

@@ -32,21 +32,15 @@ class BlockCheck implements BlockCheckInterface
      */
     private $params;
 
-    /**
-     * @var ScriptCheckInterface
-     */
-    private $scriptCheck;
 
     /**
      * @param Consensus $consensus
      * @param EcAdapterInterface $ecAdapter
-     * @param ScriptCheckInterface $scriptCheck
      */
-    public function __construct(Consensus $consensus, EcAdapterInterface $ecAdapter, ScriptCheckInterface $scriptCheck)
+    public function __construct(Consensus $consensus, EcAdapterInterface $ecAdapter)
     {
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
-        $this->scriptCheck = $scriptCheck;
         $this->params = $consensus->getParams();
     }
 
@@ -348,15 +342,15 @@ class BlockCheck implements BlockCheckInterface
      * @param TransactionInterface $tx
      * @param int $height
      * @param Flags $flags
-     * @param ScriptValidationState $state
+     * @param ScriptValidationInterface $state
      * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationState $state)
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationInterface $state)
     {
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
             if ($state->active()) {
-                $this->scriptCheck->check($view, $tx, $flags, $state);
+                $state->queue($view, $tx, $flags);
             }
         }
 

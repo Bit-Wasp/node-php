@@ -1060,6 +1060,10 @@ class Db implements DbInterface
             return new UtxoView([]);
         }
 
+        /**
+         * @var OutPointInterface[] $required
+         * @var Utxo[] $outputSet
+         */
         list ($required, $outputSet) = $this->filterUtxoRequest($block);
 
         $joinList = [];
@@ -1121,7 +1125,7 @@ WHERE tip.header_id = (
             $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
-        if (count($outputSet) !== ($initialCount + $requiredCount)) {
+        if (count($outputSet) < ($initialCount + $requiredCount)) {
             throw new \RuntimeException('Utxo was not found');
         }
 

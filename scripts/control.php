@@ -10,7 +10,7 @@ $loop = LoopFactory::create();
 $context = new ZmqContext($loop);
 
 $scriptCheckResults = $context->getSocket(\ZMQ::SOCKET_PUSH);
-$scriptCheckResults->connect("tcp://127.0.0.1:5694");
+$scriptCheckResults->bind("tcp://127.0.0.1:5694");
 
 $sub = $context->getSocket(\ZMQ::SOCKET_SUB);
 $sub->connect('tcp://127.0.0.1:5594');
