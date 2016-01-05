@@ -40,6 +40,17 @@ class NodeStart extends AbstractCommand
         $math = Bitcoin::getMath();
         $params = new Params($math);
         $loop = \React\EventLoop\Factory::create();
+
+        // Create the child process
+// All the code after pcntl_fork () will be performed by two processes: parent and child
+        $child_pid = pcntl_fork();
+        if ($child_pid) {
+            // Exit from the parent process that is bound to the console
+            exit();
+        }
+// Make the child as the main process.
+        posix_setsid();
+
         $app = new BitcoinNode($params, $loop);
 
         $app->start();
