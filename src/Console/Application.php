@@ -7,6 +7,7 @@ use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeChains;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeInfo;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeTx;
 use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
 use BitWasp\Bitcoin\Node\Console\Commands\ScriptWorker;
 use BitWasp\Bitcoin\Node\Console\Commands\SelfTestNodeCommand;
@@ -29,6 +30,7 @@ class Application extends ConsoleApplication
         $commands[] = new NodeWatch();
         $commands[] = new NodeInfo();
         $commands[] = new NodeChains();
+        $commands[] = new NodeTx();
         $commands[] = new SelfTestNodeCommand();
         $commands[] = new PrintConfig();
         $commands[] = new ScriptWorker();

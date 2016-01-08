@@ -9,6 +9,8 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
+use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
+use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
@@ -21,6 +23,8 @@ use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
+use BitWasp\Bitcoin\Transaction\Transaction;
+use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
@@ -1049,6 +1053,59 @@ class Db implements DbInterface
         return [$required, $utxos];
     }
 
+    public function getTransaction(Buffer $tipHash, Buffer $txid)
+    {
+        $tx = $this->dbh->prepare('
+        SELECT t.id, t.hash, t.version, t.nLockTime
+FROM iindex as tip
+JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
+JOIN block_transactions bt on (bt.block_hash = parent.header_id)
+JOIN transactions t on (bt.transaction_hash = t.id)
+WHERE tip.header_id = (
+    SELECT id FROM headerIndex WHERE hash = :tipHash
+) AND tip.lft BETWEEN parent.lft and parent.rgt AND t.hash = :txHash
+   ');
+
+        $tx->execute([':tipHash' => $tipHash->getBinary(), ':txHash' => $txid->getBinary()]);
+        $txResults = $tx->fetchAll(\PDO::FETCH_ASSOC);
+        if (count($txResults) === 0) {
+            throw new \RuntimeException('getTransaction: Transaction not found');
+        }
+        $txInfo = $txResults[0];
+
+        $fetchInputs = $this->dbh->prepare('SELECT i.* from transactions t join transaction_input i on t.id = i.parent_tx WHERE t.id = :id ORDER BY i.nInput');
+        $fetchOutputs = $this->dbh->prepare('SELECT o.* from transactions t join transaction_output o on t.id = o.parent_tx WHERE t.id = :id ORDER BY o.nOutput');
+
+        $fetchInputs->execute(['id' => $txInfo['id']]);
+        $fetchOutputs->execute(['id' => $txInfo['id']]);
+
+        $inputs = $fetchInputs->fetchAll();
+        $outputs = $fetchOutputs->fetchAll();
+
+        $transaction = new Transaction(
+            $txInfo['version'],
+            new TransactionInputCollection(array_map(function (array $input) {
+                return new TransactionInput(
+                    new OutPoint(
+                        new Buffer($input['hashPrevOut'], 32),
+                        $input['nPrevOut']
+                    ),
+                    new Script(new Buffer($input['scriptSig'])),
+                    $input['nSequence']
+                );
+            }, $inputs)),
+            new TransactionOutputCollection(array_map(function (array $input) {
+                return new TransactionOutput(
+                    $input['value'],
+                    new Script(new Buffer($input['scriptPubKey']))
+                );
+            }, $outputs)),
+            $txInfo['nLockTime']
+        );
+
+        return $transaction;
+    }
+
     /**
      * @param BlockInterface $block
      * @return UtxoView
@@ -1131,6 +1188,30 @@ WHERE tip.header_id = (
 
         return new UtxoView($outputSet);
 
+    }
+
+    public function fetchUtxo(Buffer $tipHash, OutPointInterface $outpoint)
+    {
+        $fetchUtxoStmt = $this->dbh->prepare('
+        SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
+                   o.value, o.scriptPubKey
+        FROM  iindex as tip
+        JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
+        JOIN block_transactions bt on (bt.block_hash = parent.header_id)
+        JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
+        JOIN transaction t on t.id = o.parent_tx
+        WHERE tip.header_id = (
+            SELECT id FROM headerIndex WHERE hash = :hash
+        ) AND tip.lft BETWEEN parent.lft and parent.rgt AND (t.hash = :prevHash AND o.nOutput = :prevOut)
+  ');
+
+        $fetchUtxoStmt->execute([
+            ':hash' => $tipHash->getBinary(),
+            ':prevHash' => $outpoint->getTxId()->getBinary(),
+            ':prevOut' => $outpoint->getVout()
+        ]);
+
+        return $fetchUtxoStmt->fetchAll();
     }
 
     public function fetchUtxos($required, $bestBlock)

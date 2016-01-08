@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Zmq;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
+use BitWasp\Buffertools\Buffer;
 use \React\ZMQ\Context;
 
 class UserControl
@@ -30,6 +31,21 @@ class UserControl
                 $result = $this->onInfo($node);
             } elseif ($e === 'chains') {
                 $result = $this->onChains($node);
+            }
+
+            $decoded = json_decode($e, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                if (isset($decoded['cmd']) && isset($decoded['params']) && is_array($decoded['params'])) {
+                    $c = $decoded['cmd'];
+                    $params = $decoded['params'];
+                    if ($c === 'tx') {
+                        if (isset($params['txid']) && strlen($params['txid']) === 64) {
+                            $result = $this->onTransaction($node, Buffer::hex($params['txid'], 32));
+                        } else {
+                            $result = ['error' => 'Missing or incorrect transaction id'];
+                        }
+                    }
+                }
             }
 
             $this->socket->send(json_encode($result, JSON_PRETTY_PRINT));
@@ -136,5 +152,48 @@ class UserControl
         }
 
         return $chains;
+    }
+
+    public function onTransaction(NodeInterface $node, Buffer $txid)
+    {
+        $chain = $node->chain()->getChain();
+        try {
+            $tx = $chain->fetchTransaction($node->txidx(), $txid);
+
+            $inputs = [];
+            foreach ($tx->getInputs() as $in) {
+                $outpoint = $in->getOutPoint();
+                $inputs[] = [
+                    'txid' => $outpoint->getTxId()->getHex(),
+                    'vout' => $outpoint->getVout(),
+                    'scriptSig' => $in->getScript()->getHex(),
+                    'sequence' => $in->getSequence()
+                ];
+            }
+
+            $outputs = [];
+            foreach ($tx->getOutputs() as $out) {
+                $outputs[] = [
+                    'value' => $out->getValue(),
+                    'scriptPubKey' => $out->getScript()->getHex()
+                ];
+            }
+
+            $buf = $tx->getBuffer()->getBinary();
+            return [
+                'hash' => $tx->getTxId()->getHex(),
+                'version' => $tx->getVersion(),
+                'inputs' => $inputs,
+                'outputs' => $outputs,
+                'nLockTime' => $tx->getLockTime(),
+                'raw' => bin2hex($buf),
+                'size' => strlen($buf)
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'error' => 'Transaction not found' . $e->getMessage() . "\n" . $e->getTraceAsString()
+            ];
+        }
     }
 }

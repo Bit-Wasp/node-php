@@ -19,6 +19,11 @@ class Chain extends EventEmitter implements ChainInterface
     private $headers;
 
     /**
+     * @var Index\Transaction
+     */
+    private $txIndex;
+
+    /**
      * @var BlockIndexInterface
      */
     private $index;
@@ -34,6 +39,7 @@ class Chain extends EventEmitter implements ChainInterface
     private $math;
 
     /**
+     * Chain constructor.
      * @param string[] $map
      * @param BlockIndexInterface $index
      * @param Index\Headers $headers
@@ -76,6 +82,15 @@ class Chain extends EventEmitter implements ChainInterface
     public function fetchAncestor($height)
     {
         return $this->fetchIndex($this->getHashFromHeight($height));
+    }
+
+    /**
+     * @param Buffer $txid
+     * @return \BitWasp\Bitcoin\Transaction\Transaction
+     */
+    public function fetchTransaction(Index\Transaction $txIndex, Buffer $txid)
+    {
+        return $txIndex->fetch($this->getIndex()->getHash(), $txid);
     }
 
     /**

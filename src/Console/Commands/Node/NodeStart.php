@@ -30,6 +30,13 @@ class NodeStart extends AbstractCommand
             ->addOption($this->optConfig, 'c', InputOption::VALUE_OPTIONAL, 'Specify the location of a configuration file');
     }
 
+    protected function isRunningAsDaemon(InputInterface $input)
+    {
+        if ($input->getOption('daemon') === true) {
+
+        }
+    }
+
     /**
      * @param InputInterface $input
      * @param OutputInterface $output
@@ -43,13 +50,15 @@ class NodeStart extends AbstractCommand
 
         // Create the child process
         // All the code after pcntl_fork () will be performed by two processes: parent and child
-        $child_pid = pcntl_fork();
-        if ($child_pid) {
-            // Exit from the parent process that is bound to the console
-            exit();
+        if (false) {
+            $child_pid = pcntl_fork();
+            if ($child_pid) {
+                // Exit from the parent process that is bound to the console
+                exit();
+            }
+            // Make the child as the main process.
+            posix_setsid();
         }
-        // Make the child as the main process.
-        posix_setsid();
 
         $app = new BitcoinNode($params, $loop);
 

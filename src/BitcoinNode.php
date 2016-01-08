@@ -70,6 +70,11 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     protected $headers;
 
     /**
+     * @var Index\Transaction
+     */
+    protected $transactions;
+
+    /**
      * @var ChainsInterface
      */
     protected $chains;
@@ -141,6 +146,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $this->pow = new ProofOfWork($math, $params);
         $this->headers = new Index\Headers($db, $consensus, $math, $this->chains, new HeaderCheck($consensus, $adapter, $this->pow));
         $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter));
+        $this->transactions = new Index\Transaction($db);
 
         $genesis = $params->getGenesisBlock();
         $this->headers->init($genesis->getHeader());
@@ -198,6 +204,21 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         }
         $this->chains->checkTips();
         return $this;
+    }
+
+    public function txidx()
+    {
+        return $this->transactions;
+    }
+
+    public function headeridx()
+    {
+        return $this->headers;
+    }
+
+    public function blockidx()
+    {
+        return $this->blocks;
     }
 
     /**
@@ -315,6 +336,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         try {
             $state = new ScriptValidation(true);
             $index = $this->blocks->accept($block, $this->headers, $state);
+            unset($state);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $this->chains->checkTips();

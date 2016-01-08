@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Node\Index\Transaction;
 use BitWasp\Buffertools\Buffer;
 
 interface DbInterface
