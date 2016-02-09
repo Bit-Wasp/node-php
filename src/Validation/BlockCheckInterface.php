@@ -3,7 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
@@ -70,10 +69,10 @@ interface BlockCheckInterface
     /**
      * @param UtxoView $view
      * @param TransactionInterface $tx
-     * @param $height
-     * @param Flags $flags
+     * @param int $height
+     * @param int $flags
      * @param ScriptValidationInterface $state
      * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationInterface $state);
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, $flags, ScriptValidationInterface $state);
 }

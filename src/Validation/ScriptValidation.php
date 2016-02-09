@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
@@ -48,18 +47,16 @@ class ScriptValidation implements ScriptValidationInterface
     /**
      * @param UtxoView $utxoView
      * @param TransactionInterface $tx
-     * @param Flags $flags
+     * @param int $flags
      * @return ScriptValidationInterface
      */
-    public function queue(UtxoView $utxoView, TransactionInterface $tx, Flags $flags)
+    public function queue(UtxoView $utxoView, TransactionInterface $tx, $flags)
     {
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
-            $scriptPubKey = $utxoView
-                ->fetchByInput($tx->getInput($i))
-                ->getOutput()
-                ->getScript();
+            $output = $utxoView->fetchByInput($tx->getInput($i))->getOutput();
 
-            $this->results[] = ScriptFactory::consensus($flags)->verify($tx, $scriptPubKey, $i);
+            $witness = isset($tx->getWitnesses()[$i]) ? $tx->getWitness($i) : null;
+            $this->results[] = ScriptFactory::consensus($flags)->verify($tx, $output->getScript(), $i, $output->getValue(), $witness);
         }
 
         return $this;

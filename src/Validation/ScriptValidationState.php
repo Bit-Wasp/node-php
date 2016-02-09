@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use React\EventLoop\LoopInterface;
@@ -82,18 +81,18 @@ class ScriptValidationState implements ScriptValidationInterface
 
     /**
      * @param TransactionInterface $tx
-     * @param Flags $flags
+     * @param int $flags
      * @param array $scripts
      * @return \React\Promise\PromiseInterface
      */
-    private function dispatch(TransactionInterface $tx, Flags $flags, array $scripts)
+    private function dispatch(TransactionInterface $tx, $flags, array $scripts)
     {
         $h = spl_object_hash($tx);
 
         $a = [
             'txid' => $h,
             'tx' => $tx->getBuffer()->getHex(),
-            'flags' => $flags->getFlags(),
+            'flags' => $flags,
             'scripts' => $scripts
         ];
         $s = json_encode($a);
@@ -109,10 +108,10 @@ class ScriptValidationState implements ScriptValidationInterface
     /**
      * @param UtxoView $utxoView
      * @param TransactionInterface $tx
-     * @param Flags $flags
+     * @param int $flags
      * @return ScriptValidationInterface
      */
-    public function queue(UtxoView $utxoView, TransactionInterface $tx, Flags $flags)
+    public function queue(UtxoView $utxoView, TransactionInterface $tx, $flags)
     {
         $scripts = [];
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {

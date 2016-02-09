@@ -4,14 +4,13 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 
 class ForkState implements ForkStateInterface
 {
     /**
-     * @var Flags
+     * @var int
      */
     private $flags;
 
@@ -86,7 +85,7 @@ class ForkState implements ForkStateInterface
             $flags |= InterpreterInterface::VERIFY_CHECKLOCKTIMEVERIFY;
         }
 
-        $this->flags = new Flags($flags);
+        $this->flags = $flags;
     }
 
     /**
@@ -130,7 +129,7 @@ class ForkState implements ForkStateInterface
     }
 
     /**
-     * @return Flags
+     * @return int
      */
     public function getScriptFlags()
     {

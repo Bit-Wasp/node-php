@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Validation;
 
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
@@ -16,10 +15,10 @@ interface ScriptValidationInterface
     /**
      * @param UtxoView $utxoView
      * @param TransactionInterface $tx
-     * @param Flags $flags
+     * @param int $flags
      * @return self
      */
-    public function queue(UtxoView $utxoView, TransactionInterface $tx, Flags $flags);
+    public function queue(UtxoView $utxoView, TransactionInterface $tx, $flags);
 
     /**
      * @return bool

@@ -108,7 +108,7 @@ class Blocks
 
         //$forks = new ForkState($index, $this->consensus->getParams(), $this->db);
         //$flags = $forks->getScriptFlags();
-        $flags = new \BitWasp\Bitcoin\Flags($this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE);
+        $flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         $nInputs = 0;
         $nFees = 0;
         $nSigOps = 0;
@@ -122,7 +122,7 @@ class Blocks
             }
 
             if (!$tx->isCoinbase()) {
-                if ($flags->checkFlags(InterpreterInterface::VERIFY_P2SH)) {
+                if ($flags & InterpreterInterface::VERIFY_P2SH) {
                     $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
                     if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');

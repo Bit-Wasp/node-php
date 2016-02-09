@@ -1,13 +1,6 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: tk
- * Date: 19/12/15
- * Time: 19:49
- */
-namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Bitcoin\Flags;
+namespace BitWasp\Bitcoin\Node\Chain;
 
 interface ForkStateInterface
 {
@@ -37,7 +30,7 @@ interface ForkStateInterface
     public function doCheckLocktimeVerify();
 
     /**
-     * @return Flags
+     * @return int
      */
     public function getScriptFlags();
 }

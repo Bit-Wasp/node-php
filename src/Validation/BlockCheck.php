@@ -6,7 +6,6 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
-use BitWasp\Bitcoin\Flags;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
@@ -341,11 +340,11 @@ class BlockCheck implements BlockCheckInterface
      * @param UtxoView $view
      * @param TransactionInterface $tx
      * @param int $height
-     * @param Flags $flags
+     * @param int $flags
      * @param ScriptValidationInterface $state
      * @return $this
      */
-    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, Flags $flags, ScriptValidationInterface $state)
+    public function checkInputs(UtxoView $view, TransactionInterface $tx, $height, $flags, ScriptValidationInterface $state)
     {
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
