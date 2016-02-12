@@ -2,9 +2,8 @@
 
 namespace BitWasp\Bitcoin\Node\State;
 
-use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class PeerState extends AbstractState
 {
@@ -88,7 +87,7 @@ class PeerState extends AbstractState
     }
 
     /**
-     * @return Buffer|null
+     * @return BufferInterface|null
      */
     public function getHashLastUnknownBlock()
     {
@@ -97,9 +96,9 @@ class PeerState extends AbstractState
 
     /**
      * @param ChainStateInterface $state
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      */
-    public function updateBlockAvailability(ChainStateInterface $state, Buffer $hash)
+    public function updateBlockAvailability(ChainStateInterface $state, BufferInterface $hash)
     {
         $chain = $state->getChain();
         if ($chain->containsHash($hash)) {

@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class ChainState implements ChainStateInterface
 {
@@ -97,10 +98,10 @@ class ChainState implements ChainStateInterface
     /**
      * Produce a block locator for a given block height.
      * @param int $height
-     * @param Buffer|null $final
+     * @param BufferInterface|null $final
      * @return BlockLocator
      */
-    public function getLocator($height, Buffer $final = null)
+    public function getLocator($height, BufferInterface $final = null)
     {
         $step = 1;
         $hashes = [];
@@ -132,19 +133,19 @@ class ChainState implements ChainStateInterface
     }
 
     /**
-     * @param Buffer|null $hashStop
+     * @param BufferInterface|null $hashStop
      * @return BlockLocator
      */
-    public function getHeadersLocator(Buffer $hashStop = null)
+    public function getHeadersLocator(BufferInterface $hashStop = null)
     {
         return $this->getLocator($this->chain->getIndex()->getHeight(), $hashStop);
     }
 
     /**
-     * @param Buffer|null $hashStop
+     * @param BufferInterface|null $hashStop
      * @return BlockLocator
      */
-    public function getBlockLocator(Buffer $hashStop = null)
+    public function getBlockLocator(BufferInterface $hashStop = null)
     {
         return $this->getLocator($this->lastBlock->getHeight(), $hashStop);
     }

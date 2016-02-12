@@ -3,12 +3,12 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 interface BlockIndexInterface
 {
     /**
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHash();
 

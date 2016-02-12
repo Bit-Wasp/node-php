@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Index;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
 /**
@@ -54,19 +55,19 @@ class Chain extends EventEmitter implements ChainInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return bool
      */
-    public function containsHash(Buffer $hash)
+    public function containsHash(BufferInterface $hash)
     {
         return $this->chainCache->containsHash($hash);
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockIndexInterface
      */
-    public function fetchIndex(Buffer $hash)
+    public function fetchIndex(BufferInterface $hash)
     {
         if (!$this->chainCache->containsHash($hash)) {
             throw new \RuntimeException('Index by this hash not known');
@@ -85,10 +86,10 @@ class Chain extends EventEmitter implements ChainInterface
     }
 
     /**
-     * @param Buffer $txid
+     * @param BufferInterface $txid
      * @return \BitWasp\Bitcoin\Transaction\Transaction
      */
-    public function fetchTransaction(Index\Transaction $txIndex, Buffer $txid)
+    public function fetchTransaction(Index\Transaction $txIndex, BufferInterface $txid)
     {
         return $txIndex->fetch($this->getIndex()->getHash(), $txid);
     }
@@ -110,17 +111,17 @@ class Chain extends EventEmitter implements ChainInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return int
      */
-    public function getHeightFromHash(Buffer $hash)
+    public function getHeightFromHash(BufferInterface $hash)
     {
         return $this->chainCache->getHeight($hash);
     }
 
     /**
      * @param int $height
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHashFromHeight($height)
     {

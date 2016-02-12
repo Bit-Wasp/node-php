@@ -28,6 +28,7 @@ use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use Packaged\Config\ConfigProviderInterface;
 
 class Db implements DbInterface
@@ -367,14 +368,13 @@ class Db implements DbInterface
         throw new \RuntimeException('MySqlDb: Failed executing Block insert transaction');
     }
 
-
-
     /**
      * @param BlockInterface $block
+     * @param BufferInterface $blockHash
      * @return bool
      * @throws \Exception
      */
-    public function insertBlock(Buffer $blockHash, BlockInterface $block)
+    public function insertBlock(BufferInterface $blockHash, BlockInterface $block)
     {
         $blockHash = $blockHash->getBinary();
 
@@ -585,10 +585,10 @@ class Db implements DbInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockIndexInterface
      */
-    public function fetchIndex(Buffer $hash)
+    public function fetchIndex(BufferInterface $hash)
     {
         if (null == $this->fetchIndexStmt) {
             $this->fetchIndexStmt = $this->dbh->prepare('
@@ -663,10 +663,10 @@ class Db implements DbInterface
     }
 
     /**
-     * @param Buffer $blockHash
+     * @param BufferInterface $blockHash
      * @return TransactionCollection
      */
-    public function fetchBlockTransactions(Buffer $blockHash)
+    public function fetchBlockTransactions(BufferInterface $blockHash)
     {
 
         if (null === $this->txsStmt) {
@@ -726,10 +726,10 @@ class Db implements DbInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return Block
      */
-    public function fetchBlock(Buffer $hash)
+    public function fetchBlock(BufferInterface $hash)
     {
 
         $stmt = $this->dbh->prepare('
@@ -764,10 +764,10 @@ class Db implements DbInterface
 
     /**
      * @param Headers $headers
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return ChainStateInterface
      */
-    public function fetchHistoricChain(Headers $headers, Buffer $hash)
+    public function fetchHistoricChain(Headers $headers, BufferInterface $hash)
     {
         $math = Bitcoin::getMath();
         $fetchChainStmt = $this->dbh->prepare('
@@ -1053,7 +1053,7 @@ class Db implements DbInterface
         return [$required, $utxos];
     }
 
-    public function getTransaction(Buffer $tipHash, Buffer $txid)
+    public function getTransaction(BufferInterface $tipHash, BufferInterface $txid)
     {
         $tx = $this->dbh->prepare('
         SELECT t.id, t.hash, t.version, t.nLockTime
@@ -1190,7 +1190,7 @@ WHERE tip.header_id = (
 
     }
 
-    public function fetchUtxo(Buffer $tipHash, OutPointInterface $outpoint)
+    public function fetchUtxo(BufferInterface $tipHash, OutPointInterface $outpoint)
     {
         $fetchUtxoStmt = $this->dbh->prepare('
         SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
@@ -1316,11 +1316,11 @@ WHERE tip.header_id = (
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param int[] $versions
      * @return array
      */
-    public function findSuperMajorityInfoByHash(Buffer $hash, array $versions)
+    public function findSuperMajorityInfoByHash(BufferInterface $hash, array $versions)
     {
         $stmt = $this->dbh->prepare('SELECT id from '.$this->tblHeaders.' where hash = :hash');
         if ($stmt->execute(['hash' => $hash->getBinary()])) {

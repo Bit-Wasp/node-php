@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
 class Chains extends EventEmitter implements ChainsInterface
@@ -125,10 +126,10 @@ class Chains extends EventEmitter implements ChainsInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return false|ChainStateInterface
      */
-    public function isKnownHeader(Buffer $hash)
+    public function isKnownHeader(BufferInterface $hash)
     {
         return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
             if ($foundState instanceof ChainState) {
@@ -144,10 +145,10 @@ class Chains extends EventEmitter implements ChainsInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return false|ChainStateInterface
      */
-    public function isTip(Buffer $hash)
+    public function isTip(BufferInterface $hash)
     {
         return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
             if ($foundState instanceof ChainState) {

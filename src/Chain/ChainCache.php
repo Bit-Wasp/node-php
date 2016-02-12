@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class ChainCache implements ChainCacheInterface
 {
@@ -27,19 +28,19 @@ class ChainCache implements ChainCacheInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return bool
      */
-    public function containsHash(Buffer $hash)
+    public function containsHash(BufferInterface $hash)
     {
         return array_key_exists($hash->getBinary(), $this->heightByHash);
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return int
      */
-    public function getHeight(Buffer $hash)
+    public function getHeight(BufferInterface $hash)
     {
         if ($this->containsHash($hash)) {
             return $this->heightByHash[$hash->getBinary()];
@@ -51,7 +52,7 @@ class ChainCache implements ChainCacheInterface
     /**
      * @param int $height
      * @throws \RuntimeException
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHash($height)
     {

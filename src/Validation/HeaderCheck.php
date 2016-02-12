@@ -7,10 +7,9 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class HeaderCheck implements HeaderCheckInterface
 {
@@ -46,12 +45,12 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param BlockHeaderInterface $header
      * @param bool $checkPow
      * @return $this
      */
-    public function check(Buffer $hash, BlockHeaderInterface $header, $checkPow = true)
+    public function check(BufferInterface $hash, BlockHeaderInterface $header, $checkPow = true)
     {
         try {
             if ($checkPow) {
@@ -85,11 +84,11 @@ class HeaderCheck implements HeaderCheckInterface
 
     /**
      * @param BlockIndexInterface $prevIndex
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param BlockHeaderInterface $header
      * @return BlockIndexInterface
      */
-    public function makeIndex(BlockIndexInterface $prevIndex, Buffer $hash, BlockHeaderInterface $header)
+    public function makeIndex(BlockIndexInterface $prevIndex, BufferInterface $hash, BlockHeaderInterface $header)
     {
         return new BlockIndex(
             $hash,

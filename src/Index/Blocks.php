@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Validation\ScriptValidationInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class Blocks
 {
@@ -78,10 +79,10 @@ class Blocks
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockInterface
      */
-    public function fetch(Buffer $hash)
+    public function fetch(BufferInterface $hash)
     {
         return $this->db->fetchBlock($hash);
     }

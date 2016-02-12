@@ -11,7 +11,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheckInterface;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class Headers
 {
@@ -73,19 +73,19 @@ class Headers
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockIndexInterface
      */
-    public function fetch(Buffer $hash)
+    public function fetch(BufferInterface $hash)
     {
         return $this->db->fetchIndex($hash);
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return array
      */
-    private function fetchChain(Buffer $hash)
+    private function fetchChain(BufferInterface $hash)
     {
         $isTip = $this->chains->isTip($hash);
         if ($isTip instanceof ChainState) {
@@ -96,12 +96,12 @@ class Headers
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param BlockHeaderInterface $header
      * @return BlockIndexInterface
      * @throws \Exception
      */
-    public function accept(Buffer $hash, BlockHeaderInterface $header)
+    public function accept(BufferInterface $hash, BlockHeaderInterface $header)
     {
         if ($this->chains->isKnownHeader($hash)) {
             // todo: check for rejected block
@@ -158,7 +158,7 @@ class Headers
             $head = [$hash, $head];
         }
 
-        if (!$bestPrev instanceof Buffer) {
+        if (!$bestPrev instanceof BufferInterface) {
             throw new \RuntimeException('Headers::accept(): Unknown start header');
         }
 

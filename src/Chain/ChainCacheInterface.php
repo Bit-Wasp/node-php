@@ -1,32 +1,27 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: tk
- * Date: 19/12/15
- * Time: 16:13
- */
+
 namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 interface ChainCacheInterface
 {
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return bool
      */
-    public function containsHash(Buffer $hash);
+    public function containsHash(BufferInterface $hash);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return int
      */
-    public function getHeight(Buffer $hash);
+    public function getHeight(BufferInterface $hash);
 
     /**
      * @param int $height
      * @throws \RuntimeException
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHash($height);
 
