@@ -11,7 +11,6 @@ use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Validation\ScriptValidationInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
-use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 
 class Blocks
