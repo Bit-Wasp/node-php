@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Index\Transaction;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitterInterface;
 
 /**
@@ -14,23 +15,23 @@ use Evenement\EventEmitterInterface;
 interface ChainInterface extends EventEmitterInterface
 {
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return bool
      */
-    public function containsHash(Buffer $hash);
+    public function containsHash(BufferInterface $hash);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockIndexInterface
      */
-    public function fetchIndex(Buffer $hash);
+    public function fetchIndex(BufferInterface $hash);
 
     /**
      * @param Transaction $txIndex
-     * @param Buffer $txid
+     * @param BufferInterface $txid
      * @return TransactionInterface
      */
-    public function fetchTransaction(Transaction $txIndex, Buffer $txid);
+    public function fetchTransaction(Transaction $txIndex, BufferInterface $txid);
 
     /**
      * @param int $height
@@ -49,14 +50,14 @@ interface ChainInterface extends EventEmitterInterface
     public function getChainCache();
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return int
      */
-    public function getHeightFromHash(Buffer $hash);
+    public function getHeightFromHash(BufferInterface $hash);
 
     /**
      * @param int $height
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHashFromHeight($height);
 

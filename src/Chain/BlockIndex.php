@@ -4,11 +4,12 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class BlockIndex implements BlockIndexInterface
 {
     /**
-     * @var Buffer
+     * @var BufferInterface
      */
     private $hash;
 
@@ -28,12 +29,12 @@ class BlockIndex implements BlockIndexInterface
     private $header;
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param int $height
      * @param int|string $work
      * @param BlockHeaderInterface $header
      */
-    public function __construct(Buffer $hash, $height, $work, BlockHeaderInterface $header)
+    public function __construct(BufferInterface $hash, $height, $work, BlockHeaderInterface $header)
     {
         $this->hash = $hash;
         $this->header = $header;
@@ -42,7 +43,7 @@ class BlockIndex implements BlockIndexInterface
     }
 
     /**
-     * @return Buffer
+     * @return BufferInterface
      */
     public function getHash()
     {

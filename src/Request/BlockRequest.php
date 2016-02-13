@@ -4,9 +4,9 @@ namespace BitWasp\Bitcoin\Node\Request;
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class BlockRequest
 {
@@ -19,18 +19,18 @@ class BlockRequest
     private $inFlight = [];
 
     /**
-     * @var Buffer|null
+     * @var BufferInterface|null
      */
     private $lastRequested;
 
     /**
      * @param ChainStateInterface $state
-     * @param Buffer $startHash
+     * @param BufferInterface $startHash
      * @throws \RuntimeException
      * @throws \Exception
      * @return Inventory[]
      */
-    private function relativeNextInventory(ChainStateInterface $state, Buffer $startHash)
+    private function relativeNextInventory(ChainStateInterface $state, BufferInterface $startHash)
     {
         $best = $state->getChain();
         if (!$best->containsHash($startHash)) {
@@ -87,19 +87,19 @@ class BlockRequest
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return bool
      */
-    public function isInFlight(Buffer $hash)
+    public function isInFlight(BufferInterface $hash)
     {
         return array_key_exists($hash->getBinary(), $this->inFlight);
     }
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return $this
      */
-    public function markReceived(Buffer $hash)
+    public function markReceived(BufferInterface $hash)
     {
         unset($this->inFlight[$hash->getBinary()]);
         return $this;

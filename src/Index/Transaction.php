@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class Transaction
 {
@@ -24,11 +25,11 @@ class Transaction
     }
 
     /**
-     * @param Buffer $tipHash
-     * @param Buffer $txid
+     * @param BufferInterface $tipHash
+     * @param BufferInterface $txid
      * @return \BitWasp\Bitcoin\Transaction\Transaction|\PDOStatement
      */
-    public function fetch(Buffer $tipHash, Buffer $txid)
+    public function fetch(BufferInterface $tipHash, BufferInterface $txid)
     {
         return $this->db->getTransaction($tipHash, $txid);
     }

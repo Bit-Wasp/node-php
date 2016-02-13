@@ -6,11 +6,10 @@ use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\ChainCacheInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 class BlockDownloader
 {
@@ -88,9 +87,9 @@ class BlockDownloader
     /**
      * @param ChainStateInterface $bestChain
      * @param Peer $peer
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      */
-    public function received(ChainStateInterface $bestChain, Peer $peer, Buffer $hash)
+    public function received(ChainStateInterface $bestChain, Peer $peer, BufferInterface $hash)
     {
         if ($this->request->isInFlight($hash)) {
             $this->request->markReceived($hash);

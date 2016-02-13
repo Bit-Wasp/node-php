@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Zmq;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use \React\ZMQ\Context;
 
 class UserControl
@@ -154,7 +155,7 @@ class UserControl
         return $chains;
     }
 
-    public function onTransaction(NodeInterface $node, Buffer $txid)
+    public function onTransaction(NodeInterface $node, BufferInterface $txid)
     {
         $chain = $node->chain()->getChain();
         try {

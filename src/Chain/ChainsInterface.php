@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 interface ChainsInterface
 {
@@ -39,14 +39,14 @@ interface ChainsInterface
     public function best();
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return false|ChainStateInterface
      */
-    public function isKnownHeader(Buffer $hash);
+    public function isKnownHeader(BufferInterface $hash);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return false|ChainStateInterface
      */
-    public function isTip(Buffer $hash);
+    public function isTip(BufferInterface $hash);
 }

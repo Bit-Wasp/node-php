@@ -12,8 +12,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
-use BitWasp\Bitcoin\Node\Index\Transaction;
-use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 
 interface DbInterface
 {
@@ -57,12 +56,12 @@ interface DbInterface
     public function insertBlockOld(BlockInterface $block);
 
     /**
-     * @param Buffer $blockHash
+     * @param BufferInterface $blockHash
      * @param BlockInterface $block
      * @return bool
      * @throws \Exception
      */
-    public function insertBlock(Buffer $blockHash, BlockInterface $block);
+    public function insertBlock(BufferInterface $blockHash, BlockInterface $block);
 
     /**
      * @param BlockIndexInterface $startIndex
@@ -73,10 +72,10 @@ interface DbInterface
     public function insertIndexBatch(BlockIndexInterface $startIndex, array $index);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return BlockIndexInterface
      */
-    public function fetchIndex(Buffer $hash);
+    public function fetchIndex(BufferInterface $hash);
 
     /**
      * @param int $id
@@ -85,23 +84,23 @@ interface DbInterface
     public function fetchIndexById($id);
 
     /**
-     * @param Buffer $blockHash
+     * @param BufferInterface $blockHash
      * @return TransactionCollection
      */
-    public function fetchBlockTransactions(Buffer $blockHash);
+    public function fetchBlockTransactions(BufferInterface $blockHash);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return Block
      */
-    public function fetchBlock(Buffer $hash);
+    public function fetchBlock(BufferInterface $hash);
 
     /**
      * @param Headers $headers
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @return ChainStateInterface
      */
-    public function fetchHistoricChain(Headers $headers, Buffer $hash);
+    public function fetchHistoricChain(Headers $headers, BufferInterface $hash);
 
     /**
      * @param Headers $headers
@@ -146,9 +145,9 @@ interface DbInterface
     public function findSuperMajorityInfo($headerId, array $versions);
 
     /**
-     * @param Buffer $hash
+     * @param BufferInterface $hash
      * @param int[] $versions
      * @return array
      */
-    public function findSuperMajorityInfoByHash(Buffer $hash, array $versions);
+    public function findSuperMajorityInfoByHash(BufferInterface $hash, array $versions);
 }
