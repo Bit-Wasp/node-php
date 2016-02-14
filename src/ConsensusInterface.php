@@ -35,5 +35,5 @@ interface ConsensusInterface
      * @param ChainStateInterface $state
      * @return int|string
      */
-    public function getWorkRequired(ChainStateInterface $state);
+    public function getWorkForNextTip(ChainStateInterface $state);
 }

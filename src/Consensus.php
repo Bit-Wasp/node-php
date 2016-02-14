@@ -6,6 +6,7 @@ use BitWasp\Bitcoin\Amount;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
 class Consensus implements ConsensusInterface
@@ -101,24 +102,31 @@ class Consensus implements ConsensusInterface
     }
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainInterface $chain
+     * @param BlockIndexInterface $prevIndex
      * @return int|string
      */
-    public function getWorkRequired(ChainStateInterface $state)
+    public function getWorkRequired(ChainInterface $chain, BlockIndexInterface $prevIndex)
     {
         $math = $this->math;
-        $index = $state->getChain()->getIndex();
 
-        if ($math->cmp($math->mod($math->add($index->getHeight(), 1), $this->params->powRetargetInterval()), 0) !== 0) {
+        if ($math->cmp($math->mod($math->add($prevIndex->getHeight(), 1), $this->params->powRetargetInterval()), 0) !== 0) {
             // No change in difficulty
-            return $index->getHeader()->getBits()->getInt();
+            return $prevIndex->getHeader()->getBits()->getInt();
         }
 
         // Retarget
-        $heightLastRetarget = $math->sub($index->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
+        $heightLastRetarget = $math->sub($prevIndex->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
+        $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
+        return $this->calculateNextWorkRequired($prevIndex, $lastTime);
+    }
 
-        $lastTime = $state->getChain()->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
-
-        return $this->calculateNextWorkRequired($index, $lastTime);
+    /**
+     * @param ChainStateInterface $state
+     * @return int|string
+     */
+    public function getWorkForNextTip(ChainStateInterface $state)
+    {
+        return $this->getWorkRequired($state->getChain(), $state->getChainIndex());
     }
 }

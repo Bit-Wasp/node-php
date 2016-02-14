@@ -2,15 +2,19 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
+use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\Forks;
+use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheckInterface;
+use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 
 class Headers
@@ -36,18 +40,25 @@ class Headers
     private $headerCheck;
 
     /**
+     * @var ProofOfWork
+     */
+    private $proofOfWork;
+
+    /**
      * Headers constructor.
      * @param Db $db
      * @param Consensus $consensus
      * @param Math $math
      * @param ChainsInterface $chains
      * @param HeaderCheckInterface $headerCheck
+     * @param ProofOfWork $proofOfWork
      */
     public function __construct(
         Db $db,
         Consensus $consensus,
         Math $math,
         ChainsInterface $chains,
+        ProofOfWork $proofOfWork,
         HeaderCheckInterface $headerCheck
     ) {
         $this->db = $db;
@@ -55,6 +66,7 @@ class Headers
         $this->chains = $chains;
         $this->consensus = $consensus;
         $this->headerCheck = $headerCheck;
+        $this->proofOfWork = $proofOfWork;
     }
 
     /**
@@ -83,20 +95,6 @@ class Headers
 
     /**
      * @param BufferInterface $hash
-     * @return array
-     */
-    private function fetchChain(BufferInterface $hash)
-    {
-        $isTip = $this->chains->isTip($hash);
-        if ($isTip instanceof ChainState) {
-            return [true, $isTip];
-        } else {
-            return [false, $this->db->fetchHistoricChain($this, $hash)];
-        }
-    }
-
-    /**
-     * @param BufferInterface $hash
      * @param BlockHeaderInterface $header
      * @return BlockIndexInterface
      * @throws \Exception
@@ -108,45 +106,24 @@ class Headers
             return $this->db->fetchIndex($hash);
         }
 
-        /* @var ChainStateInterface $state */
-        list ($isTip, $state) = $this->fetchChain($hash);
-
-        $chain = $state->getChain();
-        $startIndex = $chain->getIndex();
-
-        $chain->updateTip(
-            $this
-                ->headerCheck
-                ->check($hash, $header)
-                ->checkContextual($state, $header)
-                ->makeIndex($startIndex, $hash, $header)
-        );
-
-        $index = $chain->getIndex();
-
-        $this->db->insertIndexBatch($startIndex, [$index]);
-
-        if (!$isTip) {
-            $this->chains->trackState($state);
-        }
+        $batch = $this->prepareBatch([$header]);
+        $index = $batch->getIndices()[0];
+        $this->applyBatch($batch);
 
         return $index;
     }
 
     /**
      * @param BlockHeaderInterface[] $headers
-     * @param ChainStateInterface|null $state
-     * @param BlockIndexInterface|null $prevIndex
-     * @return ChainStateInterface
-     * @throws \Exception
+     * @return HeadersBatch
      */
-    public function acceptBatch(array $headers, ChainStateInterface &$state = null, BlockIndexInterface &$prevIndex = null)
+    public function prepareBatch(array $headers)
     {
         $countHeaders = count($headers);
-        $bestPrev = null;
+        $bestPrev = new Buffer();
         $firstUnknown = null;
         foreach ($headers as $i => &$head) {
-            if ($this->chains->isKnownHeader($head->getPrevBlock())) {
+            if ( $this->chains->isKnownHeader($head->getPrevBlock())) {
                 $bestPrev = $head->getPrevBlock();
             }
 
@@ -162,42 +139,67 @@ class Headers
             throw new \RuntimeException('Headers::accept(): Unknown start header');
         }
 
-        /* @var ChainState $chainState */
-        list ($isTip, $chainState) = $this->fetchChain($bestPrev);
-        $tip = $chainState->getChain();
-        $prevIndex = $tip->getIndex();
+        $chainState = $this->chains->isTip($bestPrev);
+        if ($chainState === false) {
+            $chainState = $this->db->fetchHistoricChain($this, $bestPrev);
+            $this->chains->trackState($chainState);
+        }
 
+        /* @var ChainStateInterface $chainState */
+        $chain = $chainState->getChain();
+        $prevIndex = $chain->getIndex();
+
+        $batch = [];
         if ($firstUnknown !== null) {
-            $batch = [];
+            $versionInfo = $this->db->findSuperMajorityInfoByHash1($prevIndex->getHash());
+            $forks = new Forks($this->consensus->getParams(), $prevIndex, $versionInfo);
+
             for ($i = $firstUnknown; $i < $countHeaders; $i++) {
+                /**
+                 * @var BufferInterface $hash
+                 * @var BlockHeaderInterface $header
+                 */
                 list ($hash, $header) = $headers[$i];
 
-                $index = $this
-                    ->headerCheck
-                    ->check($hash, $header)
-                    ->checkContextual($chainState, $header)
-                    ->makeIndex($tip->getIndex(), $hash, $header);
+                $this->headerCheck->check($hash, $header);
 
-                // This function checks for continuity of headers
-                $tip->updateTip($index);
+                $index = new BlockIndex(
+                    $hash,
+                    $this->math->add($prevIndex->getHeight(), 1),
+                    $this->math->add($this->proofOfWork->getWork($header->getBits()), $prevIndex->getWork()),
+                    $header
+                );
 
-                $batch[] = $tip->getIndex();
-            }
+                $forks->next($index);
+                $this->headerCheck->checkContextual2($chain, $index, $prevIndex, $forks);
 
-            // Do a batch update of the chain
-            if (count($batch) > 0) {
-                $this->db->insertIndexBatch($prevIndex, $batch);
-                unset($batch);
-            }
-
-            if (!$isTip) {
-                $this->chains->trackState($chainState);
+                $batch[] = $index;
+                $prevIndex = $index;
             }
         }
 
-        $prevIndex = $tip->getIndex();
-        $state = $chainState;
+        return new HeadersBatch($chainState, $batch);
+    }
 
-        return true;
+    /**
+     * @param HeadersBatch $batch
+     * @return $this
+     * @throws \Exception
+     */
+    public function applyBatch(HeadersBatch $batch)
+    {
+        $indices = $batch->getIndices();
+        if (count($indices) === 0) {
+            return $this;
+        }
+
+        $this->db->insertHeaderBatch($batch);
+
+        $tip = $batch->getTip();
+        foreach ($batch->getIndices() as $index) {
+            $tip->getChain()->updateTip($index);
+        }
+
+        return $this;
     }
 }

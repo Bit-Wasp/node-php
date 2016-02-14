@@ -17,6 +17,7 @@ use BitWasp\Bitcoin\Node\Chain\Chain;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
@@ -504,7 +505,6 @@ class Db implements DbInterface
 
         $fetchParent = $this->fetchLftStmt;
         $resizeIndex = $this->updateIndicesStmt;
-
         $fetchParent->bindParam(':prevBlock', $startIndex->getHash()->getBinary());
         if ($fetchParent->execute()) {
             foreach ($fetchParent->fetchAll() as $record) {
@@ -572,6 +572,105 @@ class Db implements DbInterface
                 $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
                 $insertIndices->execute($indexValues);
                 $this->dbh->commit();
+                return true;
+
+            }
+        } catch (\Exception $e) {
+            $this->dbh->rollBack();
+            throw $e;
+        }
+
+        throw new \RuntimeException('Failed to update chain!');
+    }
+
+
+    /**
+     * @param HeadersBatch $batch
+     * @return bool
+     * @throws \Exception
+     */
+    public function insertHeaderBatch(HeadersBatch $batch)
+    {
+        if (null === $this->fetchLftStmt) {
+            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
+            $this->updateIndicesStmt = $this->dbh->prepare('
+                UPDATE ' . $this->tblIndex . '  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
+                UPDATE ' . $this->tblIndex . '  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
+            ');
+        }
+
+        $fetchParent = $this->fetchLftStmt;
+        $resizeIndex = $this->updateIndicesStmt;
+
+        $startIndex = $batch->getTip()->getChainIndex();
+        $fetchParent->bindParam(':prevBlock', $batch->getTip()->getChainIndex()->getHash()->getBinary());
+        if ($fetchParent->execute()) {
+            foreach ($fetchParent->fetchAll() as $record) {
+                $myLeft = $record['lft'];
+            }
+        }
+
+        $fetchParent->closeCursor();
+        if (!isset($myLeft)) {
+            throw new \RuntimeException('Failed to extract header position');
+        }
+
+        $index = $batch->getIndices();
+        $totalN = count($index);
+        $nTimesTwo = 2 * $totalN;
+        $leftOffset = $myLeft;
+        $rightOffset = $myLeft + $nTimesTwo;
+
+        $this->dbh->beginTransaction();
+        try {
+            if ($resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
+                $resizeIndex->closeCursor();
+
+                $headerValues = [];
+                $headerQuery = [];
+
+                $indexValues = [];
+                $indexQuery = [];
+
+                $c = 0;
+                foreach ($index as $i) {
+                    $headerQuery[] = "(:hash$c , :height$c , :work$c ,
+                    :version$c , :prevBlock$c , :merkleRoot$c ,
+                    :nBits$c , :nTimestamp$c , :nNonce$c  )";
+
+                    $headerValues['hash' . $c] = $i->getHash()->getBinary();
+                    $headerValues['height' . $c] = $i->getHeight();
+                    $headerValues['work' . $c] = $i->getWork();
+
+                    $header = $i->getHeader();
+                    $headerValues['version' . $c] = $header->getVersion();
+                    $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
+                    $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
+                    $headerValues['nBits' . $c] = $header->getBits()->getInt();
+                    $headerValues['nTimestamp' . $c] = $header->getTimestamp();
+                    $headerValues['nNonce' . $c] = $header->getNonce();
+
+                    $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
+                    $indexValues['lft' . $c] = $leftOffset + 1 + $c;
+                    $indexValues['rgt' . $c] = $rightOffset - $c;
+                    $c++;
+                }
+
+                $insertHeaders = $this->dbh->prepare('
+                  INSERT INTO ' . $this->tblHeaders . '  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+                  VALUES ' . implode(', ', $headerQuery));
+                $insertHeaders->execute($headerValues);
+
+                $lastId = (int)$this->dbh->lastInsertId();
+                $count = count($index);
+                for ($i = 0; $i < $count; $i++) {
+                    $rowId = $i + $lastId;
+                    $indexValues['header_id' . $i] = $rowId;
+                }
+
+                $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
+                $insertIndices->execute($indexValues);
+                $this->dbh->commit();
 
                 return true;
 
@@ -582,6 +681,70 @@ class Db implements DbInterface
         }
 
         throw new \RuntimeException('Failed to update chain!');
+    }
+
+    public function eraseBlock(BufferInterface $hash)
+    {
+
+        $idStmt = $this->dbh->prepare("
+            SELECT h.id
+            from  headerIndex h
+            WHERE h.hash = :hash");
+        $idStmt->execute(['hash'=>$hash->getBinary()]);
+        $id = $idStmt->fetchColumn();
+
+        $txStmt = $this->dbh->prepare("SELECT transaction_hash from block_transactions WHERE block_hash = :id");
+        $txStmt->execute(['id'=>$id]);
+        $txs = $txStmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        $dbStmt = $this->dbh->prepare('DELETE FROM blockIndex WHERE id = :id');
+        $dbtxStmt = $this->dbh->prepare('DELETE FROM block_transactions WHERE block_hash = :id');
+
+        try {
+            $this->dbh->beginTransaction();
+            echo "ID: $id\n";
+            $r =$dbStmt->execute(['id'=>$id]);
+            var_dump($r);
+            //$dbtxStmt->execute(['id'=>$id]);
+            if (count($txs) > 1) {
+
+                echo "many\n";
+                //$placeholders = rtrim(str_repeat('?, ', count($txs) - 1), ', ');
+                //$q = 'DELETE FROM  transaction_input WHERE parent_tx in (' . $placeholders . ')';
+
+                //$dtxinStmt = $this->dbh->prepare($q);
+                //$dtxoutStmt = $this->dbh->prepare('DELETE FROM transaction_output WHERE parent_tx in (' . $placeholders . ')');
+                //$dtxStmt = $this->dbh->prepare('DELETE FROM transactions WHERE id in (' . $placeholders . ')');
+                //$dtxinStmt->execute($txs);
+                //$dtxoutStmt->execute($txs);
+                //$dtxStmt->execute($txs);
+                /*
+                */
+
+            } elseif (count($txs) == 1) {
+                echo "just one\n";
+                //
+                //var_dump($txs);
+                //echo "did count: ".count($txs).PHP_EOL;
+
+                //$dtxinStmt = $this->dbh->prepare('DELETE FROM transaction_input WHERE parent_tx = :tx');
+                //$dtxoutStmt = $this->dbh->prepare('DELETE FROM transaction_output WHERE parent_tx = :tx');
+                //$dtxStmt = $this->dbh->prepare('DELETE FROM transactions WHERE id = :tx');
+                //$dtxinStmt->execute(['tx'=>$txs[0]]);
+                ///$dtxoutStmt->execute(['tx'=>$txs[0]]);
+                //$dtxStmt->execute(['tx'=>$txs[0]]);
+
+            } else {
+                echo "None\n";
+            }
+            $this->dbh->commit();
+            return true;
+        } catch (\Exception $e) {
+            echo $e->getMessage();
+            echo $e->getTraceAsString().PHP_EOL;
+        }
+
+        throw new \RuntimeException('Failed to commit deletion');
     }
 
     /**
@@ -1214,6 +1377,11 @@ WHERE tip.header_id = (
         return $fetchUtxoStmt->fetchAll();
     }
 
+    /**
+     * @param $required
+     * @param $bestBlock
+     * @return array
+     */
     public function fetchUtxos($required, $bestBlock)
     {
         $requiredCount = count($required);
@@ -1326,6 +1494,33 @@ WHERE tip.header_id = (
         if ($stmt->execute(['hash' => $hash->getBinary()])) {
             $id = $stmt->fetch(\PDO::FETCH_COLUMN);
             return $this->findSuperMajorityInfo($id, $versions);
+        }
+
+        throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');
+    }
+
+
+    /**
+     * @param BufferInterface $hash
+     * @param int $numAncestors
+     * @return array
+     */
+    public function findSuperMajorityInfoByHash1(BufferInterface $hash, $numAncestors = 1000)
+    {
+        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from '.$this->tblHeaders.' h, '.$this->tblIndex.' i where h.hash = :hash and i.header_id = h.id');
+        if ($stmt->execute(['hash' => $hash->getBinary()])) {
+            $id = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            $stmt = $this->dbh->prepare('
+            SELECT
+                   h.version
+            FROM   iindex i, headerIndex h
+            WHERE  h.id = i.header_id
+            AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
+
+            $stmt->execute(['lft'=>$id['lft'],'rgt'=>$id['rgt']]);
+            $stream = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            return $stream;
         }
 
         throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');

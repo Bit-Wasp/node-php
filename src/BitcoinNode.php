@@ -42,7 +42,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     /**
      * @var Db
      */
-    private $db;
+    public $db;
 
     /**
      * @var Notifier
@@ -144,7 +144,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $consensus = new Consensus($math, $params);
 
         $this->pow = new ProofOfWork($math, $params);
-        $this->headers = new Index\Headers($db, $consensus, $math, $this->chains, new HeaderCheck($consensus, $adapter, $this->pow));
+        $this->headers = new Index\Headers($db, $consensus, $math, $this->chains, $this->pow, new HeaderCheck($consensus, $adapter, $this->pow));
         $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter));
         $this->transactions = new Index\Transaction($db);
 
@@ -263,34 +263,42 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function onHeaders(Peer $peer, Headers $headers)
     {
-        $vHeaders = $headers->getHeaders();
-        $count = count($vHeaders);
+        try {
+            $vHeaders = $headers->getHeaders();
 
-        if ($count > 0) {
+            $batch = $this->headers->prepareBatch($vHeaders);
+            $count = count($batch->getIndices());
+            if ($count > 0) {
 
-            $chainState = null;
-            $indexLast = null;
+                $this->headers->applyBatch($batch);
 
-            $this->headers->acceptBatch($vHeaders, $chainState, $indexLast);
+                /**
+                 * @var ChainStateInterface $chainState
+                 * @var BlockIndexInterface $indexLast
+                 */
 
-            /**
-             * @var ChainStateInterface $chainState
-             * @var BlockIndexInterface $indexLast
-             */
+                $this->chains->checkTips();
+                $chainState = $batch->getTip();
+                $indexLast = end($batch->getIndices());
 
-            $this->chains->checkTips();
-            $this->peerState->fetch($peer)->updateBlockAvailability($chainState, $indexLast->getHash());
+                $this->peerState->fetch($peer)->updateBlockAvailability($chainState, $indexLast->getHash());
 
-            if ($count === 2000) {
-                $peer->getheaders($chainState->getHeadersLocator());
+                if ($count === 2000) {
+                    $peer->getheaders($chainState->getHeadersLocator());
+                }
+
             }
 
             if ($count < 2000) {
-                $this->blockDownload->start($chainState, $peer);
+                $this->blockDownload->start($batch->getTip(), $peer);
             }
-        }
+            $this->notifier->send('p2p.headers', ['count' => $count]);
 
-        $this->notifier->send('p2p.headers', ['count' => $count]);
+        } catch (\Exception $e) {
+            echo $e->getMessage() . PHP_EOL;
+            echo $e->getTraceAsString().PHP_EOL;
+            die();
+        }
 
     }
 
@@ -332,7 +340,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     {
         $best = $this->chain();
         $block = $blockMsg->getBlock();
-
+echo "BLOCK\n";
         try {
             $state = new ScriptValidation(true);
             $index = $this->blocks->accept($block, $this->headers, $state);

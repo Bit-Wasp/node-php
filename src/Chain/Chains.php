@@ -89,6 +89,7 @@ class Chains extends EventEmitter implements ChainsInterface
         usort($tips, array($this, 'compareChainStateWork'));
 
         $greatestWork = end($tips);
+
         /** @var ChainState $greatestWork */
         if (!isset($this->best) || $this->bestIndex !== $greatestWork->getChainIndex()) {
             $this->best = $greatestWork;
