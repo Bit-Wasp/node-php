@@ -23,7 +23,6 @@ use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
-use BitWasp\Bitcoin\Node\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Zmq\Notifier;
 use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
@@ -340,10 +339,10 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     {
         $best = $this->chain();
         $block = $blockMsg->getBlock();
-echo "BLOCK\n";
+
         try {
-            $state = new ScriptValidation(true);
-            $index = $this->blocks->accept($block, $this->headers, $state);
+
+            $index = $this->blocks->accept($block, $this->headers);
             unset($state);
             $this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 

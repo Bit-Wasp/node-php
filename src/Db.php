@@ -420,22 +420,22 @@ class Db implements DbInterface
 
                 for ($j = 0; $j < $nIn; $j++) {
                     $input = $tx->getInput($j);
-                    $inBind[] = " ( :parentId$i , :nInput$i$j, :hashPrevOut$i$j, :nPrevOut$i$j, :scriptSig$i$j, :nSequence$i$j ) ";
+                    $inBind[] = " ( :parentId$i , :nInput".$i."n".$j.", :hashPrevOut".$i."n".$j.", :nPrevOut".$i."n".$j.", :scriptSig".$i."n".$j.", :nSequence".$i."n".$j." ) ";
                     $outpoint = $input->getOutPoint();
-                    $inData["hashPrevOut$i$j"] = $outpoint->getTxId()->getBinary();
-                    $inData["nPrevOut$i$j"] = $outpoint->getVout();
-                    $inData["scriptSig$i$j"] = $input->getScript()->getBinary();
-                    $inData["nSequence$i$j"] = $input->getSequence();
-                    $inData["nInput$i$j"] = $j;
+                    $inData["hashPrevOut" .$i  ."n"  .$j] = $outpoint->getTxId()->getBinary();
+                    $inData["nPrevOut"    .$i  ."n"  .$j] = $outpoint->getVout();
+                    $inData["scriptSig"   .$i  ."n"  .$j] = $input->getScript()->getBinary();
+                    $inData["nSequence"   .$i  ."n"  .$j] = $input->getSequence();
+                    $inData["nInput"      .$i  ."n"  .$j] = $j;
 
                 }
 
                 for ($k = 0; $k < $nOut; $k++) {
                     $output = $tx->getOutput($k);
-                    $outBind[] = " ( :parentId$i , :nOutput$i$k, :value$i$k, :scriptPubKey$i$k ) ";
-                    $outData["value$i$k"] = $output->getValue();
-                    $outData["scriptPubKey$i$k"] = $output->getScript()->getBinary();
-                    $outData["nOutput$i$k"] = $k;
+                    $outBind[] = " ( :parentId$i , :nOutput".$i."n".$k.", :value".$i."n".$k.", :scriptPubKey".$i."n".$k." ) ";
+                    $outData["value"        .$i  ."n"  .$k] = $output->getValue();
+                    $outData["scriptPubKey" .$i  ."n"  .$k] = $output->getScript()->getBinary();
+                    $outData["nOutput"      .$i  ."n"  .$k] = $k;
 
                 }
             }
@@ -1270,6 +1270,77 @@ WHERE tip.header_id = (
     }
 
     /**
+     * @param BufferInterface $tipHash
+     * @param OutPointInterface[] $outpoints
+     * @return array|UtxoView
+     */
+    public function fetchUtxoList(BufferInterface $tipHash, array $outpoints)
+    {
+        $requiredCount = count($outpoints);
+        if (0 === count($outpoints)) {
+            return [];
+        }
+
+        $joinList = [];
+        $queryValues = [];
+
+        $queryV = ['hash' => $tipHash->getBinary()];
+
+        for ($i = 0; $i < $requiredCount; $i++) {
+            echo "b";
+            $outpoint = $outpoints[$i];
+
+            if (0 === $i) {
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
+            } else {
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
+            }
+
+            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+        }
+
+        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+
+        $this->dbh->beginTransaction();
+
+        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) '.$innerJoin);
+        $initOutpoints->execute($queryValues);
+
+        $fetchUtxoStmt = $this->dbh->prepare('
+SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
+                   o.value, o.scriptPubKey
+FROM  outpoint,
+      iindex as tip
+JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
+JOIN block_transactions bt on (bt.block_hash = parent.header_id)
+JOIN transactions t on (bt.transaction_hash = t.id)
+JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
+WHERE tip.header_id = (
+	SELECT id FROM headerIndex WHERE hash = :hash
+) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
+        $fetchUtxoStmt->execute($queryV);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
+        $new->execute();
+
+        $this->dbh->commit();
+
+        $outputSet = [];
+        foreach ($rows as $utxo) {
+            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) < $requiredCount) {
+            echo "We requested: ".$requiredCount."\n";
+            echo "We GOT: ".count($outputSet)."\n";
+            throw new \RuntimeException('Less than required amount returned');
+        }
+
+        return $outputSet;
+    }
+    /**
      * @param BlockInterface $block
      * @return UtxoView
      */
@@ -1323,7 +1394,6 @@ WHERE tip.header_id = (
         $fetchUtxoStmt = $this->dbh->prepare('
 SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
                    o.value, o.scriptPubKey
-
 FROM  outpoint,
       iindex as tip
 JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
@@ -1352,6 +1422,90 @@ WHERE tip.header_id = (
         return new UtxoView($outputSet);
 
     }
+
+    /**
+     * @param BlockInterface $block
+     * @return UtxoView
+     */
+    public function fetchUtxoView2(BlockInterface $block)
+    {
+        $txs = $block->getTransactions();
+        if (1 === count($txs)) {
+            return new UtxoView([]);
+        }
+
+        /**
+         * @var OutPointInterface[] $required
+         * @var Utxo[] $outputSet
+         */
+        list ($required, $outputSet) = $this->filterUtxoRequest($block);
+
+        $joinList = [];
+        $queryValues = [];
+
+        $queryV = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
+        $requiredCount = count($required);
+        $initialCount = count($outputSet);
+
+        for ($i = 0; $i < $requiredCount; $i++) {
+            /**
+             * @var OutPointInterface $outpoint
+             * @var integer $txidx
+             */
+            list ($outpoint, $txidx) = $required[$i];
+
+            if (0 === $i) {
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput, :txidx' . $i . ' as txidx ';
+            } else {
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i;
+            }
+
+            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+            $queryValues['txidx' . $i] = $txidx;
+        }
+        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+
+        $this->dbh->beginTransaction();
+        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint
+    (INDEX idx (hashPrevOut, nOutput))
+    '.$innerJoin.';
+        ');
+        $initOutpoints->execute($queryValues);
+
+
+        $fetchUtxoStmt = $this->dbh->prepare('
+SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
+                   o.value, o.scriptPubKey
+FROM  outpoint,
+      iindex as tip
+JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
+JOIN block_transactions bt on (bt.block_hash = parent.header_id)
+JOIN transactions t on (bt.transaction_hash = t.id)
+JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
+WHERE tip.header_id = (
+	SELECT id FROM headerIndex WHERE hash = :hash
+) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
+        $fetchUtxoStmt->execute($queryV);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
+        $new->execute();
+
+        $this->dbh->commit();
+
+        foreach ($rows as $utxo) {
+            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) < ($initialCount + $requiredCount)) {
+            throw new \RuntimeException('Utxo was not found');
+        }
+
+        return new UtxoView($outputSet);
+
+    }
+
 
     public function fetchUtxo(BufferInterface $tipHash, OutPointInterface $outpoint)
     {

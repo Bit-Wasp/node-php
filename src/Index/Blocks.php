@@ -6,11 +6,15 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
-use BitWasp\Bitcoin\Node\Validation\ScriptValidationInterface;
+use BitWasp\Bitcoin\Node\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
+use BitWasp\Bitcoin\Transaction\OutPoint;
+use BitWasp\Bitcoin\Utxo\Utxo;
+use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 
 class Blocks
@@ -88,11 +92,64 @@ class Blocks
 
     /**
      * @param BlockInterface $block
+     * @return array
+     */
+    public function parseUtxos(BlockInterface $block)
+    {
+        $unknown = [];
+        $utxos = [];
+
+        // Record every Outpoint required for the block.
+        foreach ($block->getTransactions() as $t => $tx) {
+            if ($tx->isCoinbase()) {
+                continue;
+            }
+
+            foreach ($tx->getInputs() as $in) {
+                $lookup = $in->getOutPoint()->getTxId()->getBinary() . $in->getOutPoint()->getVout();
+                $unknown[$lookup] = $t;
+            }
+        }
+
+        // Cancel outpoints which were used in a subsequent transaction
+        foreach ($block->getTransactions() as $tx) {
+            $hash = $tx->getTxId();
+            foreach ($tx->getOutputs() as $i => $out) {
+                $lookup = $hash->getBinary() . $i;
+                if (isset($unknown[$lookup])) {
+                    unset($unknown[$lookup]);
+                }
+                $utxos[] = new Utxo(new OutPoint($hash, $i), $out);
+            }
+        }
+
+        // Restore our list of unknown outpoints
+        $required = [];
+        foreach ($unknown as $str => $txidx) {
+            $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32), substr($str, 32));
+        }
+
+        return [$required, $utxos];
+    }
+
+    /**
+     * @param BlockInterface $block
+     * @return UtxoView
+     */
+    public function prepareBatch(BlockInterface $block)
+    {
+        list ($required, $utxos) = $this->parseUtxos($block);
+        $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $required);
+
+        return new UtxoView(array_merge($utxos, $remaining));
+    }
+
+    /**
+     * @param BlockInterface $block
      * @param Headers $headers
-     * @param ScriptValidationInterface $scriptCheckState
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers, ScriptValidationInterface $scriptCheckState)
+    public function accept(BlockInterface $block, Headers $headers)
     {
         $state = $this->chains->best();
 
@@ -104,11 +161,13 @@ class Blocks
             ->check($block)
             ->checkContextual($block, $state->getLastBlock());
 
-        $view = $this->db->fetchUtxoView($block);
+        $view = $this->prepareBatch($block);
 
         //$forks = new ForkState($index, $this->consensus->getParams(), $this->db);
         //$flags = $forks->getScriptFlags();
         $flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
+        $scriptCheckState = new ScriptValidation(true, $flags);
+
         $nInputs = 0;
         $nFees = 0;
         $nSigOps = 0;

@@ -277,6 +277,9 @@ class BlockCheck implements BlockCheckInterface
     {
         $valueIn = 0;
         $nInputs = count($tx->getInputs());
+        echo "chk spend contextual: ".$tx->getTxId()->getHex().PHP_EOL;
+        echo "--\n";
+        $totalIn = '0';
         for ($i = 0; $i < $nInputs; $i++) {
             $utxo = $view->fetchByInput($tx->getInput($i));
             /*if ($out->isCoinbase()) {
@@ -286,12 +289,20 @@ class BlockCheck implements BlockCheckInterface
                 }
             }*/
 
-            $value = $utxo->getOutput()->getValue();
-            $valueIn = $this->math->add($value, $valueIn);
-            if (!$this->consensus->checkAmount($valueIn) || !$this->consensus->checkAmount($value)) {
+            $output = $utxo->getOutput();
+            $valueIn += $output->getValue();
+            $totalIn = $this->math->add($totalIn, $output->getValue());
+            echo "Check value in: ".$utxo->getOutPoint()->getTxId()->getHex()." - ".$utxo->getOutPoint()->getVout()." - ".$output->getValue().PHP_EOL;
+            if (!$this->consensus->checkAmount($valueIn)) {
+                echo "chk total amount fail\n";
+            }
+            if (!$this->consensus->checkAmount($utxo->getOutput()->getValue())) {
+                echo "chk amount fail\n";
                 throw new \RuntimeException('CheckAmount failed for inputs value');
             }
         }
+
+        echo "Value in total: " . $totalIn . " ---- " . $valueIn . PHP_EOL;
 
         $valueOut = 0;
         foreach ($tx->getOutputs() as $output) {
@@ -302,7 +313,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         if ($this->math->cmp($valueIn, $valueOut) < 0) {
-            throw new \RuntimeException('Value-in is less than value out');
+            throw new \RuntimeException('Value-in '.$valueIn.' is less than value out '.$valueOut);
         }
 
         $fee = $this->math->sub($valueIn, $valueOut);

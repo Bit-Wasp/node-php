@@ -2,7 +2,9 @@
 
 namespace BitWasp\Bitcoin\Node\Console;
 
+use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlockBest;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlocksReset;
+use BitWasp\Bitcoin\Node\Console\Commands\Db\DbPopBlock;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeChains;
@@ -31,6 +33,8 @@ class Application extends ConsoleApplication
         $commands[] = new NodeInfo();
         $commands[] = new NodeChains();
         $commands[] = new NodeTx();
+        $commands[] = new DbPopBlock();
+
         $commands[] = new SelfTestNodeCommand();
         $commands[] = new PrintConfig();
         $commands[] = new ScriptWorker();

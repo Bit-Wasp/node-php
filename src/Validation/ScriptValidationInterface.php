@@ -15,10 +15,9 @@ interface ScriptValidationInterface
     /**
      * @param UtxoView $utxoView
      * @param TransactionInterface $tx
-     * @param int $flags
      * @return self
      */
-    public function queue(UtxoView $utxoView, TransactionInterface $tx, $flags);
+    public function queue(UtxoView $utxoView, TransactionInterface $tx);
 
     /**
      * @return bool
