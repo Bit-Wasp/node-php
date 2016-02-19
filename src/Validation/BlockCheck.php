@@ -277,9 +277,7 @@ class BlockCheck implements BlockCheckInterface
     {
         $valueIn = 0;
         $nInputs = count($tx->getInputs());
-        echo "chk spend contextual: ".$tx->getTxId()->getHex().PHP_EOL;
-        echo "--\n";
-        $totalIn = '0';
+
         for ($i = 0; $i < $nInputs; $i++) {
             $utxo = $view->fetchByInput($tx->getInput($i));
             /*if ($out->isCoinbase()) {
@@ -289,25 +287,19 @@ class BlockCheck implements BlockCheckInterface
                 }
             }*/
 
-            $output = $utxo->getOutput();
-            $valueIn += $output->getValue();
-            $totalIn = $this->math->add($totalIn, $output->getValue());
-            echo "Check value in: ".$utxo->getOutPoint()->getTxId()->getHex()." - ".$utxo->getOutPoint()->getVout()." - ".$output->getValue().PHP_EOL;
-            if (!$this->consensus->checkAmount($valueIn)) {
-                echo "chk total amount fail\n";
-            }
-            if (!$this->consensus->checkAmount($utxo->getOutput()->getValue())) {
-                echo "chk amount fail\n";
+            $value = $utxo->getOutput()->getValue();
+            $valueIn = $this->math->add($valueIn, $value);
+
+            if (!$this->consensus->checkAmount($valueIn) || !$this->consensus->checkAmount($value)) {
                 throw new \RuntimeException('CheckAmount failed for inputs value');
             }
         }
 
-        echo "Value in total: " . $totalIn . " ---- " . $valueIn . PHP_EOL;
-
         $valueOut = 0;
         foreach ($tx->getOutputs() as $output) {
-            $valueOut = $this->math->add($output->getValue(), $valueOut);
-            if (!$this->consensus->checkAmount($valueOut) || !$this->consensus->checkAmount($output->getValue())) {
+            $value = $output->getValue();
+            $valueOut = $this->math->add($valueOut, $value);
+            if (!$this->consensus->checkAmount($valueOut) || !$this->consensus->checkAmount($value)) {
                 throw new \RuntimeException('CheckAmount failed for outputs value');
             }
         }
@@ -360,7 +352,7 @@ class BlockCheck implements BlockCheckInterface
         if (!$tx->isCoinbase()) {
             $this->checkContextualInputs($view, $tx, $height);
             if ($state->active()) {
-                $state->queue($view, $tx, $flags);
+                $state->queue($view, $tx);
             }
         }
 

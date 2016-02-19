@@ -89,11 +89,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     private $params;
 
     /**
-     * @var Index\UtxoIdx
-     */
-    protected $utxo;
-
-    /**
      * @var BlockDownloader
      */
     private $blockDownload;
@@ -151,7 +146,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $this->headers->init($genesis->getHeader());
         $this->blocks->init($genesis);
 
-        $this->utxo = new Index\UtxoIdx($this->chains, $db);
         $this->blockDownload = new BlockDownloader($this->chains, $this->peerState, $this->peersOutbound);
 
         $this->db = $db;
@@ -242,18 +236,21 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function onGetHeaders(Peer $peer, GetHeaders $getHeaders)
     {
-        return;
         $chain = $this->chain()->getChain();
-        $locator = $getHeaders->getLocator();
-        if (count($locator->getHashes()) === 0) {
-            $start = $locator->getHashStop()->getHex();
-        } else {
-            $start = $this->db->findFork($chain, $locator);
-        }
 
-        $headers = $this->db->fetchNextHeaders($start);
-        $peer->headers($headers);
-        echo 'Sending from ' . $start . ' + ' . count($headers) . ' headers ' . PHP_EOL;
+        $math = $this->ecAdapter->getMath();
+        if ($math->cmp($chain->getIndex()->getHeader()->getTimestamp(), (time() - 60*60*24)) >= 0) {
+            $locator = $getHeaders->getLocator();
+            if (count($locator->getHashes()) === 0) {
+                $start = $locator->getHashStop();
+            } else {
+                $start = $this->db->findFork($chain, $locator);
+            }
+
+            $headers = $this->db->fetchNextHeaders($start);
+            $peer->headers($headers);
+            $this->notifier->send('peer.sentheaders', ['count' => count($headers), 'start'=>$start->getHex()]);
+        }
     }
 
     /**

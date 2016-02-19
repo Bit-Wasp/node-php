@@ -96,6 +96,14 @@ class ChainState implements ChainStateInterface
     }
 
     /**
+     * @return bool
+     */
+    public function isSyncing()
+    {
+        return (($this->blocksLeftToSync() === 0) === false);
+    }
+
+    /**
      * Produce a block locator for a given block height.
      * @param int $height
      * @param BufferInterface|null $final

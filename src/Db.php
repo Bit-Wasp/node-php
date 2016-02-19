@@ -1110,7 +1110,7 @@ class Db implements DbInterface
      *
      * @param ChainInterface $activeChain
      * @param BlockLocator $locator
-     * @return false|string
+     * @return BufferInterface
      */
     public function findFork(ChainInterface $activeChain, BlockLocator $locator)
     {
@@ -1131,7 +1131,7 @@ class Db implements DbInterface
         if ($stmt->execute($hashes)) {
             $column = $stmt->fetch();
             $stmt->closeCursor();
-            return $column['hash'];
+            return new Buffer($column['hash'], 32);
         }
 
         throw new \RuntimeException('Failed to execute findFork');
@@ -1140,10 +1140,10 @@ class Db implements DbInterface
     /**
      * Here, we return max 2000 headers following $hash.
      * Useful for helping other nodes sync.
-     * @param string $hash
+     * @param BufferInterface $hash
      * @return BlockHeaderInterface[]
      */
-    public function fetchNextHeaders($hash)
+    public function fetchNextHeaders(BufferInterface $hash)
     {
         $stmt = $this->dbh->prepare('
             SELECT    child.version, child.prevBlock, child.merkleRoot,
@@ -1154,7 +1154,7 @@ class Db implements DbInterface
             LIMIT     2000
         ');
 
-        $stmt->bindParam(':hash', $hash);
+        $stmt->bindParam(':hash', $hash->getBinary());
         if ($stmt->execute()) {
             $results = array();
             foreach ($stmt->fetchAll() as $row) {
@@ -1172,48 +1172,7 @@ class Db implements DbInterface
             return $results;
         }
 
-        throw new \RuntimeException('Failed to fetch next headers ' . $hash);
-    }
-
-    /**
-     * @param BlockInterface $block
-     * @return array
-     */
-    public function filterUtxoRequest(BlockInterface $block)
-    {
-        $need = [];
-        $utxos = [];
-
-        // Iterating backwards, record all required inputs.
-        // If an Output can be found in a transaction in
-        // the same block, it will be dropped from the list
-        // of required inputs, and returned as a UTXO.
-
-        $vTx = $block->getTransactions();
-        for ($i = count($vTx) - 1; $i > 0; $i--) {
-            $tx = $vTx[$i];
-            foreach ($tx->getInputs() as $in) {
-                $outpoint = $in->getOutPoint();
-                $lookup = $outpoint->getTxId()->getBinary() . $outpoint->getVout();
-                $need[$lookup] = $i;
-            }
-
-            $hash = $tx->getTxId();
-            foreach ($tx->getOutputs() as $v => $out) {
-                $lookup = $hash->getBinary() . $v;
-                if (isset($need[$lookup])) {
-                    $utxos[] = new Utxo(new OutPoint($hash, $v), $out);
-                    unset($need[$lookup]);
-                }
-            }
-        }
-
-        $required = [];
-        foreach ($need as $str => $txidx) {
-            $required[] = [new OutPoint(new Buffer(substr($str, 0, 32), 32), substr($str, 32)), $txidx];
-        }
-
-        return [$required, $utxos];
+        throw new \RuntimeException('Failed to fetch next headers ' . $hash->getHex());
     }
 
     public function getTransaction(BufferInterface $tipHash, BufferInterface $txid)
@@ -1227,7 +1186,7 @@ JOIN transactions t on (bt.transaction_hash = t.id)
 WHERE tip.header_id = (
     SELECT id FROM headerIndex WHERE hash = :tipHash
 ) AND tip.lft BETWEEN parent.lft and parent.rgt AND t.hash = :txHash
-   ');
+        ');
 
         $tx->execute([':tipHash' => $tipHash->getBinary(), ':txHash' => $txid->getBinary()]);
         $txResults = $tx->fetchAll(\PDO::FETCH_ASSOC);
@@ -1287,7 +1246,6 @@ WHERE tip.header_id = (
         $queryV = ['hash' => $tipHash->getBinary()];
 
         for ($i = 0; $i < $requiredCount; $i++) {
-            echo "b";
             $outpoint = $outpoints[$i];
 
             if (0 === $i) {
@@ -1301,13 +1259,42 @@ WHERE tip.header_id = (
         }
 
         $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
+        $stmt->execute(['hash' => $tipHash->getBinary()]);
+        $id = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
 
         $this->dbh->beginTransaction();
 
-        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) '.$innerJoin);
-        $initOutpoints->execute($queryValues);
+        $newFeature = true;
+        if ($newFeature) {
+            $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
+            $initOutpoints->execute($queryValues);
 
-        $fetchUtxoStmt = $this->dbh->prepare('
+            $initUtxoStmt = $this->dbh->prepare("
+            CREATE TEMPORARY TABLE utxo (INDEX idx (tid, nOutput)) ENGINE=MEMORY
+                SELECT  outpoint.hashPrevOut, outpoint.nOutput, t.id as tid
+                FROM outpoint
+                JOIN transactions t on (t.hash = outpoint.hashPrevOut)
+            ");
+            $initUtxoStmt->execute();
+
+            $selectUtxoStmt = $this->dbh->prepare("
+            SELECT  u.hashPrevOut AS txid, u.nOutput AS vout,
+                    o.value, o.scriptPubKey
+            FROM utxo u
+            JOIN transaction_output o on (o.parent_tx = u.tid AND o.nOutput = u.nOutput)
+            JOIN block_transactions bt on (bt.transaction_hash = u.tid)
+            JOIN iindex i on (i.header_id = bt.block_hash)
+            WHERE (i.lft <= :lft AND i.rgt >= :rgt)
+            ");
+            $selectUtxoStmt->execute(['lft' => $id['lft'], 'rgt' => $id['rgt']]);
+            $rows = $selectUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        } else {
+            $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
+            $initOutpoints->execute($queryValues);
+            $fetchUtxoStmt = $this->dbh->prepare('
 SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
                    o.value, o.scriptPubKey
 FROM  outpoint,
@@ -1319,12 +1306,16 @@ JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
 WHERE tip.header_id = (
 	SELECT id FROM headerIndex WHERE hash = :hash
 ) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
-        $fetchUtxoStmt->execute($queryV);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $fetchUtxoStmt->execute($queryV);
+            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
 
         $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
         $new->execute();
-
+        if ($newFeature) {
+            $new2 = $this->dbh->prepare('DROP TEMPORARY TABLE utxo');
+            $new2->execute();
+        }
         $this->dbh->commit();
 
         $outputSet = [];
@@ -1340,326 +1331,13 @@ WHERE tip.header_id = (
 
         return $outputSet;
     }
-    /**
-     * @param BlockInterface $block
-     * @return UtxoView
-     */
-    public function fetchUtxoView(BlockInterface $block)
-    {
-        $txs = $block->getTransactions();
-        if (1 === count($txs)) {
-            return new UtxoView([]);
-        }
-
-        /**
-         * @var OutPointInterface[] $required
-         * @var Utxo[] $outputSet
-         */
-        list ($required, $outputSet) = $this->filterUtxoRequest($block);
-
-        $joinList = [];
-        $queryValues = [];
-
-        $queryV = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
-        $requiredCount = count($required);
-        $initialCount = count($outputSet);
-
-        for ($i = 0; $i < $requiredCount; $i++) {
-            /**
-             * @var OutPointInterface $outpoint
-             * @var integer $txidx
-             */
-            list ($outpoint, $txidx) = $required[$i];
-
-            if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput, :txidx' . $i . ' as txidx ';
-            } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i;
-            }
-
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
-            $queryValues['txidx' . $i] = $txidx;
-        }
-        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
-
-        $this->dbh->beginTransaction();
-        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint
-    (INDEX idx (hashPrevOut, nOutput))
-    '.$innerJoin.';
-        ');
-        $initOutpoints->execute($queryValues);
-
-
-        $fetchUtxoStmt = $this->dbh->prepare('
-SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
-                   o.value, o.scriptPubKey
-FROM  outpoint,
-      iindex as tip
-JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
-JOIN block_transactions bt on (bt.block_hash = parent.header_id)
-JOIN transactions t on (bt.transaction_hash = t.id)
-JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
-WHERE tip.header_id = (
-	SELECT id FROM headerIndex WHERE hash = :hash
-) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
-        $fetchUtxoStmt->execute($queryV);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
-        $new->execute();
-
-        $this->dbh->commit();
-
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) < ($initialCount + $requiredCount)) {
-            throw new \RuntimeException('Utxo was not found');
-        }
-
-        return new UtxoView($outputSet);
-
-    }
-
-    /**
-     * @param BlockInterface $block
-     * @return UtxoView
-     */
-    public function fetchUtxoView2(BlockInterface $block)
-    {
-        $txs = $block->getTransactions();
-        if (1 === count($txs)) {
-            return new UtxoView([]);
-        }
-
-        /**
-         * @var OutPointInterface[] $required
-         * @var Utxo[] $outputSet
-         */
-        list ($required, $outputSet) = $this->filterUtxoRequest($block);
-
-        $joinList = [];
-        $queryValues = [];
-
-        $queryV = ['hash' => $block->getHeader()->getPrevBlock()->getBinary()];
-        $requiredCount = count($required);
-        $initialCount = count($outputSet);
-
-        for ($i = 0; $i < $requiredCount; $i++) {
-            /**
-             * @var OutPointInterface $outpoint
-             * @var integer $txidx
-             */
-            list ($outpoint, $txidx) = $required[$i];
-
-            if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput, :txidx' . $i . ' as txidx ';
-            } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i . ', :txidx' . $i;
-            }
-
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
-            $queryValues['txidx' . $i] = $txidx;
-        }
-        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
-
-        $this->dbh->beginTransaction();
-        $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint
-    (INDEX idx (hashPrevOut, nOutput))
-    '.$innerJoin.';
-        ');
-        $initOutpoints->execute($queryValues);
-
-
-        $fetchUtxoStmt = $this->dbh->prepare('
-SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
-                   o.value, o.scriptPubKey
-FROM  outpoint,
-      iindex as tip
-JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
-JOIN block_transactions bt on (bt.block_hash = parent.header_id)
-JOIN transactions t on (bt.transaction_hash = t.id)
-JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
-WHERE tip.header_id = (
-	SELECT id FROM headerIndex WHERE hash = :hash
-) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
-        $fetchUtxoStmt->execute($queryV);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
-        $new->execute();
-
-        $this->dbh->commit();
-
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) < ($initialCount + $requiredCount)) {
-            throw new \RuntimeException('Utxo was not found');
-        }
-
-        return new UtxoView($outputSet);
-
-    }
-
-
-    public function fetchUtxo(BufferInterface $tipHash, OutPointInterface $outpoint)
-    {
-        $fetchUtxoStmt = $this->dbh->prepare('
-        SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
-                   o.value, o.scriptPubKey
-        FROM  iindex as tip
-        JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
-        JOIN block_transactions bt on (bt.block_hash = parent.header_id)
-        JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
-        JOIN transaction t on t.id = o.parent_tx
-        WHERE tip.header_id = (
-            SELECT id FROM headerIndex WHERE hash = :hash
-        ) AND tip.lft BETWEEN parent.lft and parent.rgt AND (t.hash = :prevHash AND o.nOutput = :prevOut)
-  ');
-
-        $fetchUtxoStmt->execute([
-            ':hash' => $tipHash->getBinary(),
-            ':prevHash' => $outpoint->getTxId()->getBinary(),
-            ':prevOut' => $outpoint->getVout()
-        ]);
-
-        return $fetchUtxoStmt->fetchAll();
-    }
-
-    /**
-     * @param $required
-     * @param $bestBlock
-     * @return array
-     */
-    public function fetchUtxos($required, $bestBlock)
-    {
-        $requiredCount = count($required);
-        $joinList = '';
-        $queryValues = ['hash' => $bestBlock];
-        for ($i = 0, $last = $requiredCount - 1; $i < $requiredCount; $i++) {
-            list ($txid, $vout, $txidx) = $required[$i];
-
-            if (0 == $i) {
-                $joinList .= "SELECT :hashParent$i as hashParent, :noutparent$i as nOut, :txidx$i as txidx\n";
-            } else {
-                $joinList .= "  SELECT :hashParent$i, :noutparent$i, :txidx$i \n";
-            }
-
-            if ($i < $last) {
-                $joinList .= "  UNION ALL\n";
-            }
-
-            $queryValues["hashParent$i"] = $txid;
-            $queryValues["noutparent$i"] = $vout;
-            $queryValues["txidx$i"] = $txidx;
-        }
-
-        $sql = '
-              SELECT    listed.hashParent as txid, listed.nOut as vout,
-                        o.value, o.scriptPubKey,
-                        allowed_block.height, listed.txidx
-              FROM      ' . $this->tblTxOut . '  o
-              INNER JOIN (
-                $joinList
-              ) as listed ON (listed.hashParent = o.parent_tx AND listed.nOut = o.nOutput)
-              INNER JOIN ' . $this->tblBlockTxs . '  as bt on listed.hashParent = bt.transaction_hash
-              JOIN (
-                    SELECT    parent.hash, parent.height
-                    FROM      ' . $this->tblHeaders . '  AS tip,
-                              ' . $this->tblHeaders . ' AS parent
-                    WHERE     tip.hash = :hash AND tip.lft BETWEEN parent.lft AND parent.rgt
-              ) as allowed_block on bt.block_hash = allowed_block.hash
-              ';
-
-        $outputSet = [];
-        $stmt = $this->dbh->prepare($sql);
-        $stmt->execute($queryValues);
-        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
-            $outputSet[] = new Utxo($utxo['txid'], $utxo['vout'], new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) !== $requiredCount) {
-            throw new \RuntimeException('Utxo was not found');
-        }
-
-        return $outputSet;
-    }
-
-    public function fetchActiveSuperMajority($headerId, array $versions)
-    {
-        $stmt = $this->dbh->prepare('
-            SELECT
-                   h.version
-            FROM '.$this->tblIndex.' as tip,
-                    '.$this->tblIndex.' as parent
-            JOIN    active_fork f on (f.header_id = parent.header_id)
-            JOIN    header h on (h.id = f.header_id)
-            WHERE   tip.header_id = :id AND tip.lft between parent.lft AND parent.rgt');
-
-        $stmt->bindValue(':id', $headerId);
-
-        if ($stmt->execute()) {
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        }
-
-        throw new \RuntimeException('Failed to query supermajority info');
-    }
-
-    public function findSuperMajorityInfo($headerId, array $versions)
-    {
-        $fragment = implode(", ", array_map(
-            function ($version) {
-                return "sum(case when h.version = $version then 1 else 0 end) v$version";
-            },
-            $versions
-        ));
-
-        $stmt = $this->dbh->prepare('
-            SELECT
-                   '.$fragment.'
-            FROM '.$this->tblIndex.' as tip,
-                    '.$this->tblIndex.' as parent
-            JOIN    '.$this->tblHeaders.' h on (h.id = parent.header_id)
-            WHERE   tip.header_id = :id
-                AND parent.header_id > :id - 1250
-                AND tip.lft between parent.lft AND parent.rgt');
-
-        $stmt->bindValue(':id', $headerId);
-        if ($stmt->execute()) {
-            return $stmt->fetch(\PDO::FETCH_ASSOC);
-        }
-
-        throw new \RuntimeException('Failed to query supermajority info');
-    }
-
-    /**
-     * @param BufferInterface $hash
-     * @param int[] $versions
-     * @return array
-     */
-    public function findSuperMajorityInfoByHash(BufferInterface $hash, array $versions)
-    {
-        $stmt = $this->dbh->prepare('SELECT id from '.$this->tblHeaders.' where hash = :hash');
-        if ($stmt->execute(['hash' => $hash->getBinary()])) {
-            $id = $stmt->fetch(\PDO::FETCH_COLUMN);
-            return $this->findSuperMajorityInfo($id, $versions);
-        }
-
-        throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');
-    }
-
 
     /**
      * @param BufferInterface $hash
      * @param int $numAncestors
      * @return array
      */
-    public function findSuperMajorityInfoByHash1(BufferInterface $hash, $numAncestors = 1000)
+    public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000)
     {
         $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from '.$this->tblHeaders.' h, '.$this->tblIndex.' i where h.hash = :hash and i.header_id = h.id');
         if ($stmt->execute(['hash' => $hash->getBinary()])) {

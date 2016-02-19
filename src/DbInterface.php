@@ -10,7 +10,6 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -121,33 +120,15 @@ interface DbInterface
     /**
      * Here, we return max 2000 headers following $hash.
      * Useful for helping other nodes sync.
-     * @param string $hash
+     * @param BufferInterface $hash
      * @return BlockHeaderInterface[]
      */
-    public function fetchNextHeaders($hash);
-
-    /**
-     * @param BlockInterface $block
-     * @return array
-     */
-    public function filterUtxoRequest(BlockInterface $block);
-
-    /**
-     * @param BlockInterface $block
-     * @return UtxoView
-     */
-    public function fetchUtxoView(BlockInterface $block);
-
-    public function fetchUtxos($required, $bestBlock);
-
-    public function fetchActiveSuperMajority($headerId, array $versions);
-
-    public function findSuperMajorityInfo($headerId, array $versions);
+    public function fetchNextHeaders(BufferInterface $hash);
 
     /**
      * @param BufferInterface $hash
-     * @param int[] $versions
+     * @param int $numAncestors
      * @return array
      */
-    public function findSuperMajorityInfoByHash(BufferInterface $hash, array $versions);
+    public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000);
 }

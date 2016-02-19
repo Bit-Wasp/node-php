@@ -106,16 +106,17 @@ class Blocks
             }
 
             foreach ($tx->getInputs() as $in) {
-                $lookup = $in->getOutPoint()->getTxId()->getBinary() . $in->getOutPoint()->getVout();
-                $unknown[$lookup] = $t;
+                $outpoint = $in->getOutPoint();
+                $unknown[$outpoint->getTxId()->getBinary() . $outpoint->getVout()] = $t;
             }
         }
 
         // Cancel outpoints which were used in a subsequent transaction
         foreach ($block->getTransactions() as $tx) {
             $hash = $tx->getTxId();
+            $hashBin = $hash->getBinary();
             foreach ($tx->getOutputs() as $i => $out) {
-                $lookup = $hash->getBinary() . $i;
+                $lookup = $hashBin . $i;
                 if (isset($unknown[$lookup])) {
                     unset($unknown[$lookup]);
                 }
@@ -126,7 +127,7 @@ class Blocks
         // Restore our list of unknown outpoints
         $required = [];
         foreach ($unknown as $str => $txidx) {
-            $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32), substr($str, 32));
+            $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32, $this->math), substr($str, 32));
         }
 
         return [$required, $utxos];
@@ -140,8 +141,10 @@ class Blocks
     {
         list ($required, $utxos) = $this->parseUtxos($block);
         $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $required);
-
-        return new UtxoView(array_merge($utxos, $remaining));
+        foreach ($remaining as $utxo) {
+            $utxos[] = $utxo;
+        }
+        return new UtxoView($utxos);
     }
 
     /**
@@ -168,12 +171,10 @@ class Blocks
         $flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         $scriptCheckState = new ScriptValidation(true, $flags);
 
-        $nInputs = 0;
         $nFees = 0;
         $nSigOps = 0;
 
         foreach ($block->getTransactions() as $tx) {
-            $nInputs += count($tx->getInputs());
             $nSigOps += $this->blockCheck->getLegacySigOps($tx);
 
             if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
@@ -201,6 +202,7 @@ class Blocks
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
         $state->updateLastBlock($index);
+
         $this->db->insertBlock($hash, $block);
 
         return $index;

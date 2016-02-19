@@ -123,7 +123,7 @@ class Headers
         $bestPrev = new Buffer();
         $firstUnknown = null;
         foreach ($headers as $i => &$head) {
-            if ( $this->chains->isKnownHeader($head->getPrevBlock())) {
+            if ($this->chains->isKnownHeader($head->getPrevBlock())) {
                 $bestPrev = $head->getPrevBlock();
             }
 
@@ -151,7 +151,7 @@ class Headers
 
         $batch = [];
         if ($firstUnknown !== null) {
-            $versionInfo = $this->db->findSuperMajorityInfoByHash1($prevIndex->getHash());
+            $versionInfo = $this->db->findSuperMajorityInfoByHash($prevIndex->getHash());
             $forks = new Forks($this->consensus->getParams(), $prevIndex, $versionInfo);
 
             for ($i = $firstUnknown; $i < $countHeaders; $i++) {

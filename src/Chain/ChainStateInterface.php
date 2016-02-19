@@ -43,6 +43,11 @@ interface ChainStateInterface
     public function blocksLeftToSync();
 
     /**
+     * @return bool
+     */
+    public function isSyncing();
+
+    /**
      * Produce a block locator for a given block height.
      * @param int $height
      * @param BufferInterface|null $final

@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
