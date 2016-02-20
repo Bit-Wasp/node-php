@@ -15,7 +15,9 @@ use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\TransactionFactory;
 use BitWasp\Buffertools\Buffer;
+use Packaged\Config\ConfigProviderInterface;
 use React\EventLoop\LoopInterface;
+use React\ZMQ\Context;
 
 class SelfTestNode extends BitcoinNode
 {
@@ -46,22 +48,20 @@ class SelfTestNode extends BitcoinNode
     protected $loop;
 
     /**
-     * @var Index\UtxoIdx
-     */
-    public $utxo;
-
-    /**
      * @var ProofOfWork
      */
     protected $pow;
 
     /**
+     * SelfTestNode constructor.
+     * @param ConfigProviderInterface $config
+     * @param Context $context
      * @param ParamsInterface $params
      * @param LoopInterface $loop
      */
-    public function __construct(ParamsInterface $params, LoopInterface $loop)
+    public function __construct(ConfigProviderInterface $config, Context $context, ParamsInterface $params, LoopInterface $loop)
     {
-        parent::__construct($params, $loop);
+        parent::__construct($config, $context, $params, $loop);
     }
 
    /**

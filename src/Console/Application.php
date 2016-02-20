@@ -2,12 +2,13 @@
 
 namespace BitWasp\Bitcoin\Node\Console;
 
+
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlocksReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
+use BitWasp\Bitcoin\Node\Console\Commands\Config\ConfigDefault;
 use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
 use BitWasp\Bitcoin\Node\Console\Commands\StartCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StopCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WatchCommand;
@@ -39,7 +40,7 @@ class Application extends ConsoleApplication
         $commands[] = new ControlCommand(new GetBlockHashCommand());
 
         //$commands[] = new SelfTestNodeCommand();
-        $commands[] = new PrintConfig();
+        $commands[] = new ConfigDefault();
         return $commands;
     }
 }
