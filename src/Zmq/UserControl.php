@@ -31,6 +31,7 @@ class UserControl
 
         $cmdControl = $context->getSocket(\ZMQ::SOCKET_REP);
         $cmdControl->bind('tcp://127.0.0.1:5560');
+
         $cmdControl->on('message', function ($e) use ($node) {
 
             $input = json_decode($e, true);

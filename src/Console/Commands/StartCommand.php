@@ -14,7 +14,6 @@ use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetHeaderCommand;
 use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Zmq\ControlCommand\InfoCommand;
 use BitWasp\Bitcoin\Node\Zmq\ControlCommand\ShutdownCommand;
-use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
@@ -89,7 +88,7 @@ class StartCommand extends AbstractCommand
         ];
 
         $consoleCommands = $commands;
-        $consoleCommands[] = new ShutdownCommand(new ScriptThreadControl($context));
+        $consoleCommands[] = new ShutdownCommand($context);
 
         new UserControl($context, $app, $consoleCommands);
 

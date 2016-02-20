@@ -28,7 +28,6 @@ class Notifier
     /**
      * @param Context $context
      * @param NodeInterface $node
-     * @param ScriptThreadControl $threadControl
      */
     public function __construct(Context $context, NodeInterface $node)
     {

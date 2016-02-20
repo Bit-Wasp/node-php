@@ -22,11 +22,9 @@ use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
-use BitWasp\Bitcoin\Node\Validation\ScriptCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Bitcoin\Node\Zmq\Notifier;
-use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 use BitWasp\Bitcoin\Node\Zmq\UserControl;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
@@ -190,7 +188,7 @@ class HeadersNode extends EventEmitter implements NodeInterface
      */
     private function initControl(ZMQContext $context)
     {
-        $this->control = new UserControl($context, $this, new ScriptThreadControl($context));
+        $this->control = new UserControl($context, $this);
         return $this;
     }
 
