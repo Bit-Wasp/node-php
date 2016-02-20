@@ -6,9 +6,9 @@ use BitWasp\Bitcoin\Node\Console\Commands\AbstractNodeClient;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 
-class NodeTx extends AbstractNodeClient
+class NodeGetHeader extends AbstractNodeClient
 {
-    protected $description = 'Get information about a transaction';
+    protected $description = 'Get information about a block header';
 
     /**
      *
@@ -16,21 +16,19 @@ class NodeTx extends AbstractNodeClient
     protected function configure()
     {
         $this->setName('node:' . $this->getNodeCommand());
-        $this->addArgument('txid', InputArgument::REQUIRED, 'Transaction hash');
-        if (null !== $this->description) {
-            $this->setDescription($this->description);
-        }
+        $this->addArgument('hash', InputArgument::REQUIRED, 'Block hash');
+        $this->setDescription($this->description);
     }
 
     protected function getParams(InputInterface $input)
     {
         return [
-            'txid' => $input->getArgument('txid')
+            'hash' => $input->getArgument('hash')
         ];
     }
 
     public function getNodeCommand()
     {
-        return 'gettx';
+        return 'getheader';
     }
 }

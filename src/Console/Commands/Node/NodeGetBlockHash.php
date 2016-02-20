@@ -6,9 +6,9 @@ use BitWasp\Bitcoin\Node\Console\Commands\AbstractNodeClient;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 
-class NodeTx extends AbstractNodeClient
+class NodeGetBlockHash extends AbstractNodeClient
 {
-    protected $description = 'Get information about a transaction';
+    protected $description = 'Returns the block hash for the given height';
 
     /**
      *
@@ -16,21 +16,26 @@ class NodeTx extends AbstractNodeClient
     protected function configure()
     {
         $this->setName('node:' . $this->getNodeCommand());
-        $this->addArgument('txid', InputArgument::REQUIRED, 'Transaction hash');
-        if (null !== $this->description) {
-            $this->setDescription($this->description);
-        }
+        $this->addArgument('height', InputArgument::REQUIRED, 'Block height');
+        $this->setDescription($this->description);
     }
 
+    /**
+     * @param InputInterface $input
+     * @return array
+     */
     protected function getParams(InputInterface $input)
     {
         return [
-            'txid' => $input->getArgument('txid')
+            'height' => $input->getArgument('height')
         ];
     }
 
+    /**
+     * @return string
+     */
     public function getNodeCommand()
     {
-        return 'gettx';
+        return 'getblockhash';
     }
 }

@@ -45,14 +45,12 @@ abstract class AbstractNodeClient extends AbstractCommand
         $push->connect('tcp://127.0.0.1:5560');
 
         $params = $this->getParams($input);
-        if (count($params) > 0) {
-            $msg = json_encode([
-                'cmd' => $this->getNodeCommand(),
-                'params' => $params
-            ]);
-        } else {
-            $msg = $this->getNodeCommand();
-        }
+
+        $msg = json_encode([
+            'cmd' => $this->getNodeCommand(),
+            'params' => $params
+        ]);
+
 
         $push->send($msg);
         $response = $push->recv();

@@ -288,6 +288,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
             if ($count < 2000) {
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
+            
             $this->notifier->send('p2p.headers', ['count' => $count]);
 
         } catch (\Exception $e) {

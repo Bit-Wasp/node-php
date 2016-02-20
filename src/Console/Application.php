@@ -8,6 +8,8 @@ use BitWasp\Bitcoin\Node\Console\Commands\Db\DbPopBlock;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeChains;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeGetBlockHash;
+use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeGetHeader;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeInfo;
 use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeTx;
 use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
@@ -33,8 +35,9 @@ class Application extends ConsoleApplication
         $commands[] = new NodeInfo();
         $commands[] = new NodeChains();
         $commands[] = new NodeTx();
+        $commands[] = new NodeGetHeader();
+        $commands[] = new NodeGetBlockHash();
         $commands[] = new DbPopBlock();
-
         $commands[] = new SelfTestNodeCommand();
         $commands[] = new PrintConfig();
         $commands[] = new ScriptWorker();

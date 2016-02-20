@@ -34,7 +34,7 @@ class NodeStop extends AbstractCommand
             }
             $loop->stop();
         });
-        $push->send('shutdown');
+        $push->send(json_encode(['cmd'=>'shutdown']));
 
         $loop->run();
     }
