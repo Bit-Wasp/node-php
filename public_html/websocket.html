@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<script src="http://autobahn.s3.amazonaws.com/js/autobahn.min.js"></script>
+<script>
+    var conn = new ab.Session('ws://localhost:8080',
+        function() {
+            // events
+            conn.subscribe('p2p.block', function(topic, data) {
+                console.log('Received P2P BLOCK ');
+                console.log(data);
+            });
+            conn.subscribe('p2p.headers', function(topic, data) {
+                console.log('Received P2P HEADERS ');
+                console.log(data);
+            });
+
+            conn.subscribe('p2p.inv', function(topic, data) {
+                console.log('Received P2P INV ');
+                console.log(data);
+            });
+            conn.subscribe('peer.outbound.new', function(topic, data) {
+                console.log('New outbound peer ');
+                console.log(data);
+            });
+            conn.subscribe('peer.inbound.new', function(topic, data) {
+                console.log('New inbound peer ');
+                console.log(data);
+            });
+
+            conn.subscribe('chain.newtip', function(topic, data) {
+                console.log('New chain tip ');
+                console.log(data);
+            });
+            conn.subscribe('peer.sentheaders', function(topic, data) {
+                console.log('Sent headers to peer ');
+                console.log(data);
+            });
+            conn.subscribe('error.onHeaders', function(topic, data) {
+                console.log('Error processing headers ');
+                console.log(data);
+            });
+            conn.subscribe('error.onBlock', function(topic, data) {
+                console.log('Error processing block ');
+                console.log(data);
+            });
+
+        },
+        function() {
+            console.warn('WebSocket connection closed');
+        },
+        {'skipSubprotocolCheck': true}
+    );
+</script>
+</html>
