@@ -3,8 +3,8 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Dec 11, 2015 at 10:35 PM
--- Server version: 5.6.27-0ubuntu1
+-- Generation Time: Feb 20, 2016 at 03:29 AM
+-- Server version: 5.6.28-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.1
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -19,8 +19,23 @@ SET time_zone = "+00:00";
 --
 -- Database: `coin`
 --
-CREATE DATABASE coin;
-use coin;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `active_fork`
+--
+
+CREATE TABLE IF NOT EXISTS `active_fork` (
+  `id` int(9) NOT NULL,
+  `header_id` int(11) NOT NULL,
+  `bip30` tinyint(1) NOT NULL DEFAULT '0',
+  `bip34` tinyint(1) NOT NULL DEFAULT '0',
+  `cltv` tinyint(1) NOT NULL DEFAULT '0',
+  `derSig` tinyint(1) NOT NULL DEFAULT '0',
+  `p2sh` tinyint(1) NOT NULL DEFAULT '0',
+  `witness` tinyint(1) NOT NULL DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
 
@@ -41,9 +56,9 @@ CREATE TABLE IF NOT EXISTS `blockIndex` (
 --
 
 CREATE TABLE IF NOT EXISTS `block_transactions` (
-  `id` int(11) NOT NULL,
-  `block_hash` varchar(32) NOT NULL,
-  `transaction_hash` int(11) NOT NULL
+  `id` int(15) NOT NULL,
+  `block_hash` int(15) NOT NULL,
+  `transaction_hash` int(15) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -53,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `block_transactions` (
 --
 
 CREATE TABLE IF NOT EXISTS `headerIndex` (
-  `id` int(11) NOT NULL,
+  `id` int(9) NOT NULL,
   `hash` varbinary(32) NOT NULL,
   `height` bigint(20) NOT NULL,
   `work` varchar(64) NOT NULL,
@@ -102,12 +117,12 @@ CREATE TABLE IF NOT EXISTS `transactions` (
 --
 
 CREATE TABLE IF NOT EXISTS `transaction_input` (
-  `id` int(9) NOT NULL,
+  `id` bigint(20) NOT NULL,
   `hashPrevOut` varbinary(32) NOT NULL,
   `nPrevOut` int(32) NOT NULL,
   `scriptSig` blob NOT NULL,
-  `nSequence` int(15) NOT NULL,
-  `parent_tx` int(11) NOT NULL,
+  `nSequence` bigint(19) NOT NULL,
+  `parent_tx` int(15) NOT NULL,
   `nInput` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -130,19 +145,23 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 --
 
 --
+-- Indexes for table `active_fork`
+--
+ALTER TABLE `active_fork`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
-  ADD PRIMARY KEY (`id`);
-ALTER TABLE `blockIndex`
+  ADD PRIMARY KEY (`id`),
   ADD KEY `hash` (`hash`);
 
 --
 -- Indexes for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-  ADD PRIMARY KEY (`id`);
-ALTER TABLE `block_transactions`
+  ADD PRIMARY KEY (`id`),
   ADD KEY `idx` (`block_hash`,`transaction_hash`);
 
 --
@@ -187,6 +206,11 @@ ALTER TABLE `transaction_output`
 --
 
 --
+-- AUTO_INCREMENT for table `active_fork`
+--
+ALTER TABLE `active_fork`
+  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+--
 -- AUTO_INCREMENT for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
@@ -195,7 +219,7 @@ ALTER TABLE `blockIndex`
 -- AUTO_INCREMENT for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(15) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `headerIndex`
 --
@@ -210,7 +234,7 @@ ALTER TABLE `transactions`
 -- AUTO_INCREMENT for table `transaction_input`
 --
 ALTER TABLE `transaction_input`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transaction_output`
 --
