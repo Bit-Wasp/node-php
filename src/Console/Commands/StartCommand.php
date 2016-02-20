@@ -93,7 +93,7 @@ class StartCommand extends AbstractCommand
         $control = new UserControl($context, $app, $consoleCommands);
 
         $websocket = $config->getItem('config', 'websocket', false);
-        
+
         if ($websocket) {
             $pusher = new Pusher($app, $commands);
 
