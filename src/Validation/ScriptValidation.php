@@ -84,7 +84,7 @@ class ScriptValidation implements ScriptValidationInterface
 
         $result = count(array_filter($this->results, function ($value) {
                 return !$value;
-            })) === 0;
+        })) === 0;
 
         $this->knownResult = $result;
         $this->results = [];

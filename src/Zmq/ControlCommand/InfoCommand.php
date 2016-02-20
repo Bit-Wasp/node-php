@@ -2,17 +2,16 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 
 class InfoCommand extends Command
 {
-    /**
-     * @return string
-     */
-    public function getName()
+    protected function configure()
     {
-        return 'info';
+        $this
+            ->setName('info')
+            ->setDescription('Returns information about the running node');
+
     }
 
     /**

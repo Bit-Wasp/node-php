@@ -2,16 +2,24 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
+use BitWasp\Buffertools\Buffer;
 
 class GetTxCommand extends Command
 {
-    public function getName()
+    protected function configure()
     {
-        return 'gettx';
+        $this->setName('gettx')
+            ->setDescription('Return information about a transaction')
+            ->setParam('txid', 'Transaction ID');
     }
 
+    /**
+     * @param NodeInterface $node
+     * @param array $params
+     * @return array
+     *
+     */
     public function execute(NodeInterface $node, array $params = [])
     {
         if (!isset($params['txid'])) {
@@ -20,7 +28,8 @@ class GetTxCommand extends Command
 
         $chain = $node->chain()->getChain();
         try {
-            $tx = $chain->fetchTransaction($node->txidx(), $params['txid']);
+            $txid = Buffer::hex($params['txid'], 32);
+            $tx = $chain->fetchTransaction($node->txidx(), $txid);
 
             $inputs = [];
             foreach ($tx->getInputs() as $in) {

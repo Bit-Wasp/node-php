@@ -2,23 +2,21 @@
 
 namespace BitWasp\Bitcoin\Node\Console;
 
-use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlockBest;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbBlocksReset;
-use BitWasp\Bitcoin\Node\Console\Commands\Db\DbPopBlock;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeChains;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeGetBlockHash;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeGetHeader;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeInfo;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeTx;
+use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
-use BitWasp\Bitcoin\Node\Console\Commands\ScriptWorker;
 use BitWasp\Bitcoin\Node\Console\Commands\SelfTestNodeCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeStart;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeStop;
-use BitWasp\Bitcoin\Node\Console\Commands\TestCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\Node\NodeWatch;
+use BitWasp\Bitcoin\Node\Console\Commands\StartCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\StopCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\WatchCommand;
+use BitWasp\Bitcoin\Node\Zmq\ControlCommand\ChainsCommand;
+use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetBlockHashCommand;
+use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetHeaderCommand;
+use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetTxCommand;
+use BitWasp\Bitcoin\Node\Zmq\ControlCommand\InfoCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
 
 class Application extends ConsoleApplication
@@ -29,19 +27,20 @@ class Application extends ConsoleApplication
         $commands[] = new DbReset();
         $commands[] = new DbWipe();
         $commands[] = new DbBlocksReset();
-        $commands[] = new NodeStart();
-        $commands[] = new NodeStop();
-        $commands[] = new NodeWatch();
-        $commands[] = new NodeInfo();
-        $commands[] = new NodeChains();
-        $commands[] = new NodeTx();
-        $commands[] = new NodeGetHeader();
-        $commands[] = new NodeGetBlockHash();
-        $commands[] = new DbPopBlock();
+
+        $commands[] = new StartCommand();
+        $commands[] = new StopCommand();
+        $commands[] = new WatchCommand();
+        $commands[] = new WebSocketCommand();
+
+        $commands[] = new ControlCommand(new InfoCommand());
+        $commands[] = new ControlCommand(new ChainsCommand());
+        $commands[] = new ControlCommand(new GetTxCommand());
+        $commands[] = new ControlCommand(new GetHeaderCommand());
+        $commands[] = new ControlCommand(new GetBlockHashCommand());
+
         $commands[] = new SelfTestNodeCommand();
         $commands[] = new PrintConfig();
-        $commands[] = new ScriptWorker();
-        $commands[] = new TestCommand();
         return $commands;
     }
 }

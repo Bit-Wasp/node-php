@@ -3,13 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Zmq;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Zmq\ControlCommand\CommandInterface;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetBlockHashCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetHeaderCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\InfoCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\ShutdownCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetTxCommand;
 use \React\ZMQ\Context;
 
 class UserControl
@@ -27,27 +21,17 @@ class UserControl
     /**
      * @param Context $context
      * @param NodeInterface $node
-     * @param ScriptThreadControl $threadControl
+     * @param CommandInterface[] $commands
      */
-    public function __construct(Context $context, NodeInterface $node, ScriptThreadControl $threadControl)
+    public function __construct(Context $context, NodeInterface $node, array $commands = [])
     {
-        /** @var CommandInterface[] $commands */
-        $commands = [
-            new InfoCommand(),
-            new ShutdownCommand($threadControl),
-            new GetTxCommand(),
-            new GetHeaderCommand(),
-            new GetBlockHashCommand(),
-            new ChainsCommand()
-        ];
-
         foreach ($commands as $command) {
             $this->commands[$command->getName()] = $command;
         }
 
         $cmdControl = $context->getSocket(\ZMQ::SOCKET_REP);
         $cmdControl->bind('tcp://127.0.0.1:5560');
-        $cmdControl->on('message', function ($e) use ($threadControl, $node) {
+        $cmdControl->on('message', function ($e) use ($node) {
 
             $input = json_decode($e, true);
             if (json_last_error() === JSON_ERROR_NONE) {

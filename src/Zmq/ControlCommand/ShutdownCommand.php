@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
 
@@ -21,14 +20,17 @@ class ShutdownCommand extends Command
     public function __construct(ScriptThreadControl $threadControl)
     {
         $this->threadControl = $threadControl;
+        parent::__construct();
     }
 
     /**
-     * @return string
+     *
      */
-    public function getName()
+    protected function configure()
     {
-        return 'shutdown';
+        $this
+            ->setName('stop')
+            ->setDescription('Shuts down the node');
     }
 
     /**

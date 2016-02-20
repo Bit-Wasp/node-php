@@ -3,17 +3,15 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 
 class ChainsCommand extends Command
 {
-    /**
-     * @return string
-     */
-    public function getName()
+    public function configure()
     {
-        return 'chains';
+        $this
+            ->setName('chains')
+            ->setDescription('Returns information about chains tracked by the node');
     }
 
     /**

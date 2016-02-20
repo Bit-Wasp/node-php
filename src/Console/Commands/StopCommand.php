@@ -1,17 +1,17 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Console\Commands\Node;
+namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class NodeStop extends AbstractCommand
+class StopCommand extends AbstractCommand
 {
     protected function configure()
     {
         $this
-            ->setName('node:stop')
+            ->setName('stop')
             ->setDescription('Issue the stop signal');
     }
 

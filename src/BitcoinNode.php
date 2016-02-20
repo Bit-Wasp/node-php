@@ -17,16 +17,14 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\State\Peers;
 use BitWasp\Bitcoin\Node\State\PeerStateCollection;
 use BitWasp\Bitcoin\Node\Zmq\Notifier;
-use BitWasp\Bitcoin\Node\Zmq\ScriptThreadControl;
-use BitWasp\Bitcoin\Node\Zmq\UserControl;
 use Evenement\EventEmitter;
+use Packaged\Config\ConfigProviderInterface;
 use React\EventLoop\LoopInterface;
 use React\ZMQ\Context as ZMQContext;
 
@@ -109,19 +107,19 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     protected $pow;
 
     /**
+     * BitcoinNode constructor.
+     * @param ConfigProviderInterface $config
+     * @param ZMQContext $zmq
      * @param ParamsInterface $params
      * @param LoopInterface $loop
      */
-    public function __construct(ParamsInterface $params, LoopInterface $loop)
+    public function __construct(ConfigProviderInterface $config, ZMQContext $zmq, ParamsInterface $params, LoopInterface $loop)
     {
 
         $math = Bitcoin::getMath();
         $adapter = Bitcoin::getEcAdapter($math);
 
-        $zmq = new ZMQContext($loop);
-        $this
-            ->initControl($zmq)
-            ->initConfig();
+        $this->config = $config;
 
         $this->notifier = new Notifier($zmq, $this);
         $this->chains = new Chains($adapter, $params);
@@ -165,25 +163,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $this->peersOutbound->close();
         $this->loop->stop();
         $this->db->stop();
-    }
-
-    /**
-     * @return $this
-     */
-    private function initControl(ZMQContext $context)
-    {
-        $this->control = new UserControl($context, $this, new ScriptThreadControl($context));
-        return $this;
-    }
-
-    /**
-     * @return $this
-     */
-    private function initConfig()
-    {
-        $this->config = (new ConfigLoader())->load();
-
-        return $this;
     }
 
     /**
@@ -401,6 +380,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         if ($this->config->getItem('config', 'listen', '0')) {
             $server = new \React\Socket\Server($this->loop);
             $listener = $peerFactory->getListener($server);
+
             $manager->registerListener($listener);
         }
 
@@ -426,6 +406,10 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         });
 
         $manager->on('inbound', function (Peer $peer) {
+            $this->notifier->send('peer.inbound.new', ['peer' =>[
+                'ip' => $peer->getRemoteAddr()->getIp(),
+                'port' => $peer->getRemoteAddr()->getPort()
+            ]]);
             $this->peersInbound->add($peer);
         });
 

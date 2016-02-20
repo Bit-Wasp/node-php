@@ -3,15 +3,13 @@
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 use BitWasp\Bitcoin\Bitcoin;
-use BitWasp\Bitcoin\Node\BitcoinNode;
-use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Node\Params\RegtestParams;
 use BitWasp\Bitcoin\Node\SelfTestNode;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class SelfTestNodeCommand extends AbstractCommand
+class SelfTestNodeCommand
 {
     /**
      * @var string
@@ -24,7 +22,7 @@ class SelfTestNodeCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setName('startt')
+            ->setName('starttest')
             ->setDescription('Start the bitcoin node')
             ->addOption($this->optConfig, 'c', InputOption::VALUE_OPTIONAL, 'Specify the location of a configuration file');
     }

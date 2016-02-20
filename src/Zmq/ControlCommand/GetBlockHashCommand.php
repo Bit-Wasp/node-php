@@ -2,18 +2,16 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Buffertools\Buffer;
 
 class GetBlockHashCommand extends Command
 {
-    /**
-     * @return string
-     */
-    public function getName()
+    protected function configure()
     {
-        return 'getblockhash';
+        $this
+            ->setName('getblockhash')
+            ->setDescription('Returns the block hash for height')
+            ->setParam('height', 'Block height');
     }
 
     /**

@@ -11,6 +11,7 @@ use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
+use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chain;
@@ -1028,6 +1029,7 @@ WHERE tip.header_id = (
                     new Script(new Buffer($input['scriptPubKey']))
                 );
             }, $outputs)),
+            new TransactionWitnessCollection([]),
             $txInfo['nLockTime']
         );
 

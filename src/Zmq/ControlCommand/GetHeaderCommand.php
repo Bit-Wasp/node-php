@@ -2,18 +2,17 @@
 
 namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Buffertools\Buffer;
 
 class GetHeaderCommand extends Command
 {
-    /**
-     * @return string
-     */
-    public function getName()
+    protected function configure()
     {
-        return 'getheader';
+        $this
+            ->setName('getheader')
+            ->setDescription('Return the requested block header')
+            ->setParam('hash', 'Block hash');
     }
 
     /**
@@ -24,9 +23,9 @@ class GetHeaderCommand extends Command
     public function execute(NodeInterface $node, array $params = [])
     {
         if (!isset($params['hash'])) {
-            throw new \RuntimeException('Missing txid field');
+            throw new \RuntimeException('Missing hash field');
         } else if (strlen($params['hash']) !== 64) {
-            throw new \RuntimeException('Invalid txid'.strlen($params['hash']));
+            throw new \RuntimeException('Invalid hash');
         }
 
         $chain = $node->chain()->getChain();
