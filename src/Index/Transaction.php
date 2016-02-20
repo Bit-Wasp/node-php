@@ -3,7 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 
 class Transaction

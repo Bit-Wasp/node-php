@@ -62,7 +62,7 @@ class ScriptValidation implements ScriptValidationInterface
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
             $output = $utxoView->fetchByInput($tx->getInput($i))->getOutput();
             $witness = isset($tx->getWitnesses()[$i]) ? $tx->getWitness($i) : null;
-            $this->results[] = true;//$this->consensus->verify($tx, $output->getScript(), $i, $output->getValue(), $witness);
+            $this->results[] = $this->consensus->verify($tx, $output->getScript(), $i, $output->getValue(), $witness);
         }
 
         return $this;

@@ -29,12 +29,11 @@ class StopCommand extends AbstractCommand
         $push = $context->getSocket(\ZMQ::SOCKET_REQ);
         $push->connect('tcp://127.0.0.1:5560');
         $push->on('message', function ($message = '') use ($loop) {
-            if ($message === 'shutdown') {
-                echo "Shutdown successfully\n";
-            }
+            echo $message.PHP_EOL;
             $loop->stop();
         });
-        $push->send(json_encode(['cmd'=>'shutdown']));
+
+        $push->send(json_encode(['cmd'=>'stop']));
 
         $loop->run();
     }

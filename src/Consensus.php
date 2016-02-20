@@ -115,7 +115,7 @@ class Consensus implements ConsensusInterface
             return $prevIndex->getHeader()->getBits()->getInt();
         }
 
-        // Retarget
+        // Re-target
         $heightLastRetarget = $math->sub($prevIndex->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
         return $this->calculateNextWorkRequired($prevIndex, $lastTime);

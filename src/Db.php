@@ -101,41 +101,6 @@ class Db implements DbInterface
     private $debug;
 
     /**
-     * @var string
-     */
-    private $tblIndex = 'iindex';
-
-    /**
-     * @var string
-     */
-    private $tblHeaders = 'headerIndex';
-
-    /**
-     * @var string
-     */
-    private $tblBlocks = 'blockIndex';
-
-    /**
-     * @var string
-     */
-    private $tblBlockTxs = 'block_transactions';
-
-    /**
-     * @var string
-     */
-    private $tblTransactions = 'transactions';
-
-    /**
-     * @var string
-     */
-    private $tblTxIn = 'transaction_input';
-
-    /**
-     * @var string
-     */
-    private $tblTxOut = 'transaction_output';
-
-    /**
      * @param ConfigProviderInterface $config
      * @param bool|false $debug
      */
@@ -479,74 +444,6 @@ class Db implements DbInterface
         }
 
         throw new \RuntimeException('Failed to update chain!');
-    }
-
-    /**
-     * @param BufferInterface $hash
-     * @return bool
-     */
-    public function eraseBlock(BufferInterface $hash)
-    {
-
-        $idStmt = $this->dbh->prepare("
-            SELECT h.id
-            from  headerIndex h
-            WHERE h.hash = :hash");
-        $idStmt->execute(['hash'=>$hash->getBinary()]);
-        $id = $idStmt->fetchColumn();
-
-        $txStmt = $this->dbh->prepare("SELECT transaction_hash from block_transactions WHERE block_hash = :id");
-        $txStmt->execute(['id'=>$id]);
-        $txs = $txStmt->fetchAll(\PDO::FETCH_COLUMN);
-
-        $dbStmt = $this->dbh->prepare('DELETE FROM blockIndex WHERE id = :id');
-        $dbtxStmt = $this->dbh->prepare('DELETE FROM block_transactions WHERE block_hash = :id');
-
-        try {
-            $this->dbh->beginTransaction();
-            echo "ID: $id\n";
-            $r =$dbStmt->execute(['id'=>$id]);
-            var_dump($r);
-            //$dbtxStmt->execute(['id'=>$id]);
-            if (count($txs) > 1) {
-
-                echo "many\n";
-                //$placeholders = rtrim(str_repeat('?, ', count($txs) - 1), ', ');
-                //$q = 'DELETE FROM  transaction_input WHERE parent_tx in (' . $placeholders . ')';
-
-                //$dtxinStmt = $this->dbh->prepare($q);
-                //$dtxoutStmt = $this->dbh->prepare('DELETE FROM transaction_output WHERE parent_tx in (' . $placeholders . ')');
-                //$dtxStmt = $this->dbh->prepare('DELETE FROM transactions WHERE id in (' . $placeholders . ')');
-                //$dtxinStmt->execute($txs);
-                //$dtxoutStmt->execute($txs);
-                //$dtxStmt->execute($txs);
-                /*
-                */
-
-            } elseif (count($txs) == 1) {
-                echo "just one\n";
-                //
-                //var_dump($txs);
-                //echo "did count: ".count($txs).PHP_EOL;
-
-                //$dtxinStmt = $this->dbh->prepare('DELETE FROM transaction_input WHERE parent_tx = :tx');
-                //$dtxoutStmt = $this->dbh->prepare('DELETE FROM transaction_output WHERE parent_tx = :tx');
-                //$dtxStmt = $this->dbh->prepare('DELETE FROM transactions WHERE id = :tx');
-                //$dtxinStmt->execute(['tx'=>$txs[0]]);
-                ///$dtxoutStmt->execute(['tx'=>$txs[0]]);
-                //$dtxStmt->execute(['tx'=>$txs[0]]);
-
-            } else {
-                echo "None\n";
-            }
-            $this->dbh->commit();
-            return true;
-        } catch (\Exception $e) {
-            echo $e->getMessage();
-            echo $e->getTraceAsString().PHP_EOL;
-        }
-
-        throw new \RuntimeException('Failed to commit deletion');
     }
 
     /**

@@ -8,7 +8,6 @@ use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
 use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\PrintConfig;
-use BitWasp\Bitcoin\Node\Console\Commands\SelfTestNodeCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StartCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StopCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WatchCommand;
@@ -39,7 +38,7 @@ class Application extends ConsoleApplication
         $commands[] = new ControlCommand(new GetHeaderCommand());
         $commands[] = new ControlCommand(new GetBlockHashCommand());
 
-        $commands[] = new SelfTestNodeCommand();
+        //$commands[] = new SelfTestNodeCommand();
         $commands[] = new PrintConfig();
         return $commands;
     }
