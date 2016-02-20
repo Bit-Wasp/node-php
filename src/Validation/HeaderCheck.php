@@ -66,32 +66,13 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param ChainStateInterface $state
-     * @param BlockHeaderInterface $header
-     * @return $this
-     */
-    public function checkContextual(ChainStateInterface $state, BlockHeaderInterface $header)
-    {
-        $work = $this->consensus->getWorkForNextTip($state);
-        if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {
-            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
-        }
-
-        // check timestamp
-        // reject block version 1 when 95% has upgraded
-        // reject block version 2 when 95% has upgraded
-
-        return $this;
-    }
-
-    /**
      * @param ChainInterface $chain
      * @param BlockIndexInterface $index
      * @param BlockIndexInterface $prevIndex
      * @param Forks $forks
      * @return $this
      */
-    public function checkContextual2(ChainInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
+    public function checkContextual(ChainInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
     {
         $work = $this->consensus->getWorkRequired($chain, $prevIndex);
 

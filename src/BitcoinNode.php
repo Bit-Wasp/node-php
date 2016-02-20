@@ -291,6 +291,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
             $this->notifier->send('p2p.headers', ['count' => $count]);
 
         } catch (\Exception $e) {
+            $this->notifier->send('error.onHeaders', ['error' => $e->getMessage()]);
             echo $e->getMessage() . PHP_EOL;
             echo $e->getTraceAsString().PHP_EOL;
             die();
@@ -348,6 +349,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
 
         } catch (\Exception $e) {
             $header = $block->getHeader();
+            $this->notifier->send('error.onBlock', ['hash'=>$header->getHash()->getHex(),'error' => $e->getMessage()]);
             echo 'Failed to accept block' . PHP_EOL;
 
             echo $e->getMessage() . PHP_EOL;

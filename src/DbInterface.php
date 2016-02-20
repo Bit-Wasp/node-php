@@ -48,27 +48,12 @@ interface DbInterface
     public function createBlockIndexGenesis(BlockIndexInterface $index);
 
     /**
-     * @param BlockInterface $block
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertBlockOld(BlockInterface $block);
-
-    /**
      * @param BufferInterface $blockHash
      * @param BlockInterface $block
      * @return bool
      * @throws \Exception
      */
     public function insertBlock(BufferInterface $blockHash, BlockInterface $block);
-
-    /**
-     * @param BlockIndexInterface $startIndex
-     * @param BlockIndexInterface[] $index
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertIndexBatch(BlockIndexInterface $startIndex, array $index);
 
     /**
      * @param BufferInterface $hash

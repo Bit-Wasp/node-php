@@ -171,7 +171,7 @@ class Headers
                 );
 
                 $forks->next($index);
-                $this->headerCheck->checkContextual2($chain, $index, $prevIndex, $forks);
+                $this->headerCheck->checkContextual($chain, $index, $prevIndex, $forks);
 
                 $batch[] = $index;
                 $prevIndex = $index;

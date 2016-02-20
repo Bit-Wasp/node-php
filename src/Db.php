@@ -180,11 +180,11 @@ class Db implements DbInterface
     {
         /** @var \PDOStatement[] $stmt */
         $stmt = [];
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlocks);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlockTxs);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTransactions);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxOut);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxIn);
+        $stmt[] = $this->dbh->prepare('TRUNCATE blocks');
+        $stmt[] = $this->dbh->prepare('TRUNCATE block_transactions');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_outputs');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_inputs');
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -200,13 +200,13 @@ class Db implements DbInterface
     {
         /** @var \PDOStatement[] $stmt */
         $stmt = [];
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblIndex);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblHeaders);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlocks);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblBlockTxs);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTransactions);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxOut);
-        $stmt[] = $this->dbh->prepare('TRUNCATE ' . $this->tblTxIn);
+        $stmt[] = $this->dbh->prepare('TRUNCATE iindex');
+        $stmt[] = $this->dbh->prepare('TRUNCATE headerIndex');
+        $stmt[] = $this->dbh->prepare('TRUNCATE blocks');
+        $stmt[] = $this->dbh->prepare('TRUNCATE block_transactions');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_outputs');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_inputs');
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -222,9 +222,9 @@ class Db implements DbInterface
      */
     public function createIndexGenesis(BlockHeaderInterface $header)
     {
-        $stmtIndex = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . ' (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
+        $stmtIndex = $this->dbh->prepare('INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
 
-        $stmtHeader = $this->dbh->prepare('INSERT INTO ' . $this->tblHeaders . ' (
+        $stmtHeader = $this->dbh->prepare('INSERT INTO headerIndex (
             hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
           ) VALUES (
             :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce
@@ -260,113 +260,9 @@ class Db implements DbInterface
      */
     public function createBlockIndexGenesis(BlockIndexInterface $index)
     {
-        $stmt = $this->dbh->prepare('INSERT INTO '.$this->tblBlocks.' ( hash ) SELECT id from headerIndex where hash = :hash ');
+        $stmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :hash ');
         $stmt->bindValue(':hash', $index->getHash()->getBinary());
         $stmt->execute();
-    }
-
-    /**
-     * @param BlockInterface $block
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertBlockOld(BlockInterface $block)
-    {
-        $blockHash = $block->getHeader()->getHash()->getBinary();
-
-        try {
-            $this->dbh->beginTransaction();
-
-            $txListBind = [];
-            $txListData = ['blockHash' => $blockHash];
-            $temp = [];
-
-            // Prepare SQL statement adding all transaction inputs in this block.
-            $inBind = [];
-            $inData = [];
-
-            // Prepare SQL statement adding all transaction outputs in this block
-            $outBind = [];
-            $outData = [ ];
-
-            // Add all transactions in the block
-            $txBind = [];
-            $txData = [];
-
-            $transactions = $block->getTransactions();
-            foreach ($transactions as $i => $tx) {
-                $hash = $tx->getTxId()->getBinary();
-                $temp[$hash] = $i;
-                $valueOut = $tx->getValueOut();
-                $nOut = count($tx->getOutputs());
-                $nIn = count($tx->getInputs());
-
-                $txListBind[] = " ( :blockHash, :tx$i) ";
-                $txListData["tx$i"] = $hash;
-
-                $txBind[] = " ( :hash$i , :version$i , :nLockTime$i , :tx$i , :nOut$i , :nValueOut$i , :nFee$i , :isCoinbase$i ) ";
-                $txData["hash$i"] = $hash;
-                $txData["tx$i"] = $tx->getBinary();
-                $txData["nOut$i"] = $nOut;
-                $txData["nValueOut$i"] = $valueOut;
-                $txData["nFee$i"] = '0';
-                $txData["nLockTime$i"] = $tx->getLockTime();
-                $txData["isCoinbase$i"] = $tx->isCoinbase();
-                $txData["version$i"] = $tx->getVersion();
-
-                $inData["parenthash$i"] = $hash;
-                for ($j = 0; $j < $nIn; $j++) {
-                    $input = $tx->getInput($j);
-                    $inBind[] = " ( :parenthash$i , :nInput$i$j, :hashPrevOut$i$j, :nPrevOut$i$j, :scriptSig$i$j, :nSequence$i$j ) ";
-                    $inData["nInput$i$j"] = $j;
-                    $inData["hashPrevOut$i$j"] = $input->getOutPoint()->getTxId()->getBinary();
-                    $inData["nPrevOut$i$j"] = $input->getOutPoint()->getVout();
-                    $inData["scriptSig$i$j"] = $input->getScript()->getBinary();
-                    $inData["nSequence$i$j"] = $input->getSequence();
-                }
-
-                $outData["parenthash$i"] = $hash; // Populate these later, list of parent_id for each output
-                for ($k = 0; $k < $nOut; $k++) {
-                    $output = $tx->getOutput($k);
-                    $outBind[] = " ( :parenthash$i , :nOutput$i$k, :value$i$k, :scriptPubKey$i$k ) ";
-
-                    $outData["nOutput$i$k"] = $k;
-                    $outData["value$i$k"] = $output->getValue();
-                    $outData["scriptPubKey$i$k"] = $output->getScript()->getBinary();
-                }
-            }
-
-            // Finish & prepare each statement
-            // Insert the blocks hash
-            $blockInsert = $this->dbh->prepare('INSERT INTO '.$this->tblBlocks.' ( hash ) VALUES ( :hash )');
-            $blockInsert->bindValue(':hash', $blockHash);
-
-            $insertTx = $this->dbh->prepare('INSERT INTO '.$this->tblTransactions.'  (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
-            unset($txBind);
-
-            $insertTxList = $this->dbh->prepare('INSERT INTO '.$this->tblBlockTxs.'  (block_hash, transaction_hash) VALUES ' . implode(', ', $txListBind));
-            unset($txListBind);
-
-            $insertInputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxIn.'  (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ' . implode(', ', $inBind));
-            unset($inBind);
-
-            $insertOutputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxOut.'  (parent_tx, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $outBind));
-            unset($outBind);
-
-            $blockInsert->execute();
-            $insertTxList->execute($txListData);
-            $insertTx->execute($txData);
-            $insertInputs->execute($inData);
-            $insertOutputs->execute($outData);
-
-            $this->dbh->commit();
-            return true;
-
-        } catch (\Exception $e) {
-            $this->dbh->rollBack();
-        }
-
-        throw new \RuntimeException('MySqlDb: Failed executing Block insert transaction');
     }
 
     /**
@@ -392,7 +288,7 @@ class Db implements DbInterface
 
             // Prepare SQL statement adding all transaction outputs in this block
             $outBind = [];
-            $outData = [ ];
+            $outData = [];
 
             // Add all transactions in the block
             $txBind = [];
@@ -408,9 +304,8 @@ class Db implements DbInterface
 
                 $txListBind[] = " ( :headerId, :txId$i) ";
 
-                $txBind[] = " ( :hash$i , :version$i , :nLockTime$i , :tx$i , :nOut$i , :nValueOut$i , :nFee$i , :isCoinbase$i ) ";
+                $txBind[] = " ( :hash$i , :version$i , :nLockTime$i , :nOut$i , :nValueOut$i , :nFee$i , :isCoinbase$i ) ";
                 $txData["hash$i"] = $hash;
-                $txData["tx$i"] = $tx->getBinary();
                 $txData["nOut$i"] = $nOut;
                 $txData["nValueOut$i"] = $valueOut;
                 $txData["nFee$i"] = '0';
@@ -442,13 +337,13 @@ class Db implements DbInterface
 
             // Finish & prepare each statement
             // Insert the block header ID
-            $blockInsert = $this->dbh->prepare('INSERT INTO '.$this->tblBlocks.' ( hash ) SELECT id from headerIndex where hash = :refHash ');
+            $blockInsert = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :refHash ');
             $blockInsert->bindValue(':refHash', $blockHash);
             $blockInsert->execute();
 
             $blockId = (int) $this->dbh->lastInsertId();
 
-            $insertTx = $this->dbh->prepare('INSERT INTO '.$this->tblTransactions.'  (hash, version, nLockTime, transaction, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
+            $insertTx = $this->dbh->prepare('INSERT INTO transactions  (hash, version, nLockTime, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
             $insertTx->execute($txData);
             unset($txBind);
 
@@ -464,13 +359,13 @@ class Db implements DbInterface
             }
             unset($val);
 
-            $insertTxList = $this->dbh->prepare('INSERT INTO '.$this->tblBlockTxs.'  (block_hash, transaction_hash) VALUES ' . implode(', ', $txListBind));
+            $insertTxList = $this->dbh->prepare('INSERT INTO block_transactions  (block_hash, transaction_hash) VALUES ' . implode(', ', $txListBind));
             unset($txListBind);
 
-            $insertInputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxIn.'  (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ' . implode(', ', $inBind));
+            $insertInputs = $this->dbh->prepare('INSERT INTO transaction_input (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ' . implode(', ', $inBind));
             unset($inBind);
 
-            $insertOutputs = $this->dbh->prepare('INSERT INTO '.$this->tblTxOut.'  (parent_tx, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $outBind));
+            $insertOutputs = $this->dbh->prepare('INSERT INTO transaction_output  (parent_tx, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $outBind));
             unset($outBind);
 
             $insertTxList->execute($txListData);
@@ -488,103 +383,6 @@ class Db implements DbInterface
     }
 
     /**
-     * @param BlockIndexInterface $startIndex
-     * @param BlockIndexInterface[] $index
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertIndexBatch(BlockIndexInterface $startIndex, array $index)
-    {
-        if (null === $this->fetchLftStmt) {
-            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
-            $this->updateIndicesStmt = $this->dbh->prepare('
-                UPDATE ' . $this->tblIndex . '  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
-                UPDATE ' . $this->tblIndex . '  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
-            ');
-        }
-
-        $fetchParent = $this->fetchLftStmt;
-        $resizeIndex = $this->updateIndicesStmt;
-        $fetchParent->bindParam(':prevBlock', $startIndex->getHash()->getBinary());
-        if ($fetchParent->execute()) {
-            foreach ($fetchParent->fetchAll() as $record) {
-                $myLeft = $record['lft'];
-            }
-        }
-
-        $fetchParent->closeCursor();
-        if (!isset($myLeft)) {
-            throw new \RuntimeException('Failed to extract header position');
-        }
-
-        $totalN = count($index);
-        $nTimesTwo = 2 * $totalN;
-        $leftOffset = $myLeft;
-        $rightOffset = $myLeft + $nTimesTwo;
-
-        $this->dbh->beginTransaction();
-        try {
-            if ($resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
-                $resizeIndex->closeCursor();
-
-                $headerValues = [];
-                $headerQuery = [];
-
-                $indexValues = [];
-                $indexQuery = [];
-
-                $c = 0;
-                foreach ($index as $i) {
-                    $headerQuery[] = "(:hash$c , :height$c , :work$c ,
-                    :version$c , :prevBlock$c , :merkleRoot$c ,
-                    :nBits$c , :nTimestamp$c , :nNonce$c  )";
-
-                    $headerValues['hash' . $c] = $i->getHash()->getBinary();
-                    $headerValues['height' . $c] = $i->getHeight();
-                    $headerValues['work' . $c] = $i->getWork();
-
-                    $header = $i->getHeader();
-                    $headerValues['version' . $c] = $header->getVersion();
-                    $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
-                    $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
-                    $headerValues['nBits' . $c] = $header->getBits()->getInt();
-                    $headerValues['nTimestamp' . $c] = $header->getTimestamp();
-                    $headerValues['nNonce' . $c] = $header->getNonce();
-
-                    $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
-                    $indexValues['lft' . $c] = $leftOffset + 1 + $c;
-                    $indexValues['rgt' . $c] = $rightOffset - $c;
-                    $c++;
-                }
-
-                $insertHeaders = $this->dbh->prepare('
-                  INSERT INTO ' . $this->tblHeaders . '  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
-                  VALUES ' . implode(', ', $headerQuery));
-                $insertHeaders->execute($headerValues);
-
-                $lastId = (int)$this->dbh->lastInsertId();
-                $count = count($index);
-                for ($i = 0; $i < $count; $i++) {
-                    $rowId = $i + $lastId;
-                    $indexValues['header_id' . $i] = $rowId;
-                }
-
-                $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
-                $insertIndices->execute($indexValues);
-                $this->dbh->commit();
-                return true;
-
-            }
-        } catch (\Exception $e) {
-            $this->dbh->rollBack();
-            throw $e;
-        }
-
-        throw new \RuntimeException('Failed to update chain!');
-    }
-
-
-    /**
      * @param HeadersBatch $batch
      * @return bool
      * @throws \Exception
@@ -592,17 +390,16 @@ class Db implements DbInterface
     public function insertHeaderBatch(HeadersBatch $batch)
     {
         if (null === $this->fetchLftStmt) {
-            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from ' . $this->tblIndex . ' i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
+            $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
             $this->updateIndicesStmt = $this->dbh->prepare('
-                UPDATE ' . $this->tblIndex . '  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
-                UPDATE ' . $this->tblIndex . '  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
+                UPDATE iindex  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
+                UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         }
 
         $fetchParent = $this->fetchLftStmt;
         $resizeIndex = $this->updateIndicesStmt;
 
-        $startIndex = $batch->getTip()->getChainIndex();
         $fetchParent->bindParam(':prevBlock', $batch->getTip()->getChainIndex()->getHash()->getBinary());
         if ($fetchParent->execute()) {
             foreach ($fetchParent->fetchAll() as $record) {
@@ -657,7 +454,7 @@ class Db implements DbInterface
                 }
 
                 $insertHeaders = $this->dbh->prepare('
-                  INSERT INTO ' . $this->tblHeaders . '  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+                  INSERT INTO headerIndex  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
                   VALUES ' . implode(', ', $headerQuery));
                 $insertHeaders->execute($headerValues);
 
@@ -668,7 +465,7 @@ class Db implements DbInterface
                     $indexValues['header_id' . $i] = $rowId;
                 }
 
-                $insertIndices = $this->dbh->prepare('INSERT INTO ' . $this->tblIndex . '  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
+                $insertIndices = $this->dbh->prepare('INSERT INTO iindex  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
                 $insertIndices->execute($indexValues);
                 $this->dbh->commit();
 
@@ -683,6 +480,10 @@ class Db implements DbInterface
         throw new \RuntimeException('Failed to update chain!');
     }
 
+    /**
+     * @param BufferInterface $hash
+     * @return bool
+     */
     public function eraseBlock(BufferInterface $hash)
     {
 
@@ -755,9 +556,9 @@ class Db implements DbInterface
     {
         if (null == $this->fetchIndexStmt) {
             $this->fetchIndexStmt = $this->dbh->prepare('
-               SELECT     i.*
-               FROM       ' . $this->tblHeaders . '  i
-               WHERE      i.hash = :hash
+               SELECT     h.*
+               FROM       headerIndex  h
+               WHERE      h.hash = :hash
             ');
         }
 
@@ -797,7 +598,7 @@ class Db implements DbInterface
         if (null == $this->fetchIndexIdStmt) {
             $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
-               FROM       ' . $this->tblHeaders . '  i
+               FROM       headerIndex  i
                WHERE      i.id = :id
             ');
         }
@@ -835,15 +636,15 @@ class Db implements DbInterface
         if (null === $this->txsStmt) {
             $this->txsStmt = $this->dbh->prepare('
                 SELECT t.hash, t.version, t.nLockTime
-                FROM ' . $this->tblTransactions . '  t
-                JOIN ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = t.hash
+                FROM transactions  t
+                JOIN block_transactions  bt ON bt.transaction_hash = t.hash
                 WHERE bt.block_hash = :hash
             ');
 
             $this->txInStmt = $this->dbh->prepare('
                 SELECT txIn.parent_tx, txIn.hashPrevOut, txIn.nPrevOut, txIn.scriptSig, txIn.nSequence
-                FROM ' . $this->tblTxIn . '  txIn
-                JOIN ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = txIn.parent_tx
+                FROM transaction_input  txIn
+                JOIN block_transactions  bt ON bt.transaction_hash = txIn.parent_tx
                 WHERE bt.block_hash = :hash
                 GROUP BY txIn.parent_tx
                 ORDER BY txIn.nInput
@@ -851,8 +652,8 @@ class Db implements DbInterface
 
             $this->txOutStmt = $this->dbh->prepare('
               SELECT    txOut.parent_tx, txOut.value, txOut.scriptPubKey
-              FROM      ' . $this->tblTxOut . '  txOut
-              JOIN      ' . $this->tblBlockTxs . '  bt ON bt.transaction_hash = txOut.parent_tx
+              FROM      transaction_output  txOut
+              JOIN      block_transactions  bt ON bt.transaction_hash = txOut.parent_tx
               WHERE     bt.block_hash = :hash
               GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
@@ -897,8 +698,8 @@ class Db implements DbInterface
 
         $stmt = $this->dbh->prepare('
            SELECT     h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
-           FROM       ' . $this->tblBlocks . '  b
-           JOIN       ' . $this->tblHeaders . '  h ON b.hash = h.id
+           FROM       blockIndex  b
+           JOIN       headerIndex  h ON b.hash = h.id
            WHERE      h.hash = :hash
         ');
 
@@ -935,9 +736,9 @@ class Db implements DbInterface
         $math = Bitcoin::getMath();
         $fetchChainStmt = $this->dbh->prepare('
            SELECT h.hash
-           FROM     ' . $this->tblIndex . ' AS node,
-                    ' . $this->tblIndex . ' AS parent
-           JOIN     ' . $this->tblHeaders . '  h on h.id = parent.header_id
+           FROM     iindex AS node,
+                    iindex AS parent
+           JOIN     headerIndex  h on h.id = parent.header_id
            WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
         $loadLastBlockStmt = $this->dbh->prepare('
         SELECT h.* from iindex as node,
@@ -1019,12 +820,12 @@ class Db implements DbInterface
     public function fetchChainState(Headers $headers)
     {
         if ($this->fetchChainStmt === null) {
-            $this->loadTipStmt = $this->dbh->prepare('SELECT h.* from '.$this->tblIndex . ' i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+            $this->loadTipStmt = $this->dbh->prepare('SELECT h.* from iindex i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
             $this->fetchChainStmt = $this->dbh->prepare('
                SELECT h.hash
-               FROM     ' . $this->tblIndex . ' AS node,
-                        ' . $this->tblIndex . ' AS parent
-               JOIN     ' . $this->tblHeaders . '  h on h.id = parent.header_id
+               FROM     iindex AS node,
+                        iindex AS parent
+               JOIN     headerIndex  h on h.id = parent.header_id
                WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
             $this->loadLastBlockStmt = $this->dbh->prepare('
             SELECT h.* from iindex as node,
@@ -1122,8 +923,8 @@ class Db implements DbInterface
         $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
         $stmt = $this->dbh->prepare('
             SELECT    node.hash
-            FROM      ' . $this->tblHeaders . ' AS node,
-                      ' . $this->tblHeaders . ' AS parent
+            FROM      headerIndex AS node,
+                      headerIndex AS parent
             WHERE     parent.hash = ? AND node.hash in (' . $placeholders . ')
             ORDER BY  node.rgt LIMIT 1
         ');
@@ -1148,7 +949,7 @@ class Db implements DbInterface
         $stmt = $this->dbh->prepare('
             SELECT    child.version, child.prevBlock, child.merkleRoot,
                       child.nTimestamp, child.nBits, child.nNonce, child.height
-            FROM      ' . $this->tblHeaders . ' AS child, ' . $this->tblHeaders . '  AS parent
+            FROM      headerIndex AS child, headerIndex  AS parent
             WHERE     child.rgt < parent.rgt
             AND       parent.hash = :hash
             LIMIT     2000
@@ -1175,6 +976,11 @@ class Db implements DbInterface
         throw new \RuntimeException('Failed to fetch next headers ' . $hash->getHex());
     }
 
+    /**
+     * @param BufferInterface $tipHash
+     * @param BufferInterface $txid
+     * @return Transaction
+     */
     public function getTransaction(BufferInterface $tipHash, BufferInterface $txid)
     {
         $tx = $this->dbh->prepare('
@@ -1266,7 +1072,7 @@ WHERE tip.header_id = (
 
         $this->dbh->beginTransaction();
 
-        $newFeature = true;
+        $newFeature = false;
         if ($newFeature) {
             $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
             $initOutpoints->execute($queryValues);
@@ -1339,7 +1145,7 @@ WHERE tip.header_id = (
      */
     public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000)
     {
-        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from '.$this->tblHeaders.' h, '.$this->tblIndex.' i where h.hash = :hash and i.header_id = h.id');
+        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
         if ($stmt->execute(['hash' => $hash->getBinary()])) {
             $id = $stmt->fetch(\PDO::FETCH_ASSOC);
 
