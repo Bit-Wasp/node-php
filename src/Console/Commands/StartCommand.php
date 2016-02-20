@@ -90,9 +90,10 @@ class StartCommand extends AbstractCommand
         $consoleCommands = $commands;
         $consoleCommands[] = new ShutdownCommand($context);
 
-        new UserControl($context, $app, $consoleCommands);
+        $control = new UserControl($context, $app, $consoleCommands);
 
         $websocket = $config->getItem('config', 'websocket', false);
+        
         if ($websocket) {
             $pusher = new Pusher($app, $commands);
 
