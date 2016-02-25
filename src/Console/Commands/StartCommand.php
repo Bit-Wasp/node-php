@@ -63,7 +63,7 @@ class StartCommand extends AbstractCommand
 
         // Create the child process
         // All the code after pcntl_fork () will be performed by two processes: parent and child
-        if (true) {
+        if ($config->getItem('config', 'daemon', false)) {
             $child_pid = pcntl_fork();
             if ($child_pid) {
                 // Exit from the parent process that is bound to the console
@@ -125,3 +125,4 @@ class StartCommand extends AbstractCommand
         return 0;
     }
 }
+
