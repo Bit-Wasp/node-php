@@ -167,7 +167,6 @@ class P2PServiceProvider implements ServiceProviderInterface
         }
     }
 
-
     /**
      * @param Container $container
      * @param Peer $peer
@@ -184,7 +183,6 @@ class P2PServiceProvider implements ServiceProviderInterface
         $blockIndex = $node->blocks();
 
         try {
-
             $index = $blockIndex->accept($block, $headerIdx);
             unset($state);
             $container['debug']->log('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
@@ -221,9 +219,9 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param Container $c
+     * @param Container $container
      */
-    public function register(Container $c)
+    public function register(Container $container)
     {
         $txRelay = $this->config->getItem('config', 'tx_relay', false);
         $netFactory = new \BitWasp\Bitcoin\Networking\Factory($this->loop, Bitcoin::getNetwork());
@@ -243,14 +241,14 @@ class P2PServiceProvider implements ServiceProviderInterface
             $manager->registerListener($listener);
         }
 
-        $manager->on('outbound', function (Peer $peer) use ($c) {
-            $peer->on('block',      $this->wrap([$this, 'onBlock'], $c));
+        $manager->on('outbound', function (Peer $peer) use ($container) {
+            $peer->on('block',      $this->wrap([$this, 'onBlock'], $container));
             $peer->on('inv',        [$this, 'onInv']);
-            $peer->on('headers',    $this->wrap([$this, 'onHeaders'], $c));
-            $peer->on('getheaders',    $this->wrap([$this, 'onGetHeaders'], $c));
+            $peer->on('headers',    $this->wrap([$this, 'onHeaders'], $container));
+            $peer->on('getheaders',    $this->wrap([$this, 'onGetHeaders'], $container));
 
             $addr = $peer->getRemoteAddr();
-            $c['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+            $container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
 
             $this->peersOutbound->add($peer);
 
@@ -261,9 +259,9 @@ class P2PServiceProvider implements ServiceProviderInterface
             $peer->getheaders($chain->getLocator($height));
         });
 
-        $manager->on('inbound', function (Peer $peer) use ($c) {
+        $manager->on('inbound', function (Peer $peer) use ($container) {
             $addr = $peer->getRemoteAddr();
-            $c['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+            $container['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->peersInbound->add($peer);
         });
 

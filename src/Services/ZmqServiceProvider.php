@@ -24,11 +24,11 @@ class ZmqServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param Container $c
+     * @param Container $container
      */
-    public function register(Container $c)
+    public function register(Container $container)
     {
-        $c['zmq'] = function () {
+        $container['zmq'] = function () {
             return new Context($this->loop);
         };
     }

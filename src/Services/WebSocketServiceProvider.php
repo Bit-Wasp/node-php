@@ -44,11 +44,11 @@ class WebSocketServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param Container $c
+     * @param Container $container
      */
-    public function register(Container $c)
+    public function register(Container $container)
     {
-        $c['websocket'] = function (Container $c) {
+        $container['websocket'] = function (Container $c) {
             $context = $c['zmq'];
 
             $pusher = new Pusher($this->node, $this->commands);

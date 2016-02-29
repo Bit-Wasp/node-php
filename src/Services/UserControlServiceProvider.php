@@ -32,11 +32,11 @@ class UserControlServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param Container $c
+     * @param Container $container
      */
-    public function register(Container $c)
+    public function register(Container $container)
     {
-        $c['userControl'] = function (Container $c) {
+        $container['userControl'] = function (Container $c) {
             return new UserControl($c['zmq'], $this->node, $this->commands);
         };
     }
