@@ -99,9 +99,11 @@ class StartCommand extends AbstractCommand
 
         // Launch services
         $container['debug'];
-        $container['websocket'];
         $container['userControl'];
 
+        if ($websocket) {
+            $container['websocket'];
+        }
         $loop->run();
 
         return 0;
