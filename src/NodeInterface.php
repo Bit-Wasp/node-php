@@ -37,5 +37,4 @@ interface NodeInterface extends EventEmitterInterface
      * @return ChainsInterface
      */
     public function chains();
-
 }

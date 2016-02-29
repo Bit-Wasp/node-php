@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
-use BitWasp\Bitcoin\Node\WebSocket\DebugPusher;
+use BitWasp\Bitcoin\Node\Services\WebSocket\DebugPusher;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use Ratchet\Wamp\WampServer;

@@ -8,8 +8,8 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Validation\BlockCheck;
-use BitWasp\Bitcoin\Node\Validation\HeaderCheck;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
+use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 

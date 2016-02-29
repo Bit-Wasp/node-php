@@ -14,7 +14,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
-use BitWasp\Bitcoin\Node\Validation\HeaderCheckInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheckInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 

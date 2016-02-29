@@ -52,18 +52,6 @@ class SelfTestNode extends BitcoinNode
      */
     protected $pow;
 
-    /**
-     * SelfTestNode constructor.
-     * @param ConfigProviderInterface $config
-     * @param Context $context
-     * @param ParamsInterface $params
-     * @param LoopInterface $loop
-     */
-    public function __construct(ConfigProviderInterface $config, Context $context, ParamsInterface $params, LoopInterface $loop)
-    {
-        parent::__construct($config, $context, $params, $loop);
-    }
-
    /**
      * @var ChainStateInterface
      */

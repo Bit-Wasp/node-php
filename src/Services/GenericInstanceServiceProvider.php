@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 

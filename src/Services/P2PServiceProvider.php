@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
@@ -12,9 +11,9 @@ use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\DbInterface;
-use BitWasp\Bitcoin\Node\Request\BlockDownloader;
-use BitWasp\Bitcoin\Node\State\Peers;
-use BitWasp\Bitcoin\Node\State\PeerStateCollection;
+use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
+use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
+use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;

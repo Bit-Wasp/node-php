@@ -2,8 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
-use BitWasp\Bitcoin\Node\Debug\DebugInterface;
+use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
 
 class DebugServiceProvider extends GenericInstanceServiceProvider
 {

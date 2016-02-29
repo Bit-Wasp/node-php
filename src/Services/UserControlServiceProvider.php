@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\UserControl\ControlCommand\CommandInterface;
-use BitWasp\Bitcoin\Node\UserControl\UserControl;
+use BitWasp\Bitcoin\Node\Services\UserControl\UserControl;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 

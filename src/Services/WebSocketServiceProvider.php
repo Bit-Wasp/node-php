@@ -3,8 +3,8 @@
 namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Bitcoin\Node\WebSocket\Pusher;
-use BitWasp\Bitcoin\Node\UserControl\ControlCommand\CommandInterface;
+use BitWasp\Bitcoin\Node\Services\WebSocket\Pusher;
+use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 use Ratchet\Http\HttpServer;
