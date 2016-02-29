@@ -27,6 +27,7 @@ use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\Transaction;
 use BitWasp\Bitcoin\Transaction\TransactionInput;
+use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
@@ -877,7 +878,7 @@ class Db implements DbInterface
     /**
      * @param BufferInterface $tipHash
      * @param BufferInterface $txid
-     * @return Transaction
+     * @return TransactionInterface
      */
     public function getTransaction(BufferInterface $tipHash, BufferInterface $txid)
     {
@@ -936,7 +937,7 @@ WHERE tip.header_id = (
     /**
      * @param BufferInterface $tipHash
      * @param OutPointInterface[] $outpoints
-     * @return array|UtxoView
+     * @return Utxo[]
      */
     public function fetchUtxoList(BufferInterface $tipHash, array $outpoints)
     {
@@ -1029,8 +1030,6 @@ WHERE tip.header_id = (
         }
 
         if (count($outputSet) < $requiredCount) {
-            echo "We requested: ".$requiredCount."\n";
-            echo "We GOT: ".count($outputSet)."\n";
             throw new \RuntimeException('Less than required amount returned');
         }
 

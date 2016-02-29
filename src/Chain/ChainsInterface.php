@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Buffertools\BufferInterface;
 
-interface ChainsInterface
+interface ChainsInterface extends \Countable
 {
     /**
      * @return ChainStateInterface[]

@@ -13,7 +13,8 @@ use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
-use BitWasp\Bitcoin\Node\Validation\HeaderCheckInterface;
+use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheckInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -46,7 +47,7 @@ class Headers
 
     /**
      * Headers constructor.
-     * @param Db $db
+     * @param DbInterface $db
      * @param Consensus $consensus
      * @param Math $math
      * @param ChainsInterface $chains
@@ -54,7 +55,7 @@ class Headers
      * @param ProofOfWork $proofOfWork
      */
     public function __construct(
-        Db $db,
+        DbInterface $db,
         Consensus $consensus,
         Math $math,
         ChainsInterface $chains,

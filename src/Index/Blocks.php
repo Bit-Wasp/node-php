@@ -8,9 +8,9 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Bitcoin\Node\Validation\BlockCheckInterface;
-use BitWasp\Bitcoin\Node\Validation\ScriptValidation;
+use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
@@ -35,7 +35,7 @@ class Blocks
     private $consensus;
 
     /**
-     * @var Db
+     * @var DbInterface
      */
     private $db;
 
@@ -46,14 +46,14 @@ class Blocks
 
     /**
      * Blocks constructor.
-     * @param Db $db
+     * @param DbInterface $db
      * @param EcAdapterInterface $ecAdapter
      * @param ChainsInterface $chains
      * @param Consensus $consensus
      * @param BlockCheckInterface $blockCheck
      */
     public function __construct(
-        Db $db,
+        DbInterface $db,
         EcAdapterInterface $ecAdapter,
         ChainsInterface $chains,
         Consensus $consensus,
