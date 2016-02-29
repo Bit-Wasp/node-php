@@ -7,9 +7,8 @@ use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Bitcoin\Node\Services\Debug\DevNullDebug;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
-use BitWasp\Bitcoin\Node\Services\DebugServiceProvider;
+use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\P2PServiceProvider;
 use BitWasp\Bitcoin\Node\Services\UserControlServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocketServiceProvider;
@@ -77,7 +76,6 @@ class StartCommand extends AbstractCommand
 
         // Create services
         $services = [
-            new DebugServiceProvider(new DevNullDebug()),
             new DbServiceProvider($db),
             new ZmqServiceProvider($loop),
             new UserControlServiceProvider($node, $consoleCommands),
@@ -90,11 +88,17 @@ class StartCommand extends AbstractCommand
         }
 
         $container = new Container();
+        $container['debug'] = function (Container $c) {
+            $context = $c['zmq'];
+            return new ZmqDebug($context);
+        };
+
         foreach ($services as $service) {
             $container->register($service);
         }
 
         // Launch services
+        $container['debug'];
         $container['websocket'];
         $container['userControl'];
 

@@ -72,7 +72,6 @@ class P2PServiceProvider implements ServiceProviderInterface
         $this->peersInbound = new Peers();
         $this->peersOutbound = new Peers();
         $this->blockDownload = new BlockDownloader($this->node->chains(), $this->peerStates, $this->peersOutbound);
-
     }
 
     /**
@@ -93,7 +92,6 @@ class P2PServiceProvider implements ServiceProviderInterface
                 $txs[] = $item;
             }
         }
-        //$this->notifier->send('p2p.inv', ['blocks' => count($blocks), 'txs' => count($txs)]);
 
         if (count($blocks) !== 0) {
             $blockView = $best->bestBlocksCache();
@@ -106,12 +104,13 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param DbInterface $db
      * @param Peer $peer
      * @param GetHeaders $getHeaders
      */
-    public function onGetHeaders(DbInterface $db, Peer $peer, GetHeaders $getHeaders)
+    public function onGetHeaders(Container $container, Peer $peer, GetHeaders $getHeaders)
     {
+        /** @var DbInterface $db */
+        $db = $container['db'];
         $chain = $this->node->chain()->getChain();
 
         $math = Bitcoin::getMath();
@@ -125,16 +124,17 @@ class P2PServiceProvider implements ServiceProviderInterface
 
             $headers = $db->fetchNextHeaders($start);
             $peer->headers($headers);
-            //$this->notifier->send('peer.sentheaders', ['count' => count($headers), 'start'=>$start->getHex()]);
+            $container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start'=>$start->getHex()]);
         }
     }
 
 
     /**
+     * @param Container $container
      * @param Peer $peer
      * @param Headers $headersMsg
      */
-    public function onHeaders(Peer $peer, Headers $headersMsg)
+    public function onHeaders(Container $container, Peer $peer, Headers $headersMsg)
     {
         $chains = $this->node->chains();
         $headers = $this->node->headers();
@@ -161,23 +161,19 @@ class P2PServiceProvider implements ServiceProviderInterface
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
 
-            //$this->notifier->send('p2p.headers', ['count' => $count]);
-
+            $container['debug']->log('p2p.headers', ['count' => $count]);
         } catch (\Exception $e) {
-            //$this->notifier->send('error.onHeaders', ['error' => $e->getMessage()]);
-            echo $e->getMessage() . PHP_EOL;
-            echo $e->getTraceAsString().PHP_EOL;
-            die();
+            $container['debug']->log('error.onHeaders', ['error' => $e->getMessage()]);
         }
-
     }
 
 
     /**
+     * @param Container $container
      * @param Peer $peer
      * @param Block $blockMsg
      */
-    public function onBlock(Peer $peer, Block $blockMsg)
+    public function onBlock(Container $container, Peer $peer, Block $blockMsg)
     {
         $node = $this->node;
         $best = $node->chain();
@@ -191,32 +187,14 @@ class P2PServiceProvider implements ServiceProviderInterface
 
             $index = $blockIndex->accept($block, $headerIdx);
             unset($state);
-            //$this->notifier->send('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
+            $container['debug']->log('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $chainsIdx->checkTips();
             $this->blockDownload->received($best, $peer, $index->getHash());
 
         } catch (\Exception $e) {
             $header = $block->getHeader();
-            //$this->notifier->send('error.onBlock', ['hash'=>$header->getHash()->getHex(),'error' => $e->getMessage()]);
-            echo 'Failed to accept block' . PHP_EOL;
-
-            echo $e->getMessage() . PHP_EOL;
-
-            if ($best->getChain()->containsHash($block->getHeader()->getPrevBlock())) {
-                if ($header->getPrevBlock() === $best->getLastBlock()->getHash()) {
-                    echo $block->getHeader()->getHash()->getHex() . PHP_EOL;
-                    echo $block->getHex() . PHP_EOL;
-                    echo 'We have prevblockIndex, so this is weird.';
-                    echo $e->getTraceAsString() . PHP_EOL;
-                    echo $e->getMessage() . PHP_EOL;
-                } else {
-                    echo 'Didn\'t elongate the chain, probably from the future..' . PHP_EOL;
-                }
-            }
-
-            echo $e->getTraceAsString() . PHP_EOL;
-            die();
+            $container['debug']->log('error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage()]);
         }
     }
 
@@ -227,6 +205,19 @@ class P2PServiceProvider implements ServiceProviderInterface
     public function onPing(Peer $peer, Ping $ping)
     {
         $peer->pong($ping);
+    }
+
+    /**
+     * @param callable $callable
+     * @return \Closure
+     */
+    public function wrap(callable $callable)
+    {
+        $wrapped = array_slice(func_get_args(), 1);
+
+        return function () use ($callable, $wrapped) {
+            return call_user_func_array($callable, array_merge($wrapped, func_get_args()));
+        };
     }
 
     /**
@@ -253,18 +244,13 @@ class P2PServiceProvider implements ServiceProviderInterface
         }
 
         $manager->on('outbound', function (Peer $peer) use ($c) {
-            $peer->on('block', array ($this, 'onBlock'));
-            $peer->on('inv', array ($this, 'onInv'));
-            $peer->on('headers', array ($this, 'onHeaders'));
-            $peer->on('getheaders', function (Peer $peer, GetHeaders $getheaders) use ($c) {
-                $this->onGetHeaders($c['db'], $peer, $getheaders);
-            });
+            $peer->on('block',      $this->wrap([$this, 'onBlock'], $c));
+            $peer->on('inv',        [$this, 'onInv']);
+            $peer->on('headers',    $this->wrap([$this, 'onHeaders'], $c));
+            $peer->on('getheaders',    $this->wrap([$this, 'onGetHeaders'], $c));
 
-            //$addr = $peer->getRemoteAddr();
-            /*$this->notifier->send('peer.outbound.new', ['peer' =>[
-                'ip' => $addr->getIp(),
-                'port' => $addr->getPort()
-            ]]);*/
+            $addr = $peer->getRemoteAddr();
+            $c['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
 
             $this->peersOutbound->add($peer);
 
@@ -275,11 +261,9 @@ class P2PServiceProvider implements ServiceProviderInterface
             $peer->getheaders($chain->getLocator($height));
         });
 
-        $manager->on('inbound', function (Peer $peer) {
-            /*$this->notifier->send('peer.inbound.new', ['peer' =>[
-                'ip' => $peer->getRemoteAddr()->getIp(),
-                'port' => $peer->getRemoteAddr()->getPort()
-            ]]);*/
+        $manager->on('inbound', function (Peer $peer) use ($c) {
+            $addr = $peer->getRemoteAddr();
+            $c['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->peersInbound->add($peer);
         });
 

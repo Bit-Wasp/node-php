@@ -40,8 +40,8 @@ class ShutdownCommand extends Command
      */
     public function execute(NodeInterface $node, array $params)
     {
-        $node->stop();
         $this->loop->stop();
+        $node->stop();
 
         return [
             'message' => 'Shutting down'

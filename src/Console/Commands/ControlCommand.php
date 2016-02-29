@@ -15,6 +15,8 @@ class ControlCommand extends AbstractCommand
     private $command;
 
     /**
+     * Wraps any CommandInterface to expose it as a console command
+     *
      * NodeControlCommand constructor.
      * @param CommandInterface $command
      */
@@ -25,6 +27,8 @@ class ControlCommand extends AbstractCommand
     }
 
     /**
+     * Loads the arguments required by this command
+     *
      * @param InputInterface $input
      * @return array
      */
@@ -39,7 +43,8 @@ class ControlCommand extends AbstractCommand
     }
 
     /**
-     *
+     * Configures the command name, arguments, and description from
+     * the CommandInterface
      */
     protected function configure()
     {
@@ -52,6 +57,8 @@ class ControlCommand extends AbstractCommand
     }
 
     /**
+     * Execute the command by requesting it over the ZMQ socket
+     *
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
@@ -61,15 +68,8 @@ class ControlCommand extends AbstractCommand
         $context = new \ZMQContext();
         $push = $context->getSocket(\ZMQ::SOCKET_REQ);
         $push->connect('tcp://127.0.0.1:5560');
+        $push->send(json_encode(['cmd' => $this->command->getName(), 'params' => $this->getParams($input)]));
 
-        $params = $this->getParams($input);
-
-        $msg = json_encode([
-            'cmd' => $this->command->getName(),
-            'params' => $params
-        ]);
-
-        $push->send($msg);
         $response = $push->recv();
         $output->writeln($response);
         return 0;
