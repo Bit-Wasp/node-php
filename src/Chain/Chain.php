@@ -20,7 +20,7 @@ class Chain extends EventEmitter implements ChainInterface
     private $headers;
 
     /**
-     * @var Index\Transaction
+     * @var Index\Transactions
      */
     private $txIndex;
 
@@ -89,7 +89,7 @@ class Chain extends EventEmitter implements ChainInterface
      * @param BufferInterface $txid
      * @return \BitWasp\Bitcoin\Transaction\Transaction
      */
-    public function fetchTransaction(Index\Transaction $txIndex, BufferInterface $txid)
+    public function fetchTransaction(Index\Transactions $txIndex, BufferInterface $txid)
     {
         return $txIndex->fetch($this->getIndex()->getHash(), $txid);
     }

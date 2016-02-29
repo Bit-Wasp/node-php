@@ -11,6 +11,9 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Transaction\OutPointInterface;
+use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\BufferInterface;
 
 interface DbInterface
@@ -78,6 +81,20 @@ interface DbInterface
      * @return Block
      */
     public function fetchBlock(BufferInterface $hash);
+
+    /**
+     * @param BufferInterface $tipHash
+     * @param BufferInterface $txid
+     * @return TransactionInterface
+     */
+    public function getTransaction(BufferInterface $tipHash, BufferInterface $txid);
+
+    /**
+     * @param BufferInterface $tipHash
+     * @param OutPointInterface[] $outpoints
+     * @return Utxo[]
+     */
+    public function fetchUtxoList(BufferInterface $tipHash, array $outpoints);
 
     /**
      * @param Headers $headers

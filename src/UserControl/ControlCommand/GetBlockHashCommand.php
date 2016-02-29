@@ -1,17 +1,19 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
+namespace BitWasp\Bitcoin\Node\UserControl\ControlCommand;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 
 class GetBlockHashCommand extends Command
 {
+    const PARAM_HEIGHT = 'height';
+
     protected function configure()
     {
         $this
             ->setName('getblockhash')
             ->setDescription('Returns the block hash for height')
-            ->setParam('height', 'Block height');
+            ->setParam(self::PARAM_HEIGHT, 'Block height');
     }
 
     /**
@@ -19,17 +21,17 @@ class GetBlockHashCommand extends Command
      * @param array $params
      * @return array
      */
-    public function execute(NodeInterface $node, array $params = [])
+    public function execute(NodeInterface $node, array $params)
     {
-        if (!isset($params['height'])) {
-            throw new \RuntimeException('Missing height field');
-        } else if (is_int($params['height'])) {
+        if (!is_int($params[self::PARAM_HEIGHT])) {
             throw new \RuntimeException('Invalid height');
         }
 
         $chain = $node->chain()->getChain();
+        $hash = $chain->getHashFromHeight($params[self::PARAM_HEIGHT]);
 
-        $hash = $chain->getHashFromHeight($params['height']);
-        return ['hash'=>$hash->getHex()];
+        return [
+            'hash' => $hash->getHex()
+        ];
     }
 }

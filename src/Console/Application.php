@@ -8,15 +8,15 @@ use BitWasp\Bitcoin\Node\Console\Commands\Db\DbReset;
 use BitWasp\Bitcoin\Node\Console\Commands\Db\DbWipe;
 use BitWasp\Bitcoin\Node\Console\Commands\Config\ConfigDefault;
 use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StartCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StopCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WatchCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\ChainsCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetBlockHashCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetHeaderCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\GetTxCommand;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\InfoCommand;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\ChainsCommand;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\GetBlockHashCommand;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\GetHeaderCommand;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\GetTxCommand;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\InfoCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
 
 class Application extends ConsoleApplication

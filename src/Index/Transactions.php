@@ -2,22 +2,22 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
-use BitWasp\Bitcoin\Node\Db;
+use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Buffertools\BufferInterface;
 
-class Transaction
+class Transactions
 {
 
     /**
-     * @var Db
+     * @var DbInterface
      */
     private $db;
 
     /**
      * Transaction constructor.
-     * @param Db $db
+     * @param DbInterface $db
      */
-    public function __construct(Db $db)
+    public function __construct(DbInterface $db)
     {
         $this->db = $db;
     }

@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\CommandInterface;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\CommandInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;

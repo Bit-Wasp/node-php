@@ -3,7 +3,7 @@
 namespace BitWasp\Bitcoin\Node\WebSocket;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\CommandInterface;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\CommandInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\Wamp\WampServerInterface;
 
@@ -72,19 +72,11 @@ class Pusher implements WampServerInterface
             /** @var CommandInterface $command */
             $command = $this->command[$topic->getId()];
 
-            try {
-                $result = $command->execute($this->node, $params);
-                $conn->callResult($id, $result);
-
-            } catch (\Exception $e) {
-                $result = ['error'=>$e->getMessage()];
-                $conn->callError($id, $topic, 'You are not allowed to make calls');
-            }
-
-        } else {
-
-            // In this application if clients send data it's because the user hacked around in console
+            $result = $command->run($this->node, $params);
+            $conn->callResult($id, $result);
         }
+
+        $conn->callError($id, $topic, ['error' => 'Invalid call']);
 
     }
 

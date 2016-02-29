@@ -6,6 +6,7 @@ use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
+use BitWasp\Bitcoin\Script\Opcodes;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
 use BitWasp\Buffertools\Buffer;
@@ -98,16 +99,13 @@ class RegtestParams extends Params
         $timestamp = new Buffer('The Times 03/Jan/2009 Chancellor on brink of second bailout for banks', null, $this->math);
         $publicKey = Buffer::hex('04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f', null, $this->math);
 
-        $inputScript = ScriptFactory::create()
-            ->push(Buffer::int('486604799', 4, $this->math)->flip())
-            ->push(Buffer::int('4', null, $this->math))
-            ->push($timestamp)
-            ->getScript();
+        $inputScript = ScriptFactory::sequence([
+            Buffer::int('486604799', 4, $this->math)->flip(),
+            Buffer::int('4', null, $this->math),
+            $timestamp
+        ]);
 
-        $outputScript = ScriptFactory::create()
-            ->push($publicKey)
-            ->op('OP_CHECKSIG')
-            ->getScript();
+        $outputScript = ScriptFactory::sequence([$publicKey, Opcodes::OP_CHECKSIG]);
 
         return new Block(
             $this->math,

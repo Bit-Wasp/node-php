@@ -1,9 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Zmq;
+namespace BitWasp\Bitcoin\Node\UserControl;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Bitcoin\Node\Zmq\ControlCommand\CommandInterface;
+use BitWasp\Bitcoin\Node\UserControl\ControlCommand\CommandInterface;
 use \React\ZMQ\Context;
 
 class UserControl
@@ -31,26 +31,19 @@ class UserControl
 
         $cmdControl = $context->getSocket(\ZMQ::SOCKET_REP);
         $cmdControl->bind('tcp://127.0.0.1:5560');
-
         $cmdControl->on('message', function ($e) use ($node) {
 
             $input = json_decode($e, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 if (isset($input['cmd'])) {
-                    $found = false;
                     foreach ($this->commands as $name => $command) {
                         if ($input['cmd'] === $name) {
-                            $found = true;
                             $params = isset($input['params']) && is_array($input['params']) ? $input['params'] : [];
-                            try {
-                                $result = $command->execute($node, $params);
-                            } catch (\Exception $e) {
-                                $result = ['error' => $e->getMessage()];
-                            }
+                            $result = $command->run($node, $params);
                         }
                     }
 
-                    if (!$found) {
+                    if (!isset($result)) {
                         $result = ['error'=>'Unknown command'];
                     }
                 } else {

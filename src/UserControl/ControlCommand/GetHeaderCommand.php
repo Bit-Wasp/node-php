@@ -1,18 +1,20 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Zmq\ControlCommand;
+namespace BitWasp\Bitcoin\Node\UserControl\ControlCommand;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Buffertools\Buffer;
 
 class GetHeaderCommand extends Command
 {
+    const PARAM_HASH = 'hash';
+
     protected function configure()
     {
         $this
             ->setName('getheader')
             ->setDescription('Return the requested block header')
-            ->setParam('hash', 'Block hash');
+            ->setParam(self::PARAM_HASH, 'Block hash');
     }
 
     /**
@@ -20,17 +22,17 @@ class GetHeaderCommand extends Command
      * @param array $params
      * @return array
      */
-    public function execute(NodeInterface $node, array $params = [])
+    public function execute(NodeInterface $node, array $params)
     {
-        if (!isset($params['hash'])) {
-            throw new \RuntimeException('Missing hash field');
-        } else if (strlen($params['hash']) !== 64) {
+        if (strlen($params[self::PARAM_HASH]) !== 64) {
             throw new \RuntimeException('Invalid hash');
         }
 
         $chain = $node->chain()->getChain();
+        $index = $chain->fetchIndex(Buffer::hex($params[self::PARAM_HASH]));
 
-        $index = $chain->fetchIndex(Buffer::hex($params['hash']));
-        return $this->convertIndexToArray($index);
+        return [
+            'header' => $this->convertIndexToArray($index)
+        ];
     }
 }

@@ -68,6 +68,14 @@ class Chains extends EventEmitter implements ChainsInterface
     }
 
     /**
+     * @return int
+     */
+    public function count()
+    {
+        return count($this->states);
+    }
+
+    /**
      * @param ChainStateInterface $a
      * @param ChainStateInterface $b
      * @return int

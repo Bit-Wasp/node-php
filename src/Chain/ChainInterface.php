@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Bitcoin\Node\Index\Transaction;
+use BitWasp\Bitcoin\Node\Index\Transactions;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
@@ -27,11 +27,11 @@ interface ChainInterface extends EventEmitterInterface
     public function fetchIndex(BufferInterface $hash);
 
     /**
-     * @param Transaction $txIndex
+     * @param Transactions $txIndex
      * @param BufferInterface $txid
      * @return TransactionInterface
      */
-    public function fetchTransaction(Transaction $txIndex, BufferInterface $txid);
+    public function fetchTransaction(Transactions $txIndex, BufferInterface $txid);
 
     /**
      * @param int $height
