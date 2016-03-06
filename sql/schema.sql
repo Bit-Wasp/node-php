@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Feb 20, 2016 at 03:29 AM
+-- Generation Time: Mar 06, 2016 at 05:37 PM
 -- Server version: 5.6.28-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.1
 
@@ -162,7 +162,8 @@ ALTER TABLE `blockIndex`
 --
 ALTER TABLE `block_transactions`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx` (`block_hash`,`transaction_hash`);
+  ADD KEY `idx` (`block_hash`,`transaction_hash`),
+  ADD KEY `txidx` (`transaction_hash`,`block_hash`);
 
 --
 -- Indexes for table `headerIndex`

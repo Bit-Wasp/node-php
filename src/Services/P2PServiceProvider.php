@@ -194,6 +194,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             $header = $block->getHeader();
             $container['debug']->log('error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage()]);
         }
+
     }
 
     /**

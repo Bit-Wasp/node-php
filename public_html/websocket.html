@@ -1,54 +1,91 @@
 <!DOCTYPE html>
 <html>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+<link href="css/style.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-2.2.1.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 <script src="http://autobahn.s3.amazonaws.com/js/autobahn.min.js"></script>
 <script>
-    var conn = new ab.Session('ws://localhost:8080',
-        function() {
-            // events
-            conn.subscribe('p2p.block', function(topic, data) {
-                console.log('Received P2P BLOCK ');
-                console.log(data);
-            });
-            conn.subscribe('p2p.headers', function(topic, data) {
-                console.log('Received P2P HEADERS ');
-                console.log(data);
-            });
 
-            conn.subscribe('p2p.inv', function(topic, data) {
-                console.log('Received P2P INV ');
-                console.log(data);
-            });
-            conn.subscribe('peer.outbound.new', function(topic, data) {
-                console.log('New outbound peer ');
-                console.log(data);
-            });
-            conn.subscribe('peer.inbound.new', function(topic, data) {
-                console.log('New inbound peer ');
-                console.log(data);
-            });
+    $(function () {
+        var conn = new ab.Session('ws://127.0.0.1:8080',
+            function() {
+                // events
+                conn.subscribe('p2p.block', function(topic, data) {
+                    console.log('Received P2P BLOCK ');
+                    console.log(data);
+                });
 
-            conn.subscribe('chain.newtip', function(topic, data) {
-                console.log('New chain tip ');
-                console.log(data);
-            });
-            conn.subscribe('peer.sentheaders', function(topic, data) {
-                console.log('Sent headers to peer ');
-                console.log(data);
-            });
-            conn.subscribe('error.onHeaders', function(topic, data) {
-                console.log('Error processing headers ');
-                console.log(data);
-            });
-            conn.subscribe('error.onBlock', function(topic, data) {
-                console.log('Error processing block ');
-                console.log(data);
-            });
+                conn.subscribe('p2p.headers', function(topic, data) {
+                    console.log('Received P2P HEADERS ');
+                    console.log(data);
+                });
 
-        },
-        function() {
-            console.warn('WebSocket connection closed');
-        },
-        {'skipSubprotocolCheck': true}
-    );
+                conn.subscribe('p2p.inv', function(topic, data) {
+                    console.log('Received P2P INV ');
+                    console.log(data);
+                });
+                conn.subscribe('peer.outbound.new', function(topic, data) {
+                    console.log('New outbound peer ');
+                    console.log(data);
+                });
+                conn.subscribe('peer.inbound.new', function(topic, data) {
+                    console.log('New inbound peer ');
+                    console.log(data);
+                });
+
+                conn.subscribe('chain.newtip', function(topic, data) {
+                    console.log('New chain tip ');
+                    console.log(data);
+                });
+
+                conn.subscribe('peer.sentheaders', function(topic, data) {
+                    console.log('Sent headers to peer ');
+                    console.log(data);
+                });
+                conn.subscribe('error.onHeaders', function(topic, data) {
+                    console.log('Error processing headers ');
+                    console.log(data);
+                });
+                conn.subscribe('error.onBlock', function(topic, data) {
+                    console.log('Error processing block ');
+                    console.log(data);
+                });
+
+                conn.call('info').then(function (result) {
+                    console.log('yay');
+                    console.log(result);
+                    var header = result.best_header;
+                    $("#status_connection").html('Connected');
+                    $("#status_height").html(header.height);
+                }, function () {
+                    console.log('nay');
+                    $("#status_connection").html('Disconnected');
+                });
+            },
+            function() {
+                console.warn('WebSocket connection closed');
+            },
+            {'skipSubprotocolCheck': true}
+        )
+    });
+
 </script>
+<body>
+    <div class="container">
+        <div class="col-lg-3 col-sm-12">
+            <div class="well">
+                <div class="row">
+                    <div class="col-md-3">Status:</div>
+                    <div class="col-md-9"><div id="status_connection">Not connected</div></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3">Height:</div>
+                    <div class="col-md-9"><div id="status_height"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
 </html>

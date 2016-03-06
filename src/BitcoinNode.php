@@ -52,6 +52,10 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $adapter = Bitcoin::getEcAdapter($math);
 
         $this->chains = new Chains($adapter, $params);
+        $this->chains->on('newtip', function (ChainStateInterface $tip) {
+            $index = $tip->getChainIndex();
+            $this->emit('event', ['chains.newtip', ['hash' => $index->getHash()->getHex()]]);
+        });
 
         $consensus = new Consensus($math, $params);
 

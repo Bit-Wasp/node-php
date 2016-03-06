@@ -526,25 +526,24 @@ class Db implements DbInterface
     }
 
     /**
-     * @param BufferInterface $blockHash
+     * @param int $blockId
      * @return TransactionCollection
      */
-    public function fetchBlockTransactions(BufferInterface $blockHash)
+    public function fetchBlockTransactions($blockId)
     {
-
         if (null === $this->txsStmt) {
             $this->txsStmt = $this->dbh->prepare('
-                SELECT t.hash, t.version, t.nLockTime
+                SELECT t.id, t.hash, t.version, t.nLockTime
                 FROM transactions  t
-                JOIN block_transactions  bt ON bt.transaction_hash = t.hash
-                WHERE bt.block_hash = :hash
+                JOIN block_transactions  bt ON bt.transaction_hash = t.id
+                WHERE bt.block_hash = :id
             ');
 
             $this->txInStmt = $this->dbh->prepare('
                 SELECT txIn.parent_tx, txIn.hashPrevOut, txIn.nPrevOut, txIn.scriptSig, txIn.nSequence
                 FROM transaction_input  txIn
                 JOIN block_transactions  bt ON bt.transaction_hash = txIn.parent_tx
-                WHERE bt.block_hash = :hash
+                WHERE bt.block_hash = :id
                 GROUP BY txIn.parent_tx
                 ORDER BY txIn.nInput
             ');
@@ -553,39 +552,40 @@ class Db implements DbInterface
               SELECT    txOut.parent_tx, txOut.value, txOut.scriptPubKey
               FROM      transaction_output  txOut
               JOIN      block_transactions  bt ON bt.transaction_hash = txOut.parent_tx
-              WHERE     bt.block_hash = :hash
+              WHERE     bt.block_hash = :id
               GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
             ');
         }
 
-        $binHash = $blockHash->getBinary();
         // We pass a callback instead of looping
-        $this->txsStmt->bindValue(':hash', $binHash);
+        $this->txsStmt->bindValue(':id', $blockId);
         $this->txsStmt->execute();
         /** @var TxBuilder[] $builder */
         $builder = [];
-        $this->txsStmt->fetchAll(\PDO::FETCH_FUNC, function ($hash, $version, $locktime) use (&$builder) {
-            $builder[$hash] = (new TxBuilder())
+        $this->txsStmt->fetchAll(\PDO::FETCH_FUNC, function ($id, $hash, $version, $locktime) use (&$builder) {
+            $builder[$id] = (new TxBuilder())
                 ->version($version)
                 ->locktime($locktime);
         });
 
-        $this->txInStmt->bindParam(':hash', $binHash);
+        $this->txInStmt->bindParam(':id', $blockId);
         $this->txInStmt->execute();
         $this->txInStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $hashPrevOut, $nPrevOut, $scriptSig, $nSequence) use (&$builder) {
             $builder[$parent_tx]->spendOutPoint(new OutPoint(new Buffer($hashPrevOut, 32), $nPrevOut), new Script(new Buffer($scriptSig)), $nSequence);
         });
 
-        $this->txOutStmt->bindParam(':hash', $binHash);
+        $this->txOutStmt->bindParam(':id', $blockId);
         $this->txOutStmt->execute();
         $this->txOutStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $value, $scriptPubKey) use (&$builder) {
             $builder[$parent_tx]->output($value, new Script(new Buffer($scriptPubKey)));
         });
 
-        return new TransactionCollection(array_map(function (TxBuilder $value) {
-            return $value->get();
-        }, $builder));
+        $collection = [];
+        foreach ($builder as $b) {
+            $collection[] = $b->get();
+        }
+        return new TransactionCollection($collection);
     }
 
     /**
@@ -596,7 +596,7 @@ class Db implements DbInterface
     {
 
         $stmt = $this->dbh->prepare('
-           SELECT     h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
+           SELECT     h.id, h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
            FROM       blockIndex  b
            JOIN       headerIndex  h ON b.hash = h.id
            WHERE      h.hash = :hash
@@ -617,7 +617,7 @@ class Db implements DbInterface
                         Buffer::int($r['nBits'], 4),
                         $r['nNonce']
                     ),
-                    $this->fetchBlockTransactions($hash)
+                    $this->fetchBlockTransactions($r['id'])
                 );
             }
         }
@@ -936,8 +936,9 @@ WHERE tip.header_id = (
 
     /**
      * @param BufferInterface $tipHash
-     * @param OutPointInterface[] $outpoints
+     * @param array $outpoints
      * @return Utxo[]
+     * @throws \Exception
      */
     public function fetchUtxoList(BufferInterface $tipHash, array $outpoints)
     {
@@ -950,7 +951,6 @@ WHERE tip.header_id = (
         $queryValues = [];
 
         $queryV = ['hash' => $tipHash->getBinary()];
-
         for ($i = 0; $i < $requiredCount; $i++) {
             $outpoint = $outpoints[$i];
 
@@ -972,35 +972,37 @@ WHERE tip.header_id = (
 
         $this->dbh->beginTransaction();
 
-        $newFeature = false;
-        if ($newFeature) {
-            $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
-            $initOutpoints->execute($queryValues);
+        try {
+            $newFeature = true;
+            if ($newFeature) {
+                /* This works well:
+$fetchUtxoStmt = $this->dbh->prepare('
+SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
+JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
+JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
+JOIN block_transactions bt on (bt.transaction_hash = t.id)
+JOIN iindex i on (i.header_id = bt.block_hash)
+WHERE i.lft <= :lft and i.rgt >= :rgt
+');
+                */
+                $fetchUtxoStmt = $this->dbh->prepare('
+SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
+JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
+JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
+JOIN block_transactions bt on (bt.transaction_hash = t.id)
+JOIN iindex i on (i.header_id = bt.block_hash)
+WHERE i.lft <= :lft and i.rgt >= :rgt
+');
+                $queryValues['rgt'] = $id['rgt'];
+                $queryValues['lft'] = $id['lft'];
 
-            $initUtxoStmt = $this->dbh->prepare("
-            CREATE TEMPORARY TABLE utxo (INDEX idx (tid, nOutput)) ENGINE=MEMORY
-                SELECT  outpoint.hashPrevOut, outpoint.nOutput, t.id as tid
-                FROM outpoint
-                JOIN transactions t on (t.hash = outpoint.hashPrevOut)
-            ");
-            $initUtxoStmt->execute();
+                $fetchUtxoStmt->execute($queryValues);
+                $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $selectUtxoStmt = $this->dbh->prepare("
-            SELECT  u.hashPrevOut AS txid, u.nOutput AS vout,
-                    o.value, o.scriptPubKey
-            FROM utxo u
-            JOIN transaction_output o on (o.parent_tx = u.tid AND o.nOutput = u.nOutput)
-            JOIN block_transactions bt on (bt.transaction_hash = u.tid)
-            JOIN iindex i on (i.header_id = bt.block_hash)
-            WHERE (i.lft <= :lft AND i.rgt >= :rgt)
-            ");
-            $selectUtxoStmt->execute(['lft' => $id['lft'], 'rgt' => $id['rgt']]);
-            $rows = $selectUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        } else {
-            $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
-            $initOutpoints->execute($queryValues);
-            $fetchUtxoStmt = $this->dbh->prepare('
+            } else {
+                $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
+                $initOutpoints->execute($queryValues);
+                $fetchUtxoStmt = $this->dbh->prepare('
 SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
                    o.value, o.scriptPubKey
 FROM  outpoint,
@@ -1012,17 +1014,21 @@ JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
 WHERE tip.header_id = (
 	SELECT id FROM headerIndex WHERE hash = :hash
 ) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
-            $fetchUtxoStmt->execute($queryV);
-            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-        }
+                $fetchUtxoStmt->execute($queryV);
+                $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
 
-        $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
-        $new->execute();
-        if ($newFeature) {
-            $new2 = $this->dbh->prepare('DROP TEMPORARY TABLE utxo');
-            $new2->execute();
+            if (!$newFeature) {
+                $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
+                $new->execute();
+            }
+
+            $this->dbh->commit();
+
+        } catch (\Exception $e) {
+            $this->dbh->rollBack();
+            throw $e;
         }
-        $this->dbh->commit();
 
         $outputSet = [];
         foreach ($rows as $utxo) {
@@ -1030,7 +1036,7 @@ WHERE tip.header_id = (
         }
 
         if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than required amount returned');
+            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
         }
 
         return $outputSet;

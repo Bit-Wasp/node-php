@@ -71,10 +71,10 @@ interface DbInterface
     public function fetchIndexById($id);
 
     /**
-     * @param BufferInterface $blockHash
+     * @param int $blockId
      * @return TransactionCollection
      */
-    public function fetchBlockTransactions(BufferInterface $blockHash);
+    public function fetchBlockTransactions($blockId);
 
     /**
      * @param BufferInterface $hash
