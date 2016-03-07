@@ -6,6 +6,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
@@ -166,8 +167,9 @@ class Blocks
 
         $view = $this->prepareBatch($block);
 
-        //$forks = new ForkState($index, $this->consensus->getParams(), $this->db);
-        //$flags = $forks->getScriptFlags();
+        //$versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
+        //$forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+        //$flags = $forks->getFlags();
         $flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         $scriptCheckState = new ScriptValidation(true, $flags);
 

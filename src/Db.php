@@ -147,11 +147,11 @@ class Db implements DbInterface
     {
         /** @var \PDOStatement[] $stmt */
         $stmt = [];
-        $stmt[] = $this->dbh->prepare('TRUNCATE blocks');
+        $stmt[] = $this->dbh->prepare('TRUNCATE blockIndex');
         $stmt[] = $this->dbh->prepare('TRUNCATE block_transactions');
         $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
-        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_outputs');
-        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_inputs');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_output');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_input');
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -169,11 +169,11 @@ class Db implements DbInterface
         $stmt = [];
         $stmt[] = $this->dbh->prepare('TRUNCATE iindex');
         $stmt[] = $this->dbh->prepare('TRUNCATE headerIndex');
-        $stmt[] = $this->dbh->prepare('TRUNCATE blocks');
+        $stmt[] = $this->dbh->prepare('TRUNCATE blockIndex');
         $stmt[] = $this->dbh->prepare('TRUNCATE block_transactions');
         $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
-        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_outputs');
-        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_inputs');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_output');
+        $stmt[] = $this->dbh->prepare('TRUNCATE transaction_input');
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -949,11 +949,8 @@ WHERE tip.header_id = (
 
         $joinList = [];
         $queryValues = [];
-
-        $queryV = ['hash' => $tipHash->getBinary()];
         for ($i = 0; $i < $requiredCount; $i++) {
             $outpoint = $outpoints[$i];
-
             if (0 === $i) {
                 $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
             } else {
@@ -973,10 +970,7 @@ WHERE tip.header_id = (
         $this->dbh->beginTransaction();
 
         try {
-            $newFeature = true;
-            if ($newFeature) {
-                /* This works well:
-$fetchUtxoStmt = $this->dbh->prepare('
+            $fetchUtxoStmt = $this->dbh->prepare('
 SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
 JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
 JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
@@ -984,62 +978,29 @@ JOIN block_transactions bt on (bt.transaction_hash = t.id)
 JOIN iindex i on (i.header_id = bt.block_hash)
 WHERE i.lft <= :lft and i.rgt >= :rgt
 ');
-                */
-                $fetchUtxoStmt = $this->dbh->prepare('
-SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
-JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
-JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
-JOIN block_transactions bt on (bt.transaction_hash = t.id)
-JOIN iindex i on (i.header_id = bt.block_hash)
-WHERE i.lft <= :lft and i.rgt >= :rgt
-');
-                $queryValues['rgt'] = $id['rgt'];
-                $queryValues['lft'] = $id['lft'];
+            $queryValues['rgt'] = $id['rgt'];
+            $queryValues['lft'] = $id['lft'];
 
-                $fetchUtxoStmt->execute($queryValues);
-                $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            } else {
-                $initOutpoints = $this->dbh->prepare('CREATE TEMPORARY TABLE outpoint (INDEX idx (hashPrevOut, nOutput)) ENGINE=MEMORY '.$innerJoin);
-                $initOutpoints->execute($queryValues);
-                $fetchUtxoStmt = $this->dbh->prepare('
-SELECT outpoint.hashPrevOut as txid, outpoint.nOutput as vout,
-                   o.value, o.scriptPubKey
-FROM  outpoint,
-      iindex as tip
-JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
-JOIN block_transactions bt on (bt.block_hash = parent.header_id)
-JOIN transactions t on (bt.transaction_hash = t.id)
-JOIN transaction_output o on (o.parent_tx = bt.transaction_hash)
-WHERE tip.header_id = (
-	SELECT id FROM headerIndex WHERE hash = :hash
-) AND tip.lft BETWEEN parent.lft and parent.rgt AND (outpoint.hashPrevOut = t.hash AND outpoint.nOutput = o.nOutput)');
-                $fetchUtxoStmt->execute($queryV);
-                $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-            }
-
-            if (!$newFeature) {
-                $new = $this->dbh->prepare('DROP TEMPORARY TABLE outpoint');
-                $new->execute();
-            }
+            $fetchUtxoStmt->execute($queryValues);
+            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $this->dbh->commit();
+
+            $outputSet = [];
+            foreach ($rows as $utxo) {
+                $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            }
+
+            if (count($outputSet) < $requiredCount) {
+                throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+            }
+
+            return $outputSet;
 
         } catch (\Exception $e) {
             $this->dbh->rollBack();
             throw $e;
         }
-
-        $outputSet = [];
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
-        }
-
-        return $outputSet;
     }
 
     /**

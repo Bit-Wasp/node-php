@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
+use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
@@ -185,16 +186,20 @@ class P2PServiceProvider implements ServiceProviderInterface
         try {
             $index = $blockIndex->accept($block, $headerIdx);
             unset($state);
-            $container['debug']->log('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
 
             $chainsIdx->checkTips();
             $this->blockDownload->received($best, $peer, $index->getHash());
 
+            $txcount = count($block->getTransactions());
+            $size = number_format($block->getBuffer()->getSize() / 1024, 3) . " kb";
+            $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
+                return $r + count($v->getInputs());
+            }, 0);
+            $container['debug']->log('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]);
         } catch (\Exception $e) {
             $header = $block->getHeader();
             $container['debug']->log('error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage()]);
         }
-
     }
 
     /**

@@ -172,11 +172,20 @@ class Forks
 
     /**
      * @param BlockIndexInterface $index
+     * @return bool
+     */
+    public function isNext(BlockIndexInterface $index)
+    {
+        return $index->getHeader()->getPrevBlock()->equals($this->index->getHash());
+    }
+
+    /**
+     * @param BlockIndexInterface $index
      * @return $this
      */
     public function next(BlockIndexInterface $index)
     {
-        if (!$index->getHeader()->getPrevBlock()->equals($this->index->getHash())) {
+        if (!$this->isNext($index)) {
             throw new \RuntimeException('Incorrect next block for forks');
         }
 
