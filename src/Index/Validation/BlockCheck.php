@@ -3,7 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
@@ -27,11 +26,6 @@ class BlockCheck implements BlockCheckInterface
     private $math;
 
     /**
-     * @var ParamsInterface
-     */
-    private $params;
-
-    /**
      * @param Consensus $consensus
      * @param EcAdapterInterface $ecAdapter
      */
@@ -39,7 +33,6 @@ class BlockCheck implements BlockCheckInterface
     {
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
-        $this->params = $consensus->getParams();
     }
 
     /**
@@ -186,6 +179,7 @@ class BlockCheck implements BlockCheckInterface
     public function checkTransaction(TransactionInterface $transaction, $checkSize = true)
     {
         // Must be at least one transaction input and output
+        $params = $this->consensus->getParams();
         $inputs = $transaction->getInputs();
         $nInputs = count($inputs);
         if (0 === $nInputs) {
@@ -198,7 +192,7 @@ class BlockCheck implements BlockCheckInterface
             throw new \RuntimeException('CheckTransaction: no outputs');
         }
 
-        if ($checkSize && $transaction->getBuffer()->getSize() > $this->params->maxBlockSizeBytes()) {
+        if ($checkSize && $transaction->getBuffer()->getSize() > $params->maxBlockSizeBytes()) {
             throw new \RuntimeException('CheckTransaction: tx size exceeds max block size');
         }
 
@@ -229,6 +223,7 @@ class BlockCheck implements BlockCheckInterface
      */
     public function check(BlockInterface $block)
     {
+        $params = $this->consensus->getParams();
         $header = $block->getHeader();
         if ($block->getMerkleRoot() != $header->getMerkleRoot()) {
             throw new \RuntimeException('Blocks::check(): failed to verify merkle root');
@@ -236,7 +231,7 @@ class BlockCheck implements BlockCheckInterface
 
         $transactions = $block->getTransactions();
         $txCount = count($transactions);
-        if (0 === $txCount || $block->getBuffer()->getSize() > $this->params->maxBlockSizeBytes()) {
+        if (0 === $txCount || $block->getBuffer()->getSize() > $params->maxBlockSizeBytes()) {
             throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
         }
 
@@ -257,7 +252,7 @@ class BlockCheck implements BlockCheckInterface
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 
-        if ($this->math->cmp($nSigOps, $this->params->getMaxBlockSigOps()) > 0) {
+        if ($this->math->cmp($nSigOps, $params->getMaxBlockSigOps()) > 0) {
             throw new \RuntimeException('Blocks::check(): out-of-bounds sigop count');
         }
 
