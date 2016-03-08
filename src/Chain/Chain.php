@@ -19,11 +19,6 @@ class Chain extends EventEmitter implements ChainInterface
     private $headers;
 
     /**
-     * @var Index\Transactions
-     */
-    private $txIndex;
-
-    /**
      * @var BlockIndexInterface
      */
     private $index;
