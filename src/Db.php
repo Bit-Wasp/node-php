@@ -966,9 +966,10 @@ WHERE tip.header_id = (
 SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
 JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
 JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
+LEFT JOIN transaction_input ti on (ti.hashPrevOut = t.hash AND ti.nPrevOut = o.nOutput)
 JOIN block_transactions bt on (bt.transaction_hash = t.id)
 JOIN iindex i on (i.header_id = bt.block_hash)
-WHERE i.lft <= :lft and i.rgt >= :rgt
+WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
 ');
             $queryValues['rgt'] = $id['rgt'];
             $queryValues['lft'] = $id['lft'];
