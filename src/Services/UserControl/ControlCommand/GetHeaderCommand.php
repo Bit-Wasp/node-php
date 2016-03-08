@@ -9,14 +9,6 @@ class GetHeaderCommand extends Command
 {
     const PARAM_HASH = 'hash';
 
-    protected function configure()
-    {
-        $this
-            ->setName('getheader')
-            ->setDescription('Return the requested block header')
-            ->setParam(self::PARAM_HASH, 'Block hash');
-    }
-
     /**
      * @param NodeInterface $node
      * @param array $params
@@ -34,5 +26,13 @@ class GetHeaderCommand extends Command
         return [
             'header' => $this->convertIndexToArray($index)
         ];
+    }
+
+    protected function configure()
+    {
+        $this
+            ->setName('getheader')
+            ->setDescription('Return the requested block header')
+            ->setParam(self::PARAM_HASH, 'Block hash');
     }
 }

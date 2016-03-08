@@ -4,7 +4,6 @@ namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
-use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
 class BatchScriptValidation implements ScriptValidationInterface
@@ -63,7 +62,7 @@ class BatchScriptValidation implements ScriptValidationInterface
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
             $output = $utxoView->fetchByInput($tx->getInput($i))->getOutput();
             $witness = isset($tx->getWitnesses()[$i]) ? $tx->getWitness($i) : null;
-            $t['scripts'][] = $output->getScript()->getHex()    ;
+            $t['scripts'][] = $output->getScript()->getHex();
         }
 
         $this->results[] = $t;
@@ -96,7 +95,7 @@ class BatchScriptValidation implements ScriptValidationInterface
         $push->send(json_encode($msg));
         $response = $push->recv();
         $result = json_decode($response, true);
-        if (!isset($result['result']) || (bool) $result['result'] === false) {
+        if (!isset($result['result']) || (bool)$result['result'] === false) {
             return false;
         }
 

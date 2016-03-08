@@ -5,12 +5,9 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
-use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 
@@ -56,8 +53,8 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $consensus = new Consensus($math, $params);
 
         $pow = new ProofOfWork($math, $params);
-        $this->headers = new Index\Headers($db, $consensus, $math, $this->chains, $pow, new HeaderCheck($consensus, $adapter, $pow));
-        $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus, new BlockCheck($consensus, $adapter));
+        $this->headers = new Index\Headers($db, $adapter, $this->chains, $consensus, $pow);
+        $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus);
         $this->transactions = new Index\Transactions($db);
 
         $genesis = $params->getGenesisBlock();

@@ -57,7 +57,7 @@ class ChainCache implements ChainCacheInterface
     public function getHash($height)
     {
         if (!array_key_exists($height, $this->hashByHeight)) {
-            throw new \RuntimeException('ChainCache: index at this height ('.$height.') not known');
+            throw new \RuntimeException('ChainCache: index at this height (' . $height . ') not known');
         }
 
         return new Buffer($this->hashByHeight[$height], 32);

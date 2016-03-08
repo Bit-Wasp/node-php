@@ -59,9 +59,13 @@ class UtxoCache implements UtxoViewInterface
         return $this->cache->fetch($index);
     }
 
+    /**
+     * @param TransactionInputInterface $input
+     * @return Utxo
+     */
     public function fetchByInput(TransactionInputInterface $input)
     {
-        return $this->fetch($input->getTransactionId(), $input->getVout());
+        return $this->fetch($input->getOutPoint()->getTxId(), $input->getOutPoint()->getVout());
     }
 
     /**
@@ -91,7 +95,7 @@ class UtxoCache implements UtxoViewInterface
      */
     public function cache(Utxo $utxo)
     {
-        $index = $this->getInternalIndex($utxo->getTransactionId(), $utxo->getVout());
+        $index = $this->getInternalIndex($utxo->getOutPoint()->getTxId(), $utxo->getOutPoint()->getVout());
         $this->cache->save($index, $utxo, 5 * 60);
     }
 

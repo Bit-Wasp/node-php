@@ -6,14 +6,6 @@ use BitWasp\Bitcoin\Node\NodeInterface;
 
 class InfoCommand extends Command
 {
-    protected function configure()
-    {
-        $this
-            ->setName('info')
-            ->setDescription('Returns information about the running node');
-
-    }
-
     /**
      * @param NodeInterface $node
      * @param array $params
@@ -29,5 +21,13 @@ class InfoCommand extends Command
             'best_block' => $this->convertIndexToArray($chains->best()->getLastBlock()),
             'nChain' => $nChain
         ];
+    }
+
+    protected function configure()
+    {
+        $this
+            ->setName('info')
+            ->setDescription('Returns information about the running node');
+
     }
 }

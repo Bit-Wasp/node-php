@@ -28,17 +28,6 @@ class PeerStateCollection
      * @param Peer $peer
      * @return PeerState
      */
-    public function createState(Peer $peer)
-    {
-        $peerState = PeerState::create();
-        $this->storage->attach($peer, $peerState);
-        return $peerState;
-    }
-
-    /**
-     * @param Peer $peer
-     * @return PeerState
-     */
     public function fetch(Peer $peer)
     {
         if (!$this->storage->contains($peer)) {
@@ -48,5 +37,16 @@ class PeerStateCollection
         }
 
         return $state;
+    }
+
+    /**
+     * @param Peer $peer
+     * @return PeerState
+     */
+    public function createState(Peer $peer)
+    {
+        $peerState = PeerState::create();
+        $this->storage->attach($peer, $peerState);
+        return $peerState;
     }
 }

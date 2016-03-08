@@ -3,15 +3,15 @@
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
+use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
-use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Locktime;
-use BitWasp\Bitcoin\Chain\ParamsInterface;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
+use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Consensus;
+use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
 class BlockCheck implements BlockCheckInterface
@@ -305,7 +305,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         if ($this->math->cmp($valueIn, $valueOut) < 0) {
-            throw new \RuntimeException('Value-in '.$valueIn.' is less than value out '.$valueOut);
+            throw new \RuntimeException('Value-in ' . $valueIn . ' is less than value out ' . $valueOut);
         }
 
         $fee = $this->math->sub($valueIn, $valueOut);

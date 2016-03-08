@@ -55,7 +55,7 @@ class UtxoView implements \Countable
         $txid = $outpoint->getTxId()->getBinary();
         $vout = $outpoint->getVout();
         return array_key_exists($txid, $this->utxo)
-            && array_key_exists($vout, $this->utxo[$txid]);
+        && array_key_exists($vout, $this->utxo[$txid]);
     }
 
     /**

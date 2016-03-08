@@ -10,7 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
-use BitWasp\Bitcoin\Node\Index\Validation\BatchScriptValidation;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
@@ -52,20 +52,19 @@ class Blocks
      * @param EcAdapterInterface $ecAdapter
      * @param ChainsInterface $chains
      * @param Consensus $consensus
-     * @param BlockCheckInterface $blockCheck
      */
     public function __construct(
         DbInterface $db,
         EcAdapterInterface $ecAdapter,
         ChainsInterface $chains,
-        Consensus $consensus,
-        BlockCheckInterface $blockCheck
+        Consensus $consensus
     ) {
-        $this->chains = $chains;
-        $this->blockCheck = $blockCheck;
-        $this->consensus = $consensus;
+    
         $this->db = $db;
         $this->math = $ecAdapter->getMath();
+        $this->chains = $chains;
+        $this->consensus = $consensus;
+        $this->blockCheck = new BlockCheck($consensus, $ecAdapter);
     }
 
     /**

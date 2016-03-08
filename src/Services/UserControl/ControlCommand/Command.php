@@ -129,15 +129,15 @@ abstract class Command implements CommandInterface
         $header = $index->getHeader();
 
         return [
-            'height'        => $index->getHeight(),
-            'hash'          => $index->getHash()->getHex(),
-            'work'          => $index->getWork(),
-            'version'       => $header->getVersion(),
-            'prevBlock'     => $header->getPrevBlock()->getHex(),
-            'merkleRoot'    => $header->getMerkleRoot()->getHex(),
-            'nBits'         => $header->getBits()->getInt(),
-            'nTimestamp'    => $header->getTimestamp(),
-            'nNonce'        => $header->getNonce()
+            'height' => $index->getHeight(),
+            'hash' => $index->getHash()->getHex(),
+            'work' => $index->getWork(),
+            'version' => $header->getVersion(),
+            'prevBlock' => $header->getPrevBlock()->getHex(),
+            'merkleRoot' => $header->getMerkleRoot()->getHex(),
+            'nBits' => $header->getBits()->getInt(),
+            'nTimestamp' => $header->getTimestamp(),
+            'nNonce' => $header->getNonce()
         ];
     }
 

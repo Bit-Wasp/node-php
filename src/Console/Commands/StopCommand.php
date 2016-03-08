@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
-use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -29,11 +28,11 @@ class StopCommand extends AbstractCommand
         $push = $context->getSocket(\ZMQ::SOCKET_REQ);
         $push->connect('tcp://127.0.0.1:5560');
         $push->on('message', function ($message = '') use ($loop) {
-            echo $message.PHP_EOL;
+            echo $message . PHP_EOL;
             $loop->stop();
         });
 
-        $push->send(json_encode(['cmd'=>'stop']));
+        $push->send(json_encode(['cmd' => 'stop']));
 
         $loop->run();
     }

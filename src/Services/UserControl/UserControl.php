@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Services\UserControl;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
-use \React\ZMQ\Context;
+use React\ZMQ\Context;
 
 class UserControl
 {

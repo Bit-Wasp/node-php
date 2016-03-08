@@ -9,13 +9,6 @@ class GetTxCommand extends Command
 {
     const PARAM_TXID = 'txid';
 
-    protected function configure()
-    {
-        $this->setName('gettx')
-            ->setDescription('Return information about a transaction')
-            ->setParam(self::PARAM_TXID, 'Transaction ID');
-    }
-
     /**
      * @param NodeInterface $node
      * @param array $params
@@ -34,5 +27,12 @@ class GetTxCommand extends Command
         return [
             'tx' => $this->convertTransactionToArray($tx)
         ];
+    }
+
+    protected function configure()
+    {
+        $this->setName('gettx')
+            ->setDescription('Return information about a transaction')
+            ->setParam(self::PARAM_TXID, 'Transaction ID');
     }
 }

@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
@@ -20,7 +21,6 @@ use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 use React\EventLoop\LoopInterface;
-use BitWasp\Bitcoin\Node\NodeInterface;
 
 class P2PServiceProvider implements ServiceProviderInterface
 {
@@ -95,7 +95,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             }
         }
 
-        if (count($blocks) !== 0) {
+        if ($this->config->getItem('config', 'download_blocks', true) && count($blocks) !== 0) {
             $blockView = $best->bestBlocksCache();
             $this->blockDownload->advertised($best, $blockView, $peer, $blocks);
         }
@@ -117,7 +117,7 @@ class P2PServiceProvider implements ServiceProviderInterface
         $chain = $this->node->chain()->getChain();
 
         $math = Bitcoin::getMath();
-        if ($math->cmp($chain->getIndex()->getHeader()->getTimestamp(), (time() - 60*60*24)) >= 0) {
+        if ($math->cmp($chain->getIndex()->getHeader()->getTimestamp(), (time() - 60 * 60 * 24)) >= 0) {
             $locator = $getHeaders->getLocator();
             if (count($locator->getHashes()) === 0) {
                 $start = $locator->getHashStop();
@@ -127,7 +127,7 @@ class P2PServiceProvider implements ServiceProviderInterface
 
             $headers = $db->fetchNextHeaders($start);
             $peer->headers($headers);
-            $container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start'=>$start->getHex()]);
+            $container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start' => $start->getHex()]);
         }
     }
 
@@ -155,18 +155,19 @@ class P2PServiceProvider implements ServiceProviderInterface
 
                 $this->peerStates->fetch($peer)->updateBlockAvailability($chainState, $indexLast->getHash());
 
-                if ($count === 2000) {
+                if ($count >= 1999) {
                     $peer->getheaders($chainState->getHeadersLocator());
                 }
             }
 
-            if ($count < 2000) {
+            if ($this->config->getItem('config', 'download_blocks', true) && $count < 2000) {
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
 
+            $headers->emit('headers', [$batch]);
             $container['debug']->log('p2p.headers', ['count' => $count]);
         } catch (\Exception $e) {
-            $container['debug']->log('error.onHeaders', ['error' => $e->getMessage()]);
+            $container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }
 

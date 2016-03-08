@@ -20,8 +20,7 @@ class WebSocketCommand extends AbstractCommand
     {
         $this
             ->setName('websocket')
-            ->setDescription('Start the watch websocket')
-        ;
+            ->setDescription('Start the watch websocket');
     }
 
     /**
@@ -33,7 +32,7 @@ class WebSocketCommand extends AbstractCommand
     {
 
 
-        $loop   = \React\EventLoop\Factory::create();
+        $loop = \React\EventLoop\Factory::create();
         $pusher = new DebugPusher();
 
         // Listen for the web server to make a ZeroMQ push after an ajax request

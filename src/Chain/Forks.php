@@ -85,6 +85,21 @@ class Forks
     }
 
     /**
+     * @return array
+     */
+    public function toArray()
+    {
+        return [
+            'p2sh' => $this->p2sh,
+            'cltv' => $this->cltv,
+            'witness' => $this->witness,
+            'derSig' => $this->derSig,
+            'bip30' => $this->bip30,
+            'bip34' => $this->bip34
+        ];
+    }
+
+    /**
      * @param int $version
      */
     private function updateCount($version)

@@ -3,9 +3,9 @@
 namespace BitWasp\Bitcoin\Node\Services\Debug;
 
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\NodeInterface;
 use React\ZMQ\Context;
 use React\ZMQ\SocketWrapper;
-use BitWasp\Bitcoin\Node\NodeInterface;
 
 class ZmqDebug implements DebugInterface
 {
@@ -29,7 +29,7 @@ class ZmqDebug implements DebugInterface
 
         $node->chains()->on('newtip', function (ChainStateInterface $tip) {
             $index = $tip->getChainIndex();
-            $this->log('chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work'=> $index->getWork()]);
+            $this->log('chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work' => $index->getWork()]);
         });
 
         $node->chains()->on('retarget', function (ChainStateInterface $tip) {

@@ -2,7 +2,9 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
+use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
+use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
@@ -12,13 +14,14 @@ use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheckInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
+use Evenement\EventEmitter;
 
-class Headers
+class Headers extends EventEmitter
 {
     /**
      * @var Consensus
@@ -29,6 +32,11 @@ class Headers
      * @var Db
      */
     private $db;
+
+    /**
+     * @var ChainsInterface
+     */
+    private $chains;
 
     /**
      * @var Math
@@ -48,26 +56,25 @@ class Headers
     /**
      * Headers constructor.
      * @param DbInterface $db
-     * @param Consensus $consensus
-     * @param Math $math
+     * @param EcAdapterInterface $ecAdapter
      * @param ChainsInterface $chains
-     * @param HeaderCheckInterface $headerCheck
+     * @param Consensus $consensus
      * @param ProofOfWork $proofOfWork
      */
     public function __construct(
         DbInterface $db,
-        Consensus $consensus,
-        Math $math,
+        EcAdapterInterface $ecAdapter,
         ChainsInterface $chains,
-        ProofOfWork $proofOfWork,
-        HeaderCheckInterface $headerCheck
+        Consensus $consensus,
+        ProofOfWork $proofOfWork
     ) {
+    
         $this->db = $db;
-        $this->math = $math;
+        $this->math = $ecAdapter->getMath();
         $this->chains = $chains;
         $this->consensus = $consensus;
-        $this->headerCheck = $headerCheck;
         $this->proofOfWork = $proofOfWork;
+        $this->headerCheck = new HeaderCheck($consensus, $ecAdapter, $proofOfWork);
     }
 
     /**

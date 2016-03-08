@@ -19,7 +19,6 @@ use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
@@ -533,7 +532,7 @@ class Db implements DbInterface
     {
         if (null === $this->txsStmt) {
             $this->txsStmt = $this->dbh->prepare('
-                SELECT t.id, t.hash, t.version, t.nLockTime
+                SELECT t.id, t.version, t.nLockTime
                 FROM transactions  t
                 JOIN block_transactions  bt ON bt.transaction_hash = t.id
                 WHERE bt.block_hash = :id
@@ -563,7 +562,7 @@ class Db implements DbInterface
         $this->txsStmt->execute();
         /** @var TxBuilder[] $builder */
         $builder = [];
-        $this->txsStmt->fetchAll(\PDO::FETCH_FUNC, function ($id, $hash, $version, $locktime) use (&$builder) {
+        $this->txsStmt->fetchAll(\PDO::FETCH_FUNC, function ($id, $version, $locktime) use (&$builder) {
             $builder[$id] = (new TxBuilder())
                 ->version($version)
                 ->locktime($locktime);
@@ -676,26 +675,21 @@ class Db implements DbInterface
 
             $loadLastBlockStmt->bindValue(':id', $row['id']);
             $loadLastBlockStmt->execute();
-            $block = $loadLastBlockStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $block = $loadLastBlockStmt->fetch(\PDO::FETCH_ASSOC);
 
-            if (count($block) === 1) {
-                $block = $block[0];
-                $lastBlock = new BlockIndex(
-                    new Buffer($block['hash'], 32),
-                    $block['height'],
-                    $block['work'],
-                    new BlockHeader(
-                        $block['version'],
-                        new Buffer($block['prevBlock'], 32),
-                        new Buffer($block['merkleRoot'], 32),
-                        $block['nTimestamp'],
-                        Buffer::int($block['nBits'], 4, $math),
-                        $block['nNonce']
-                    )
-                );
-            } else {
-                $lastBlock = $index;
-            }
+            $lastBlock = new BlockIndex(
+                new Buffer($block['hash'], 32),
+                $block['height'],
+                $block['work'],
+                new BlockHeader(
+                    $block['version'],
+                    new Buffer($block['prevBlock'], 32),
+                    new Buffer($block['merkleRoot'], 32),
+                    $block['nTimestamp'],
+                    Buffer::int($block['nBits'], 4, $math),
+                    $block['nNonce']
+                )
+            );
 
             return new ChainState(
                 new Chain(
@@ -819,12 +813,11 @@ class Db implements DbInterface
             $hashes[] = $hash->getBinary();
         }
 
-        $placeholders = rtrim(str_repeat('?, ', count($hashes) - 1), ', ') ;
         $stmt = $this->dbh->prepare('
             SELECT    node.hash
             FROM      headerIndex AS node,
                       headerIndex AS parent
-            WHERE     parent.hash = ? AND node.hash in (' . $placeholders . ')
+            WHERE     parent.hash = ? AND node.hash in (' . rtrim(str_repeat('?, ', count($hashes) - 1), ', ') . ')
             ORDER BY  node.rgt LIMIT 1
         ');
 
@@ -936,7 +929,7 @@ WHERE tip.header_id = (
 
     /**
      * @param BufferInterface $tipHash
-     * @param array $outpoints
+     * @param OutPointInterface[] $outpoints
      * @return Utxo[]
      * @throws \Exception
      */
@@ -947,25 +940,24 @@ WHERE tip.header_id = (
             return [];
         }
 
-        $joinList = [];
         $queryValues = [];
-        for ($i = 0; $i < $requiredCount; $i++) {
-            $outpoint = $outpoints[$i];
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+
             if (0 === $i) {
                 $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
             } else {
                 $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
             }
-
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
         }
 
         $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+
         $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
         $stmt->execute(['hash' => $tipHash->getBinary()]);
         $id = $stmt->fetch(\PDO::FETCH_ASSOC);
-        $stmt->closeCursor();
 
         $this->dbh->beginTransaction();
 

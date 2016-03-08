@@ -10,9 +10,6 @@ use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\P2PServiceProvider;
-use BitWasp\Bitcoin\Node\Services\UserControlServiceProvider;
-use BitWasp\Bitcoin\Node\Services\WebSocketServiceProvider;
-use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetBlockHashCommand;
@@ -20,6 +17,9 @@ use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetHeaderCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\InfoCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ShutdownCommand;
+use BitWasp\Bitcoin\Node\Services\UserControlServiceProvider;
+use BitWasp\Bitcoin\Node\Services\WebSocketServiceProvider;
+use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use Pimple\Container;
 
 class StartCommand extends AbstractCommand

@@ -8,7 +8,6 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Buffertools\BufferInterface;
@@ -41,6 +40,7 @@ class HeaderCheck implements HeaderCheckInterface
         EcAdapterInterface $ecAdapter,
         ProofOfWork $proofOfWork
     ) {
+    
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
         $this->pow = $proofOfWork;

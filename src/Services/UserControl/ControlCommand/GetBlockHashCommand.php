@@ -8,14 +8,6 @@ class GetBlockHashCommand extends Command
 {
     const PARAM_HEIGHT = 'height';
 
-    protected function configure()
-    {
-        $this
-            ->setName('getblockhash')
-            ->setDescription('Returns the block hash for height')
-            ->setParam(self::PARAM_HEIGHT, 'Block height');
-    }
-
     /**
      * @param NodeInterface $node
      * @param array $params
@@ -33,5 +25,13 @@ class GetBlockHashCommand extends Command
         return [
             'hash' => $hash->getHex()
         ];
+    }
+
+    protected function configure()
+    {
+        $this
+            ->setName('getblockhash')
+            ->setDescription('Returns the block hash for height')
+            ->setParam(self::PARAM_HEIGHT, 'Block height');
     }
 }

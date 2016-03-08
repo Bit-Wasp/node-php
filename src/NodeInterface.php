@@ -2,11 +2,8 @@
 
 namespace BitWasp\Bitcoin\Node;
 
-use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Index\Blocks;
-use BitWasp\Bitcoin\Node\Index\Transactions;
 use Evenement\EventEmitterInterface;
 
 interface NodeInterface extends EventEmitterInterface

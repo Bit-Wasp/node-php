@@ -22,6 +22,13 @@ class Peers
         $this->close();
     }
 
+    public function close()
+    {
+        foreach ($this->storage as $peer) {
+            $peer->close();
+        }
+    }
+
     /**
      * @param Peer $peer
      */
@@ -42,13 +49,6 @@ class Peers
     {
         foreach ($this->storage as $peer) {
             $peer->send($netMessage);
-        }
-    }
-
-    public function close()
-    {
-        foreach ($this->storage as $peer) {
-            $peer->close();
         }
     }
 }
