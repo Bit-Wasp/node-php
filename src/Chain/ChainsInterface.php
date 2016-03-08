@@ -3,8 +3,9 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Buffertools\BufferInterface;
+use Evenement\EventEmitterInterface;
 
-interface ChainsInterface extends \Countable
+interface ChainsInterface extends \Countable, EventEmitterInterface
 {
     /**
      * @return ChainStateInterface[]

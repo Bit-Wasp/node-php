@@ -114,12 +114,12 @@ class Chains extends EventEmitter implements ChainsInterface
         $this->states[] = $state;
 
         // Implement
-        /*$state->getChain()->on('tip', function (BlockIndexInterface $index) use ($state) {
+        $state->getChain()->on('tip', function (BlockIndexInterface $index) use ($state) {
             $math = $this->adapter->getMath();
             if ($math->cmp($math->mod($index->getHeight(), $this->params->powRetargetInterval()), 0) === 0) {
                 $this->emit('retarget', [$state, $index]);
             }
-        });*/
+        });
     }
 
     /**

@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
@@ -52,11 +53,6 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $adapter = Bitcoin::getEcAdapter($math);
 
         $this->chains = new Chains($adapter, $params);
-        $this->chains->on('newtip', function (ChainStateInterface $tip) {
-            $index = $tip->getChainIndex();
-            $this->emit('event', ['chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work'=> $index->getWork()]]);
-        });
-
         $consensus = new Consensus($math, $params);
 
         $pow = new ProofOfWork($math, $params);
