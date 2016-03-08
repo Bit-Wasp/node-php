@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Networking\Messages\Headers;
 use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
+use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
@@ -105,6 +106,7 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
+     * @param Container $container
      * @param Peer $peer
      * @param GetHeaders $getHeaders
      */
@@ -225,6 +227,19 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
+     * @param Peer $peer
+     * @param Container $c
+     * @param Manager $manager
+     * @param Locator $locator
+     */
+    public function onPeerClose(Container $c, Manager $manager, Locator $locator, Peer $peer)
+    {
+        $addr = $peer->getRemoteAddr();
+        $c['debug']->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+        $manager->connectNextPeer($locator);
+    }
+
+    /**
      * @param Container $container
      */
     public function register(Container $container)
@@ -247,12 +262,12 @@ class P2PServiceProvider implements ServiceProviderInterface
             $manager->registerListener($listener);
         }
 
-        $manager->on('outbound', function (Peer $peer) use ($container) {
-            $peer->on('block',      $this->wrap([$this, 'onBlock'], $container));
-            $peer->on('inv',        [$this, 'onInv']);
-            $peer->on('headers',    $this->wrap([$this, 'onHeaders'], $container));
-            $peer->on('getheaders',    $this->wrap([$this, 'onGetHeaders'], $container));
-
+        $manager->on('outbound', function (Peer $peer) use ($container, $manager, $locator) {
+            $peer->on('block', $this->wrap([$this, 'onBlock'], $container));
+            $peer->on('inv', [$this, 'onInv']);
+            $peer->on('headers', $this->wrap([$this, 'onHeaders'], $container));
+            $peer->on('getheaders', $this->wrap([$this, 'onGetHeaders'], $container));
+            $peer->on('close', $this->wrap([$this, 'onPeerClose'], $container, $manager, $locator));
             $addr = $peer->getRemoteAddr();
             $container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
 

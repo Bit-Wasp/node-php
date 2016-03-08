@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Services\Debug;
 
 use React\ZMQ\Context;
 use React\ZMQ\SocketWrapper;
+use BitWasp\Bitcoin\Node\NodeInterface;
 
 class ZmqDebug implements DebugInterface
 {
@@ -14,12 +15,16 @@ class ZmqDebug implements DebugInterface
 
     /**
      * ZmqDebug constructor.
+     * @param NodeInterface $node
      * @param Context $context
      */
-    public function __construct(Context $context)
+    public function __construct(NodeInterface $node, Context $context)
     {
         $this->socket = $context->getSocket(\ZMQ::SOCKET_PUB);
         $this->socket->bind('tcp://127.0.0.1:5566');
+        $node->on('event', function ($event, array $params) {
+            $this->log($event, $params);
+        });
     }
 
     /**

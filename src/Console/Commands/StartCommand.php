@@ -88,9 +88,9 @@ class StartCommand extends AbstractCommand
         }
 
         $container = new Container();
-        $container['debug'] = function (Container $c) {
+        $container['debug'] = function (Container $c) use ($node) {
             $context = $c['zmq'];
-            return new ZmqDebug($context);
+            return new ZmqDebug($node, $context);
         };
 
         foreach ($services as $service) {

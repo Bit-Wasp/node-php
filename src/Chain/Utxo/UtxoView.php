@@ -60,7 +60,7 @@ class UtxoView implements \Countable
 
     /**
      * @param OutPointInterface $outpoint
-     * @return mixed
+     * @return Utxo
      */
     public function fetch(OutPointInterface $outpoint)
     {

@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BatchScriptValidation;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
@@ -167,10 +168,10 @@ class Blocks
 
         $view = $this->prepareBatch($block);
 
-        //$versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
-        //$forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
-        //$flags = $forks->getFlags();
-        $flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
+        $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
+        $forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+        $flags = $forks->getFlags();
+        //$flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         $scriptCheckState = new ScriptValidation(true, $flags);
 
         $nFees = 0;

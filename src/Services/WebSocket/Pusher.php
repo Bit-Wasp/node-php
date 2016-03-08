@@ -32,9 +32,6 @@ class Pusher implements WampServerInterface
      */
     public function __construct(NodeInterface $node, array $commands = [])
     {
-        $node->on('event', function ($event, array $params) {
-            $this->onMessage(json_encode(['event' => $event, 'params' => $params]));
-        });
 
         foreach ($commands as $command) {
             $this->command[$command->getName()] = $command;
