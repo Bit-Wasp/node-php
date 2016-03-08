@@ -15,6 +15,11 @@ class Forks
     private $params;
 
     /**
+     * @var \BitWasp\Bitcoin\Math\Math
+     */
+    private $math;
+
+    /**
      * @var BlockIndexInterface
      */
     private $index;
@@ -68,7 +73,7 @@ class Forks
      * Forks constructor.
      * @param ParamsInterface $params
      * @param BlockIndexInterface $index
-     * @param int[] $versions
+     * @param array[] $versions
      */
     public function __construct(ParamsInterface $params, BlockIndexInterface $index, array $versions)
     {

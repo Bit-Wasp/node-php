@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Console\Commands\Config;
 
-use BitWasp\Bitcoin\Networking\Console\Commands\AbstractCommand;
+use BitWasp\Bitcoin\Node\Console\Commands\AbstractCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -39,6 +39,9 @@ database=
 
 # Should the client listen for incoming connections? []
 listen=0
+txrelay=0
+daemon=1
+download_blocks=1
 
 # Enable websocket for debugging [default: false]
 websocket=0
