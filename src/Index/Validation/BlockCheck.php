@@ -299,13 +299,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         $fee = $this->math->sub($valueIn, $valueOut);
-        if ($this->math->cmp($fee, 0) < 0) {
-            throw new \RuntimeException('Fee is less than zero');
-        }
-
-        if (!$this->consensus->checkAmount($fee)) {
-            throw new \RuntimeException('CheckAmount failed for fee');
-        }
+        $this->checkAmount($fee);
 
         return $this;
     }
