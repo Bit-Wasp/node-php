@@ -84,7 +84,7 @@ class SelfTestNode extends BitcoinNode
                 $best = $this->forkState;
                 $index = $best->getChainIndex();
                 ;
-            } elseif ($math->cmp($this->i, 14)>0 && $math->cmp($this->i, 30)<0) {
+            } elseif ($math->cmp($this->i, 14) > 0 && $math->cmp($this->i, 30)<0) {
                 echo "Induce fork by 10\n";
                 $testing = true;
                 $best = $this->forkState;
@@ -99,7 +99,7 @@ class SelfTestNode extends BitcoinNode
 
             $tx = TransactionFactory::build()
                 ->input(new Buffer('', 32), 0xffffffff, new Script(Buffer::hex('2b03b2ef051e4d696e656420627920416e74506f6f6c207573613117a9167c205674133e81220000ea700200')))
-                ->payToAddress(50+mt_rand(2, 500000), AddressFactory::fromString('15HCzh8AoKRnTWMtmgAsT9TKUPrQ6oh9HQ'))
+                ->payToAddress(50 + mt_rand(2, 500000), AddressFactory::fromString('15HCzh8AoKRnTWMtmgAsT9TKUPrQ6oh9HQ'))
                 ->get();
 
             $txs = new TransactionCollection([$tx]);
