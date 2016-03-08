@@ -115,7 +115,7 @@ interface DbInterface
      *
      * @param ChainInterface $activeChain
      * @param BlockLocator $locator
-     * @return false|string
+     * @return BufferInterface
      */
     public function findFork(ChainInterface $activeChain, BlockLocator $locator);
 

@@ -31,7 +31,6 @@ class BlockCheck implements BlockCheckInterface
      */
     private $params;
 
-
     /**
      * @param Consensus $consensus
      * @param EcAdapterInterface $ecAdapter
@@ -140,21 +139,22 @@ class BlockCheck implements BlockCheckInterface
         // Check output values
         $value = 0;
         foreach ($outputs as $output) {
-            if ($this->math->cmp($output->getValue(), 0) < 0) {
-                throw new \RuntimeException('CheckOutputsAmount: value negative');
-            }
-
-            if (!$this->consensus->checkAmount($output->getValue())) {
-                throw new \RuntimeException('CheckOutputsAmount: invalid amount');
-            }
-
+            $this->checkAmount($output->getValue());
             $value = $this->math->add($value, $output->getValue());
-            if ($this->math->cmp($value, 0) < 0 || !$this->consensus->checkAmount($value)) {
-                throw new \RuntimeException('CheckOutputsAmount: invalid total amount');
-            }
+            $this->checkAmount($value);
         }
 
         return $this;
+    }
+
+    /**
+     * @param int $value
+     */
+    private function checkAmount($value)
+    {
+        if ($this->math->cmp($value, 0) < 0 || !$this->consensus->checkAmount($value)) {
+            throw new \RuntimeException('CheckOutputsAmount: invalid amount');
+        }
     }
 
     /**
@@ -253,10 +253,7 @@ class BlockCheck implements BlockCheckInterface
 
         $nSigOps = 0;
         foreach ($transactions as $transaction) {
-            if (!$this->checkTransaction($transaction)) {
-                throw new \RuntimeException('Blocks::check(): failed checkTransaction');
-            }
-
+            $this->checkTransaction($transaction);
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 
@@ -287,21 +284,14 @@ class BlockCheck implements BlockCheckInterface
                 }
             }*/
 
-            $value = $utxo->getOutput()->getValue();
-            $valueIn = $this->math->add($valueIn, $value);
-
-            if (!$this->consensus->checkAmount($valueIn) || !$this->consensus->checkAmount($value)) {
-                throw new \RuntimeException('CheckAmount failed for inputs value');
-            }
+            $valueIn = $this->math->add($valueIn, $utxo->getOutput()->getValue());
+            $this->checkAmount($valueIn);
         }
 
         $valueOut = 0;
         foreach ($tx->getOutputs() as $output) {
-            $value = $output->getValue();
-            $valueOut = $this->math->add($valueOut, $value);
-            if (!$this->consensus->checkAmount($valueOut) || !$this->consensus->checkAmount($value)) {
-                throw new \RuntimeException('CheckAmount failed for outputs value');
-            }
+            $valueOut = $this->math->add($valueOut, $output->getValue());
+            $this->checkAmount($valueOut);
         }
 
         if ($this->math->cmp($valueIn, $valueOut) < 0) {

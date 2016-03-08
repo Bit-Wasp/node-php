@@ -366,7 +366,7 @@ class Db implements DbInterface
         $fetchParent = $this->fetchLftStmt;
         $resizeIndex = $this->updateIndicesStmt;
 
-        $fetchParent->bindParam(':prevBlock', $batch->getTip()->getChainIndex()->getHash()->getBinary());
+        $fetchParent->bindValue(':prevBlock', $batch->getTip()->getChainIndex()->getHash()->getBinary());
         if ($fetchParent->execute()) {
             foreach ($fetchParent->fetchAll() as $record) {
                 $myLeft = $record['lft'];
@@ -461,7 +461,7 @@ class Db implements DbInterface
         }
 
         $stmt = $this->fetchIndexStmt;
-        $stmt->bindParam(':hash', $hash->getBinary());
+        $stmt->bindValue(':hash', $hash->getBinary());
 
         if ($stmt->execute()) {
             $row = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -568,13 +568,13 @@ class Db implements DbInterface
                 ->locktime($locktime);
         });
 
-        $this->txInStmt->bindParam(':id', $blockId);
+        $this->txInStmt->bindValue(':id', $blockId);
         $this->txInStmt->execute();
         $this->txInStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $hashPrevOut, $nPrevOut, $scriptSig, $nSequence) use (&$builder) {
             $builder[$parent_tx]->spendOutPoint(new OutPoint(new Buffer($hashPrevOut, 32), $nPrevOut), new Script(new Buffer($scriptSig)), $nSequence);
         });
 
-        $this->txOutStmt->bindParam(':id', $blockId);
+        $this->txOutStmt->bindValue(':id', $blockId);
         $this->txOutStmt->execute();
         $this->txOutStmt->fetchAll(\PDO::FETCH_FUNC, function ($parent_tx, $value, $scriptPubKey) use (&$builder) {
             $builder[$parent_tx]->output($value, new Script(new Buffer($scriptPubKey)));
@@ -647,7 +647,7 @@ class Db implements DbInterface
         ORDER BY parent.rgt
         LIMIT 1');
         $stmt = $this->fetchIndexStmt;
-        $stmt->bindParam(':hash', $hash->getBinary());
+        $stmt->bindValue(':hash', $hash->getBinary());
 
         if ($stmt->execute()) {
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -847,7 +847,7 @@ class Db implements DbInterface
             LIMIT     2000
         ');
 
-        $stmt->bindParam(':hash', $hash->getBinary());
+        $stmt->bindValue(':hash', $hash->getBinary());
         if ($stmt->execute()) {
             $results = array();
             foreach ($stmt->fetchAll() as $row) {

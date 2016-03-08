@@ -41,7 +41,7 @@ interface BlockCheckInterface
     /**
      * @param TransactionInterface $transaction
      * @param bool|true $checkSize
-     * @return bool
+     * @return $this
      */
     public function checkTransaction(TransactionInterface $transaction, $checkSize = true);
 

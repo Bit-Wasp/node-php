@@ -170,7 +170,6 @@ class Blocks
         $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
         $forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
         $flags = $forks->getFlags();
-        //$flags = $this->math->cmp($index->getHeader()->getTimestamp(), $this->consensus->getParams()->p2shActivateTime()) >= 0 ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         $scriptCheckState = new ScriptValidation(true, $flags);
 
         $nFees = 0;
