@@ -14,7 +14,7 @@ use Packaged\Config\ConfigProviderInterface;
 class BitcoinNode extends EventEmitter implements NodeInterface
 {
     /**
-     * @var Db
+     * @var DbInterface
      */
     private $db;
 
