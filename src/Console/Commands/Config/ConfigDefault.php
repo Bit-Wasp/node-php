@@ -37,13 +37,27 @@ database=
 # General Configuration
 [config]
 
-# Should the client listen for incoming connections? []
+## Listening server - allows the node to accept inbound connections
 listen=0
-txrelay=0
+
+## Daemon - whether process should fork in the background
+# defaults to off
 daemon=1
+
+## Download blocks - sync blocks in addition to headers
+# defaults to on
 download_blocks=1
 
-# Enable websocket for debugging [default: false]
+## Check Signatures - whether any script validation should be performed
+# defaults to on
+check_signatures=1
+
+## Transaction relay - whether the node should request transaction INV messages
+# defaults to off
+txrelay=0
+
+## Web socket - Enable WAMP server for logs and commands
+# defaults to off
 websocket=0
 
 ');

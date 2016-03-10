@@ -24,7 +24,7 @@ class Application extends ConsoleApplication
 
         $commands[] = new DbCommand('resetBlocksOnly', 'Removes only block and transaction information');
         $commands[] = new DbCommand('reset', 'Deletes everything from the database');
-        $commands[] = new DbCommand('wipe', 'Deletes everthing, INCLUDING the database');
+        $commands[] = new DbCommand('wipe', 'Deletes everything - INCLUDING the database');
 
         $commands[] = new StartCommand();
         $commands[] = new StopCommand();

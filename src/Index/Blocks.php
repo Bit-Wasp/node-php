@@ -153,7 +153,7 @@ class Blocks
      * @param Headers $headers
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers)
+    public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true)
     {
         $state = $this->chains->best();
 
@@ -170,7 +170,7 @@ class Blocks
         $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
         $forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
         $flags = $forks->getFlags();
-        $scriptCheckState = new ScriptValidation(true, $flags);
+        $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
         $nFees = 0;
         $nSigOps = 0;

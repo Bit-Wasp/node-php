@@ -12,8 +12,8 @@ class DbCommand extends AbstractCommand
     /**
      * @var string
      */
-    private $command;
-
+    private $dbName;
+    private $dbDesc;
     /**
      * DbCommand constructor.
      * @param string $name
@@ -21,13 +21,9 @@ class DbCommand extends AbstractCommand
      */
     public function __construct($name, $description)
     {
+        $this->dbName = $name;
+        $this->dbDesc = $description;
         parent::__construct();
-
-        $this
-            ->setName('db:'.$name)
-            ->setDescription($description);
-
-        $this->command = $name;
     }
 
     /**
@@ -35,7 +31,9 @@ class DbCommand extends AbstractCommand
      */
     protected function configure()
     {
-
+        $this
+            ->setName('db:'.$this->dbName)
+            ->setDescription($this->dbDesc);
     }
 
     /**
@@ -45,7 +43,7 @@ class DbCommand extends AbstractCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        call_user_func([new Db((new ConfigLoader())->load()), $this->command]);
+        call_user_func([new Db((new ConfigLoader())->load()), $this->dbName]);
         return 0;
     }
 }

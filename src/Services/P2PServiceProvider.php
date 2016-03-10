@@ -186,8 +186,10 @@ class P2PServiceProvider implements ServiceProviderInterface
         $headerIdx = $node->headers();
         $blockIndex = $node->blocks();
 
+        $checkSignatures = $this->config->getItem('config', 'check_signatures', true);
+
         try {
-            $index = $blockIndex->accept($block, $headerIdx);
+            $index = $blockIndex->accept($block, $headerIdx, $checkSignatures);
             unset($state);
 
             $chainsIdx->checkTips();
