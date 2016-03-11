@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Index\UtxoDb;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 
@@ -34,6 +35,11 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     protected $transactions;
 
     /**
+     * @var Index\UtxoDb
+     */
+    protected $utxos;
+
+    /**
      * @var ChainsInterface
      */
     protected $chains;
@@ -54,8 +60,9 @@ class BitcoinNode extends EventEmitter implements NodeInterface
 
         $pow = new ProofOfWork($math, $params);
         $this->headers = new Index\Headers($db, $adapter, $this->chains, $consensus, $pow);
-        $this->blocks = new Index\Blocks($db, $adapter, $this->chains, $consensus);
+        $this->blocks = new Index\Blocks($db, $config, $adapter, $this->chains, $consensus);
         $this->transactions = new Index\Transactions($db);
+        $this->utxos = new UtxoDb($db, $math);
 
         $genesis = $params->getGenesisBlock();
         $this->headers->init($genesis->getHeader());
@@ -116,5 +123,10 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     public function chains()
     {
         return $this->chains;
+    }
+
+    public function utxos()
+    {
+        return $this->utxos;
     }
 }

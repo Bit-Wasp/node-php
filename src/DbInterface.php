@@ -110,6 +110,25 @@ interface DbInterface
     public function fetchChainState(Headers $headers);
 
     /**
+     * @param BufferInterface $index
+     * @return int
+     */
+    public function insertToBlockIndex(BufferInterface $index);
+
+    /**
+     * @param int $blockId
+     * @param BlockInterface $block
+     * @return true
+     */
+    public function insertBlockTransactions($blockId, BlockInterface $block);
+
+    /**
+     * @param OutPointInterface[] $deleteOutPoints
+     * @param Utxo[] $newUtxos
+     */
+    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos);
+
+    /**
      * We use this to help other nodes sync headers. Identify last common
      * hash in our chain
      *
@@ -133,4 +152,11 @@ interface DbInterface
      * @return array
      */
     public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000);
+
+    /**
+     * @param callable $function
+     * @return void
+     * @throws \Exception
+     */
+    public function transaction(callable $function);
 }

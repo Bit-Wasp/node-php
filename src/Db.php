@@ -151,7 +151,7 @@ class Db implements DbInterface
         $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
         $stmt[] = $this->dbh->prepare('TRUNCATE transaction_output');
         $stmt[] = $this->dbh->prepare('TRUNCATE transaction_input');
-
+        $stmt[] = $this->dbh->prepare('TRUNCATE utxo');
         foreach ($stmt as $st) {
             $st->execute();
         }
@@ -229,6 +229,117 @@ class Db implements DbInterface
         $stmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :hash ');
         $stmt->bindValue(':hash', $index->getHash()->getBinary());
         $stmt->execute();
+    }
+
+    /**
+     * @param BufferInterface $blockHash
+     * @return string
+     */
+    public function insertToBlockIndex(BufferInterface $blockHash)
+    {
+        // Insert the block header ID
+        $blockInsert = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :refHash ');
+        $blockInsert->bindValue(':refHash', $blockHash->getBinary());
+        $blockInsert->execute();
+
+        return $this->dbh->lastInsertId();
+    }
+
+    /**
+     * @param int $blockId
+     * @param BlockInterface $block
+     * @return bool
+     */
+    public function insertBlockTransactions($blockId, BlockInterface $block)
+    {
+        $txListBind = [];
+        $txListData = [];
+        $temp = [];
+
+        // Prepare SQL statement adding all transaction inputs in this block.
+        $inBind = [];
+        $inData = [];
+
+        // Prepare SQL statement adding all transaction outputs in this block
+        $outBind = [];
+        $outData = [];
+
+        // Add all transactions in the block
+        $txBind = [];
+        $txData = [];
+
+        $transactions = $block->getTransactions();
+        foreach ($transactions as $i => $tx) {
+            $hash = $tx->getTxId()->getBinary();
+            $temp[$i] = $hash;
+            $valueOut = $tx->getValueOut();
+            $nOut = count($tx->getOutputs());
+            $nIn = count($tx->getInputs());
+
+            $txListBind[] = " ( :headerId, :txId$i) ";
+
+            $txBind[] = " ( :hash$i , :version$i , :nLockTime$i , :nOut$i , :nValueOut$i , :nFee$i , :isCoinbase$i ) ";
+            $txData["hash$i"] = $hash;
+            $txData["nOut$i"] = $nOut;
+            $txData["nValueOut$i"] = $valueOut;
+            $txData["nFee$i"] = '0';
+            $txData["nLockTime$i"] = $tx->getLockTime();
+            $txData["isCoinbase$i"] = $tx->isCoinbase();
+            $txData["version$i"] = $tx->getVersion();
+
+            for ($j = 0; $j < $nIn; $j++) {
+                $input = $tx->getInput($j);
+                $inBind[] = " ( :parentId$i , :nInput".$i."n".$j.", :hashPrevOut".$i."n".$j.", :nPrevOut".$i."n".$j.", :scriptSig".$i."n".$j.", :nSequence".$i."n".$j." ) ";
+                $outpoint = $input->getOutPoint();
+                $inData["hashPrevOut" .$i  ."n"  .$j] = $outpoint->getTxId()->getBinary();
+                $inData["nPrevOut"    .$i  ."n"  .$j] = $outpoint->getVout();
+                $inData["scriptSig"   .$i  ."n"  .$j] = $input->getScript()->getBinary();
+                $inData["nSequence"   .$i  ."n"  .$j] = $input->getSequence();
+                $inData["nInput"      .$i  ."n"  .$j] = $j;
+
+            }
+
+            for ($k = 0; $k < $nOut; $k++) {
+                $output = $tx->getOutput($k);
+                $outBind[] = " ( :parentId$i , :nOutput".$i."n".$k.", :value".$i."n".$k.", :scriptPubKey".$i."n".$k." ) ";
+                $outData["value"        .$i  ."n"  .$k] = $output->getValue();
+                $outData["scriptPubKey" .$i  ."n"  .$k] = $output->getScript()->getBinary();
+                $outData["nOutput"      .$i  ."n"  .$k] = $k;
+
+            }
+        }
+
+        $insertTx = $this->dbh->prepare('INSERT INTO transactions  (hash, version, nLockTime, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
+        $insertTx->execute($txData);
+        unset($txBind);
+
+        // Populate inserts
+        $txListData['headerId'] = $blockId;
+        $lastId = (int)$this->dbh->lastInsertId();
+        foreach ($temp as $i => $hash) {
+            $rowId = $i + $lastId;
+            $val = $rowId;
+            $outData["parentId$i"] = $val;
+            $inData["parentId$i"] = $val;
+            $txListData["txId$i"] = $val;
+        }
+        unset($val);
+
+        $insertTxList = $this->dbh->prepare('INSERT INTO block_transactions  (block_hash, transaction_hash) VALUES ' . implode(', ', $txListBind));
+        unset($txListBind);
+
+        $insertInputs = $this->dbh->prepare('INSERT INTO transaction_input (parent_tx, nInput, hashPrevOut, nPrevOut, scriptSig, nSequence) VALUES ' . implode(', ', $inBind));
+        unset($inBind);
+
+        $insertOutputs = $this->dbh->prepare('INSERT INTO transaction_output  (parent_tx, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $outBind));
+        unset($outBind);
+
+        $insertTxList->execute($txListData);
+        $insertInputs->execute($inData);
+        $insertOutputs->execute($outData);
+
+        return true;
+
     }
 
     /**
@@ -346,6 +457,86 @@ class Db implements DbInterface
         }
 
         throw new \RuntimeException('MySqlDb: Failed executing Block insert transaction');
+    }
+
+    /**
+     * @param OutPointInterface[] $deleteOutPoints
+     * @param Utxo[] $newUtxos
+     * @throws \Exception
+     */
+    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos)
+    {
+        $this->transaction(function () use ($deleteOutPoints, $newUtxos) {
+            if (count($deleteOutPoints) > 0) {
+                $queryValues = [];
+                $joinList = [];
+                foreach ($deleteOutPoints as $i => $outpoint) {
+                    $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+                    $queryValues['noutparent' . $i ] = $outpoint->getVout();
+                    $joinList[] = '(  :hashParent' . $i . ' , :noutparent' . $i .  ' )';
+                }
+
+                $sql = 'DELETE FROM utxo where (hashPrevOut, nOutput) IN (' . implode(",", $joinList) . ')';
+
+                $deleteStatement = $this->dbh->prepare($sql);
+                $deleteStatement->execute($queryValues);
+            }
+
+            if (count($newUtxos) > 0) {
+                $utxoQuery = [];
+                $utxoValues = [];
+                foreach ($newUtxos as $c => $utxo) {
+                    $utxoQuery[] = "(:hashPrevOut$c, :nOutput$c, :value$c, :scriptPubKey$c)";
+                    $utxoValues['hashPrevOut' . $c] = $utxo->getOutPoint()->getTxId()->getBinary();
+                    $utxoValues['nOutput' . $c] = $utxo->getOutPoint()->getVout();
+                    $utxoValues['value' . $c] = $utxo->getOutput()->getValue();
+                    $utxoValues['scriptPubKey' . $c] = $utxo->getOutput()->getScript()->getBinary();
+                }
+
+                $insertUtxos = $this->dbh->prepare('INSERT INTO utxo  (hashPrevOut, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+                $insertUtxos->execute($utxoValues);
+            }
+        });
+    }
+
+
+    /**
+     * @param BufferInterface $tipHash
+     * @param OutPointInterface[] $outpoints
+     * @return Utxo[]
+     * @throws \Exception
+     */
+    public function fetchUtxoUtxoList(BufferInterface $tipHash, array $outpoints)
+    {
+        $requiredCount = count($outpoints);
+        if (0 === count($outpoints)) {
+            return [];
+        }
+
+        $queryValues = [];
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+            $joinList[] = '(  :noutparent' . $i . ',  :hashParent' . $i . ')';
+            //$joinList[] = '(  :hashParent' . $i . ' , :noutparent' . $i . ')';
+        }
+
+        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u WHERE (nOutput, hashPrevOut) IN ('. implode(",", $joinList) . ')');
+        $fetchUtxoStmt->execute($queryValues);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $outputSet = [];
+        foreach ($rows as $utxo) {
+            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) < $requiredCount) {
+            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+        }
+
+        return $outputSet;
+
     }
 
     /**
@@ -1020,5 +1211,23 @@ WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
         }
 
         throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');
+    }
+
+    /**
+     * @param callable $function
+     * @return void
+     * @throws \Exception
+     */
+    public function transaction(callable $function)
+    {
+        $this->dbh->beginTransaction();
+
+        try {
+            $this->dbh->commit();
+            $function();
+        } catch (\Exception $e) {
+            $this->dbh->rollBack();
+            throw $e;
+        }
     }
 }

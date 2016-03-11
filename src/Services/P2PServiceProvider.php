@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Bitcoin;
+use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
@@ -11,7 +12,9 @@ use BitWasp\Bitcoin\Networking\Messages\Ping;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Index\UtxoDb;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
@@ -186,7 +189,7 @@ class P2PServiceProvider implements ServiceProviderInterface
         $headerIdx = $node->headers();
         $blockIndex = $node->blocks();
 
-        $checkSignatures = $this->config->getItem('config', 'check_signatures', true);
+        $checkSignatures = (bool) $this->config->getItem('config', 'check_signatures', true);
 
         try {
             $index = $blockIndex->accept($block, $headerIdx, $checkSignatures);
@@ -200,10 +203,11 @@ class P2PServiceProvider implements ServiceProviderInterface
             $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
                 return $r + count($v->getInputs());
             }, 0);
-            $container['debug']->log('p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]);
+            $this->node->emit('event', ['p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]]);
+            $this->node->emit('p2p.block', [$best, $block]);
         } catch (\Exception $e) {
             $header = $block->getHeader();
-            $container['debug']->log('error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage()]);
+            $this->node->emit('event', ['error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
         }
     }
 
@@ -281,6 +285,13 @@ class P2PServiceProvider implements ServiceProviderInterface
             $height = ($height != 0) ? $height - 1 : $height;
 
             $peer->getheaders($chain->getLocator($height));
+        });
+
+        $this->node->on('p2p.block', function (ChainStateInterface $chainState, BlockInterface $block) {
+            if ($this->config->getItem('config', 'index_utxos', true)) {
+                $utxos = $this->node->utxos();
+                $utxos->update($chainState, $block);
+            }
         });
 
         $manager->on('inbound', function (Peer $peer) use ($container) {

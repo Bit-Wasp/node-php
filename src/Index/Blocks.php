@@ -18,6 +18,7 @@ use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
+use Packaged\Config\ConfigProviderInterface;
 
 class Blocks
 {
@@ -42,6 +43,11 @@ class Blocks
     private $db;
 
     /**
+     * @var ConfigProviderInterface
+     */
+    private $config;
+
+    /**
      * @var \BitWasp\Bitcoin\Math\Math
      */
     private $math;
@@ -49,18 +55,21 @@ class Blocks
     /**
      * Blocks constructor.
      * @param DbInterface $db
+     * @param ConfigProviderInterface $config
      * @param EcAdapterInterface $ecAdapter
      * @param ChainsInterface $chains
      * @param Consensus $consensus
      */
     public function __construct(
         DbInterface $db,
+        ConfigProviderInterface $config,
         EcAdapterInterface $ecAdapter,
         ChainsInterface $chains,
         Consensus $consensus
     ) {
-    
+
         $this->db = $db;
+        $this->config = $config;
         $this->math = $ecAdapter->getMath();
         $this->chains = $chains;
         $this->consensus = $consensus;
@@ -141,10 +150,17 @@ class Blocks
     public function prepareBatch(BlockInterface $block)
     {
         list ($required, $utxos) = $this->parseUtxos($block);
-        $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $required);
+
+        if ($this->config->getItem('config', 'index_utxos', true)) {
+            $remaining = $this->db->fetchUtxoUtxoList($block->getHeader()->getPrevBlock(), $required);
+        } else {
+            $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $required);
+        }
+
         foreach ($remaining as $utxo) {
             $utxos[] = $utxo;
         }
+
         return new UtxoView($utxos);
     }
 
@@ -202,9 +218,15 @@ class Blocks
         }
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
-        $state->updateLastBlock($index);
 
-        $this->db->insertBlock($hash, $block);
+        $this->db->transaction(function () use ($hash, $block) {
+            $blockId = $this->db->insertToBlockIndex($hash);
+            if ($this->config->getItem('config', 'index_transactions', true)) {
+                $this->db->insertBlockTransactions($blockId, $block);
+            }
+        });
+
+        $state->updateLastBlock($index);
 
         return $index;
     }

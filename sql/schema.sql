@@ -143,6 +143,20 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 --
 -- Indexes for dumped tables
 --
+CREATE TABLE IF NOT EXISTS `utxo` (
+  `id` int(19) NOT NULL,
+  `hashPrevOut` varbinary(32) NOT NULL,
+  `nOutput` int(19) NOT NULL,
+  `value` bigint(32) NOT NULL,
+  `scriptPubKey` blob NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+ALTER TABLE `utxo`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
+
+ALTER TABLE `utxo`
+  MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
 
 --
 -- Indexes for table `active_fork`
