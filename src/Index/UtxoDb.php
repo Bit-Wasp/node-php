@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
@@ -78,10 +79,14 @@ class UtxoDb
         return [$spent, $newOutputs];
     }
 
-    public function update(ChainStateInterface $chainState, BlockInterface $block)
+    /**
+     * @param ChainStateInterface $chainState
+     * @param BlockInterface $block
+     * @param BlockData $blockData
+     */
+    public function update(ChainStateInterface $chainState, BlockInterface $block, BlockData $blockData)
     {
-        list ($spent, $newOutputs) = $this->parseUtxos($block);
-        $this->db->updateUtxoSet($spent, $newOutputs);
+        $this->db->updateUtxoSet($blockData->requiredOutpoints, $blockData->remainingNew);
     }
 
 }

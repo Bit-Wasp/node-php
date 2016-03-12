@@ -501,12 +501,11 @@ class Db implements DbInterface
 
 
     /**
-     * @param BufferInterface $tipHash
      * @param OutPointInterface[] $outpoints
      * @return Utxo[]
      * @throws \Exception
      */
-    public function fetchUtxoUtxoList(BufferInterface $tipHash, array $outpoints)
+    public function fetchUtxoDbList(array $outpoints)
     {
         $requiredCount = count($outpoints);
         if (0 === count($outpoints)) {
@@ -518,11 +517,17 @@ class Db implements DbInterface
         foreach ($outpoints as $i => $outpoint) {
             $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
             $queryValues['noutparent' . $i ] = $outpoint->getVout();
-            $joinList[] = '(  :noutparent' . $i . ',  :hashParent' . $i . ')';
-            //$joinList[] = '(  :hashParent' . $i . ' , :noutparent' . $i . ')';
+
+            if (0 === $i) {
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
+            } else {
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
+            }
         }
 
-        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u WHERE (nOutput, hashPrevOut) IN ('. implode(",", $joinList) . ')');
+        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+
+        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN ('. $innerJoin . ') ou where ou.hashPrevOut = u.hashPrevOut and ou.nOutput = u.nOutput');
         $fetchUtxoStmt->execute($queryValues);
         $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 

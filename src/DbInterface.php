@@ -97,6 +97,12 @@ interface DbInterface
     public function fetchUtxoList(BufferInterface $tipHash, array $outpoints);
 
     /**
+     * @param OutPointInterface[] $outpoints
+     * @return Utxo[]
+     */
+    public function fetchUtxoDbList(array $outpoints);
+
+    /**
      * @param Headers $headers
      * @param BufferInterface $hash
      * @return ChainStateInterface

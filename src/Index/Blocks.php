@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\Forks;
@@ -18,9 +19,10 @@ use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
+use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 
-class Blocks
+class Blocks extends EventEmitter
 {
     /**
      * @var BlockCheckInterface
@@ -108,6 +110,7 @@ class Blocks
     {
         $unknown = [];
         $utxos = [];
+        $remainingNew = [];
 
         // Record every Outpoint required for the block.
         foreach ($block->getTransactions() as $t => $tx) {
@@ -127,10 +130,14 @@ class Blocks
             $hashBin = $hash->getBinary();
             foreach ($tx->getOutputs() as $i => $out) {
                 $lookup = $hashBin . $i;
+                $utxo = new Utxo(new OutPoint($hash, $i), $out);
                 if (isset($unknown[$lookup])) {
                     unset($unknown[$lookup]);
+                } else {
+                    $remainingNew[] = $utxo;
                 }
-                $utxos[] = new Utxo(new OutPoint($hash, $i), $out);
+
+                $utxos[] = $utxo;
             }
         }
 
@@ -140,28 +147,31 @@ class Blocks
             $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32, $this->math), substr($str, 32));
         }
 
-        return [$required, $utxos];
+        return [$required, $utxos, $remainingNew];
     }
 
     /**
      * @param BlockInterface $block
-     * @return UtxoView
+     * @return BlockData
      */
     public function prepareBatch(BlockInterface $block)
     {
-        list ($required, $utxos) = $this->parseUtxos($block);
+        $blockData = new BlockData();
+        list ($blockData->requiredOutpoints, $blockData->parsedUtxos, $blockData->remainingNew) = $this->parseUtxos($block);
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
-            $remaining = $this->db->fetchUtxoUtxoList($block->getHeader()->getPrevBlock(), $required);
+            $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
         } else {
-            $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $required);
+            $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);
         }
 
+        $allUtxos = $blockData->parsedUtxos;
         foreach ($remaining as $utxo) {
-            $utxos[] = $utxo;
+            $allUtxos[] = $utxo;
         }
 
-        return new UtxoView($utxos);
+        $blockData->utxoView = new UtxoView($allUtxos);
+        return $blockData;
     }
 
     /**
@@ -181,7 +191,8 @@ class Blocks
             ->check($block)
             ->checkContextual($block, $state->getLastBlock());
 
-        $view = $this->prepareBatch($block);
+        $blockData = $this->prepareBatch($block);
+        $view = $blockData->utxoView;
 
         $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
         $forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
@@ -227,6 +238,7 @@ class Blocks
         });
 
         $state->updateLastBlock($index);
+        $this->emit('block', [$state, $block, $blockData]);
 
         return $index;
     }

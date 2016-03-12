@@ -208,6 +208,8 @@ class Headers extends EventEmitter
             $tip->getChain()->updateTip($index);
         }
 
+        $this->emit('headers', [$batch]);
+
         return $this;
     }
 }

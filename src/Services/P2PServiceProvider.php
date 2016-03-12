@@ -17,6 +17,7 @@ use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Protocol;
 use BitWasp\Bitcoin\Networking\Structure\NetworkAddressInterface;
+use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\NodeInterface;
@@ -217,7 +218,6 @@ class P2PServiceProvider implements ServiceProviderInterface
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
 
-            $headers->emit('headers', [$batch]);
             $this->container['debug']->log('p2p.headers', ['count' => $count]);
         } catch (\Exception $e) {
             $this->container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -253,7 +253,6 @@ class P2PServiceProvider implements ServiceProviderInterface
                 return $r + count($v->getInputs());
             }, 0);
             $this->node->emit('event', ['p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]]);
-            $this->node->emit('p2p.block', [$best, $block]);
         } catch (\Exception $e) {
             $header = $block->getHeader();
             $this->node->emit('event', ['error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
@@ -325,10 +324,10 @@ class P2PServiceProvider implements ServiceProviderInterface
             $peer->getheaders($chain->getLocator($height));
         });
 
-        $this->node->on('p2p.block', function (ChainStateInterface $chainState, BlockInterface $block) {
+        $this->node->blocks()->on('block', function (ChainStateInterface $chainState, BlockInterface $block, BlockData $blockData) {
             if ($this->config->getItem('config', 'index_utxos', true)) {
                 $utxos = $this->node->utxos();
-                $utxos->update($chainState, $block);
+                $utxos->update($chainState, $block, $blockData);
             }
         });
 

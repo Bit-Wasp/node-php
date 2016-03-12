@@ -125,6 +125,9 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         return $this->chains;
     }
 
+    /**
+     * @return UtxoDb
+     */
     public function utxos()
     {
         return $this->utxos;
