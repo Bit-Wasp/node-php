@@ -7,6 +7,7 @@ use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
+use BitWasp\Bitcoin\Node\DebugDb;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\P2PServiceProvider;
@@ -58,7 +59,7 @@ class StartCommand extends AbstractCommand
         $params = new Params($math);
         $loop = \React\EventLoop\Factory::create();
 
-        $db = new Db($config, false);
+        $db = new Db($config);
         $node = new BitcoinNode($config, $params, $db);
 
         // Configure commands exposed by UserControl & WebSocket

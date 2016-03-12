@@ -159,11 +159,11 @@ class Blocks extends EventEmitter
         $blockData = new BlockData();
         list ($blockData->requiredOutpoints, $blockData->parsedUtxos, $blockData->remainingNew) = $this->parseUtxos($block);
 
-        if ($this->config->getItem('config', 'index_utxos', true)) {
-            $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
-        } else {
+        //if ($this->config->getItem('config', 'index_utxos', true)) {
+        //    $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
+        //} else {
             $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);
-        }
+        //}
 
         $allUtxos = $blockData->parsedUtxos;
         foreach ($remaining as $utxo) {
@@ -177,6 +177,7 @@ class Blocks extends EventEmitter
     /**
      * @param BlockInterface $block
      * @param Headers $headers
+     * @param bool $checkSignatures
      * @return BlockIndexInterface
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true)

@@ -46,19 +46,6 @@ interface DbInterface
     public function createIndexGenesis(BlockHeaderInterface $header);
 
     /**
-     * @param BlockIndexInterface $index
-     */
-    public function createBlockIndexGenesis(BlockIndexInterface $index);
-
-    /**
-     * @param BufferInterface $blockHash
-     * @param BlockInterface $block
-     * @return bool
-     * @throws \Exception
-     */
-    public function insertBlock(BufferInterface $blockHash, BlockInterface $block);
-
-    /**
      * @param BufferInterface $hash
      * @return BlockIndexInterface
      */

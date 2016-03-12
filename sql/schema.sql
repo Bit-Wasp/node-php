@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Mar 06, 2016 at 05:37 PM
+-- Generation Time: Mar 12, 2016 at 08:27 PM
 -- Server version: 5.6.28-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.1
 
@@ -17,7 +17,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `coin`
+-- Database: `coinevents`
 --
 
 -- --------------------------------------------------------
@@ -140,9 +140,12 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
   `nOutput` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+-- --------------------------------------------------------
+
 --
--- Indexes for dumped tables
+-- Table structure for table `utxo`
 --
+
 CREATE TABLE IF NOT EXISTS `utxo` (
   `id` int(19) NOT NULL,
   `hashPrevOut` varbinary(32) NOT NULL,
@@ -151,12 +154,9 @@ CREATE TABLE IF NOT EXISTS `utxo` (
   `scriptPubKey` blob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
-ALTER TABLE `utxo`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
-
-ALTER TABLE `utxo`
-  MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
+--
+-- Indexes for dumped tables
+--
 
 --
 -- Indexes for table `active_fork`
@@ -184,7 +184,7 @@ ALTER TABLE `block_transactions`
 --
 ALTER TABLE `headerIndex`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `hash` (`hash`),
+  ADD UNIQUE KEY `hash` (`hash`) USING HASH,
   ADD KEY `prevBlock` (`prevBlock`);
 
 --
@@ -215,6 +215,13 @@ ALTER TABLE `transaction_input`
 ALTER TABLE `transaction_output`
   ADD PRIMARY KEY (`id`),
   ADD KEY `parent_tx` (`parent_tx`);
+
+--
+-- Indexes for table `utxo`
+--
+ALTER TABLE `utxo`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -255,6 +262,11 @@ ALTER TABLE `transaction_input`
 --
 ALTER TABLE `transaction_output`
   MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `utxo`
+--
+ALTER TABLE `utxo`
+  MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
