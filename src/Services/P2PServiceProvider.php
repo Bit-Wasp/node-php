@@ -9,12 +9,16 @@ use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
 use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Messages\Ping;
+use BitWasp\Bitcoin\Networking\Peer\ConnectionParams;
+use BitWasp\Bitcoin\Networking\Peer\Connector;
+use BitWasp\Bitcoin\Networking\Peer\Listener;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
+use BitWasp\Bitcoin\Networking\Protocol;
+use BitWasp\Bitcoin\Networking\Structure\NetworkAddressInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
-use BitWasp\Bitcoin\Node\Index\UtxoDb;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
@@ -24,6 +28,8 @@ use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 use React\EventLoop\LoopInterface;
+use React\Promise\Deferred;
+use React\Socket\Server;
 
 class P2PServiceProvider implements ServiceProviderInterface
 {
@@ -63,6 +69,41 @@ class P2PServiceProvider implements ServiceProviderInterface
     private $blockDownload;
 
     /**
+     * @var \BitWasp\Bitcoin\Networking\Factory
+     */
+    private $factory;
+
+    /**
+     * @var ConnectionParams
+     */
+    private $params;
+
+    /**
+     * @var Connector
+     */
+    private $connector;
+
+    /**
+     * @var \BitWasp\Bitcoin\Networking\Messages\Factory
+     */
+    private $messages;
+
+    /**
+     * @var Manager
+     */
+    private $manager;
+
+    /**
+     * @var Locator
+     */
+    private $locator;
+
+    /**
+     * @var Container
+     */
+    private $container;
+
+    /**
      * P2PServiceProvider constructor.
      * @param LoopInterface $loop
      * @param ConfigProviderInterface $config
@@ -77,6 +118,17 @@ class P2PServiceProvider implements ServiceProviderInterface
         $this->peersInbound = new Peers();
         $this->peersOutbound = new Peers();
         $this->blockDownload = new BlockDownloader($this->node->chains(), $this->peerStates, $this->peersOutbound);
+        $this->factory = new \BitWasp\Bitcoin\Networking\Factory($this->loop, Bitcoin::getNetwork());
+        $dns = $this->factory->getDns();
+        $this->messages = $this->factory->getMessages();
+
+        $this->params = new ConnectionParams();
+        $this->params->requestTxRelay((bool) $this->config->getItem('config', 'tx_relay', false));
+
+        $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns);
+        $this->manager = new Manager($this->connector);
+        $this->locator = new Locator($dns);
+
     }
 
     /**
@@ -109,14 +161,13 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param Container $container
      * @param Peer $peer
      * @param GetHeaders $getHeaders
      */
-    public function onGetHeaders(Container $container, Peer $peer, GetHeaders $getHeaders)
+    public function onGetHeaders(Peer $peer, GetHeaders $getHeaders)
     {
         /** @var DbInterface $db */
-        $db = $container['db'];
+        $db = $this->container['db'];
         $chain = $this->node->chain()->getChain();
 
         $math = Bitcoin::getMath();
@@ -130,17 +181,16 @@ class P2PServiceProvider implements ServiceProviderInterface
 
             $headers = $db->fetchNextHeaders($start);
             $peer->headers($headers);
-            $container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start' => $start->getHex()]);
+            $this->container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start' => $start->getHex()]);
         }
     }
 
 
     /**
-     * @param Container $container
      * @param Peer $peer
      * @param Headers $headersMsg
      */
-    public function onHeaders(Container $container, Peer $peer, Headers $headersMsg)
+    public function onHeaders(Peer $peer, Headers $headersMsg)
     {
         $chains = $this->node->chains();
         $headers = $this->node->headers();
@@ -168,18 +218,17 @@ class P2PServiceProvider implements ServiceProviderInterface
             }
 
             $headers->emit('headers', [$batch]);
-            $container['debug']->log('p2p.headers', ['count' => $count]);
+            $this->container['debug']->log('p2p.headers', ['count' => $count]);
         } catch (\Exception $e) {
-            $container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            $this->container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }
 
     /**
-     * @param Container $container
      * @param Peer $peer
      * @param Block $blockMsg
      */
-    public function onBlock(Container $container, Peer $peer, Block $blockMsg)
+    public function onBlock(Peer $peer, Block $blockMsg)
     {
         $node = $this->node;
         $best = $node->chain();
@@ -235,15 +284,12 @@ class P2PServiceProvider implements ServiceProviderInterface
 
     /**
      * @param Peer $peer
-     * @param Container $c
-     * @param Manager $manager
-     * @param Locator $locator
      */
-    public function onPeerClose(Container $c, Manager $manager, Locator $locator, Peer $peer)
+    public function onPeerClose(Peer $peer)
     {
-        $addr = $peer->getRemoteAddr();
-        $c['debug']->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
-        $manager->connectNextPeer($locator);
+        $addr = $peer->getRemoteVersion()->getSenderAddress();
+        $this->container['debug']->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+        $this->connectNextPeer();
     }
 
     /**
@@ -251,32 +297,24 @@ class P2PServiceProvider implements ServiceProviderInterface
      */
     public function register(Container $container)
     {
-        $txRelay = $this->config->getItem('config', 'tx_relay', false);
-        $netFactory = new \BitWasp\Bitcoin\Networking\Factory($this->loop, Bitcoin::getNetwork());
-
-        $dns = $netFactory->getDns();
-        $peerFactory = $netFactory->getPeerFactory($dns);
-        $handler = $peerFactory->getPacketHandler();
-        $handler->on('ping', array($this, 'onPing'));
-
-        $locator = $peerFactory->getLocator();
-        $manager = $peerFactory->getManager($txRelay);
-        $manager->registerHandler($handler);
+        $this->container = $container;
 
         // Setup listener if required
         if ($this->config->getItem('config', 'listen', '0')) {
-            $listener = $peerFactory->getListener(new \React\Socket\Server($this->loop));
-            $manager->registerListener($listener);
+            $listener = new Listener($this->params, $this->messages, new Server($this->loop), $this->loop);
+            $this->manager->registerListener($listener);
         }
 
-        $manager->on('outbound', function (Peer $peer) use ($container, $manager, $locator) {
-            $peer->on('block', $this->wrap([$this, 'onBlock'], $container));
+        $this->manager->on('outbound', function (Peer $peer) {
+            $peer->on('ping', array($this, 'onPing'));
+            $peer->on('block', [$this, 'onBlock']);
             $peer->on('inv', [$this, 'onInv']);
-            $peer->on('headers', $this->wrap([$this, 'onHeaders'], $container));
-            $peer->on('getheaders', $this->wrap([$this, 'onGetHeaders'], $container));
-            $peer->on('close', $this->wrap([$this, 'onPeerClose'], $container, $manager, $locator));
-            $addr = $peer->getRemoteAddr();
-            $container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+            $peer->on('headers', [$this, 'onHeaders']);
+            $peer->on('getheaders', [$this, 'onGetHeaders']);
+            $peer->on('close', [$this, 'onPeerClose']);
+
+            $addr = $peer->getRemoteVersion()->getSenderAddress();
+            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
 
             $this->peersOutbound->add($peer);
 
@@ -294,18 +332,79 @@ class P2PServiceProvider implements ServiceProviderInterface
             }
         });
 
-        $manager->on('inbound', function (Peer $peer) use ($container) {
-            $addr = $peer->getRemoteAddr();
+        $this->manager->on('inbound', function (Peer $peer) use ($container) {
+            $peer->on('ping', array($this, 'onPing'));
+
+            $addr = $peer->getRemoteVersion()->getSenderAddress();
             $container['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->peersInbound->add($peer);
         });
 
-        $locator
+        $this
+            ->locator
             ->queryDnsSeeds(1)
-            ->then(function (Locator $locator) use ($manager, $handler) {
-                for ($i = 0; $i < 1; $i++) {
-                    $manager->connectNextPeer($locator);
-                }
+            ->then(function () {
+                $this->connectNextPeer();
             });
+    }
+
+    /**
+     * @param Peer $peer
+     * @return bool
+     */
+    public function checkAcceptablePeer(Peer $peer)
+    {
+        $remote = $peer->getRemoteVersion();
+        if ($remote->getVersion() < Protocol::GETHEADERS) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return \React\Promise\PromiseInterface|static
+     */
+    public function connectNextPeer()
+    {
+        $addr = new Deferred();
+        try {
+            $addr->resolve($this->locator->popAddress());
+        } catch (\Exception $e) {
+            $this->locator->queryDnsSeeds(1)->then(function (Locator $locator) use ($addr) {
+                $addr->resolve($locator->popAddress());
+            });
+        }
+
+        return $addr
+            ->promise()
+            ->then(function (NetworkAddressInterface $host) {
+                $goodPeer = new Deferred();
+
+                $this
+                    ->connector
+                    ->connect($host)
+                    ->then(function (Peer $peer) use ($goodPeer) {
+                    $check = $this->checkAcceptablePeer($peer);
+
+                    if (false === $check) {
+                        $peer->close();
+                        $goodPeer->reject();
+                    } else {
+                        $goodPeer->resolve($peer);
+                    }
+
+                }, function ($e) use ($goodPeer) {
+                    $goodPeer->reject();
+                });
+
+                return $goodPeer->promise();
+            })
+            ->then(function (Peer $peer) {
+                $this->manager->registerOutboundPeer($peer);
+            }, function () {
+                return $this->connectNextPeer();
+            });
+
     }
 }

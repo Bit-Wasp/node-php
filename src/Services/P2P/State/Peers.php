@@ -25,7 +25,7 @@ class Peers
     public function close()
     {
         foreach ($this->storage as $peer) {
-            $peer->close();
+            $peer->intentionalClose();
         }
     }
 
