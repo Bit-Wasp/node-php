@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Protocol;
+use BitWasp\Bitcoin\Networking\Services;
 use BitWasp\Bitcoin\Networking\Structure\NetworkAddressInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
@@ -313,7 +314,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             $peer->on('close', [$this, 'onPeerClose']);
 
             $addr = $peer->getRemoteVersion()->getSenderAddress();
-            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $addr->getServices()->getInt()]]);
 
             $this->peersOutbound->add($peer);
 
@@ -355,6 +356,10 @@ class P2PServiceProvider implements ServiceProviderInterface
     {
         $remote = $peer->getRemoteVersion();
         if ($remote->getVersion() < Protocol::GETHEADERS) {
+            return false;
+        }
+
+        if ($this->config->getItem('config', 'download_blocks', true) && $remote->getServices()->getInt() & Services::NETWORK == 0) {
             return false;
         }
 
