@@ -291,7 +291,23 @@ class P2PServiceProvider implements ServiceProviderInterface
             $list[] = $ad->getIp();
         }
 
-        $this->container['debug']->log('p2p.addr', ['count' => count($addr), $list]);
+        $this->container['debug']->log('p2p.addr', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => count($addr), 'list' => $list]);
+    }
+
+    public function decodeServices($services)
+    {
+        $results = [];
+        foreach ([
+            'blockchain' => Services::NETWORK,
+            'getutxo' => Services::GETUTXO,
+            'bloom' => Services::BLOOM
+                 ] as $str => $flag) {
+            if (($services & $flag) == $flag) {
+                $results[] = $str;
+            }
+        }
+
+        return $results;
     }
 
     /**
@@ -317,7 +333,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             $peer->on('close', [$this, 'onPeerClose']);
 
             $addr = $peer->getRemoteAddress();
-            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $addr->getServices()->getInt()]]);
+            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $this->decodeServices($addr->getServices())]]);
 
             $this->peersOutbound->add($peer);
 
@@ -347,7 +363,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             ->locator
             ->queryDnsSeeds(1)
             ->then(function () {
-                for ($i = 0; $i < 8; $i++) {
+                for ($i = 0; $i < 1; $i++) {
                     $this->connectNextPeer();
                 }
             });
@@ -364,7 +380,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             return false;
         }
 
-        if ($this->config->getItem('config', 'download_blocks', true) && $remote->getServices()->getInt() & Services::NETWORK == 0) {
+        if ($this->config->getItem('config', 'download_blocks', true) && $remote->getServices() & Services::NETWORK == 0) {
             return false;
         }
 

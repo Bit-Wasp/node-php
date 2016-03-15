@@ -89,7 +89,7 @@ class Blocks extends EventEmitter
         try {
             $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
-            $this->db->createBlockIndexGenesis($index);
+            $this->db->insertToBlockIndex($index->getHash());
         }
     }
 
