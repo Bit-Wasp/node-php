@@ -4,6 +4,8 @@ namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockInterface;
+use BitWasp\Bitcoin\Networking\Message;
+use BitWasp\Bitcoin\Networking\Messages\Addr;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Headers;
@@ -187,7 +189,6 @@ class P2PServiceProvider implements ServiceProviderInterface
         }
     }
 
-
     /**
      * @param Peer $peer
      * @param Headers $headersMsg
@@ -219,7 +220,7 @@ class P2PServiceProvider implements ServiceProviderInterface
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
 
-            $this->container['debug']->log('p2p.headers', ['count' => $count]);
+            $this->container['debug']->log('p2p.headers', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => $count]);
         } catch (\Exception $e) {
             $this->container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
@@ -253,10 +254,10 @@ class P2PServiceProvider implements ServiceProviderInterface
             $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
                 return $r + count($v->getInputs());
             }, 0);
-            $this->node->emit('event', ['p2p.block', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]]);
+            $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]]);
         } catch (\Exception $e) {
             $header = $block->getHeader();
-            $this->node->emit('event', ['error.onBlock', ['hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
+            $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
         }
     }
 
@@ -270,26 +271,27 @@ class P2PServiceProvider implements ServiceProviderInterface
     }
 
     /**
-     * @param callable $callable
-     * @return \Closure
-     */
-    public function wrap(callable $callable)
-    {
-        $wrapped = array_slice(func_get_args(), 1);
-
-        return function () use ($callable, $wrapped) {
-            return call_user_func_array($callable, array_merge($wrapped, func_get_args()));
-        };
-    }
-
-    /**
      * @param Peer $peer
      */
     public function onPeerClose(Peer $peer)
     {
-        $addr = $peer->getRemoteVersion()->getSenderAddress();
+        $addr = $peer->getRemoteAddress();
         $this->container['debug']->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
         $this->connectNextPeer();
+    }
+
+    /**
+     * @param Peer $peer
+     * @param Addr $addr
+     */
+    public function onAddr(Peer $peer, Addr $addr)
+    {
+        $list = [];
+        foreach ($addr->getAddresses() as $ad) {
+            $list[] = $ad->getIp();
+        }
+
+        $this->container['debug']->log('p2p.addr', ['count' => count($addr), $list]);
     }
 
     /**
@@ -306,14 +308,15 @@ class P2PServiceProvider implements ServiceProviderInterface
         }
 
         $this->manager->on('outbound', function (Peer $peer) {
-            $peer->on('ping', array($this, 'onPing'));
-            $peer->on('block', [$this, 'onBlock']);
-            $peer->on('inv', [$this, 'onInv']);
-            $peer->on('headers', [$this, 'onHeaders']);
-            $peer->on('getheaders', [$this, 'onGetHeaders']);
+            $peer->on(Message::PING, array($this, 'onPing'));
+            $peer->on(Message::BLOCK, [$this, 'onBlock']);
+            $peer->on(Message::INV, [$this, 'onInv']);
+            $peer->on(Message::HEADERS, [$this, 'onHeaders']);
+            $peer->on(Message::ADDR, [$this, 'onAddr']);
+            $peer->on(Message::GETHEADERS, [$this, 'onGetHeaders']);
             $peer->on('close', [$this, 'onPeerClose']);
 
-            $addr = $peer->getRemoteVersion()->getSenderAddress();
+            $addr = $peer->getRemoteAddress();
             $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $addr->getServices()->getInt()]]);
 
             $this->peersOutbound->add($peer);
@@ -333,9 +336,9 @@ class P2PServiceProvider implements ServiceProviderInterface
         });
 
         $this->manager->on('inbound', function (Peer $peer) use ($container) {
-            $peer->on('ping', array($this, 'onPing'));
+            $peer->on(Message::PING, array($this, 'onPing'));
 
-            $addr = $peer->getRemoteVersion()->getSenderAddress();
+            $addr = $peer->getRemoteAddress();
             $container['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->peersInbound->add($peer);
         });
@@ -344,7 +347,9 @@ class P2PServiceProvider implements ServiceProviderInterface
             ->locator
             ->queryDnsSeeds(1)
             ->then(function () {
-                $this->connectNextPeer();
+                for ($i = 0; $i < 8; $i++) {
+                    $this->connectNextPeer();
+                }
             });
     }
 
