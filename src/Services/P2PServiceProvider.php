@@ -246,7 +246,6 @@ class P2PServiceProvider implements ServiceProviderInterface
 
         try {
             $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
-            unset($state);
 
             $chainsIdx->checkTips();
             $this->blockDownload->received($best, $peer, $index->getHash());
