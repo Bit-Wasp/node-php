@@ -104,6 +104,12 @@ class Db implements DbInterface
      * @var \PDOStatement
      */
     private $dropDatabaseStmt;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $fetchLftRgtByHash;
+
     /**
      * @var \PDOStatement
      */
@@ -127,6 +133,8 @@ class Db implements DbInterface
 
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
+        $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
+
         $this->updateIndicesStmt = $this->dbh->prepare('
                 UPDATE iindex  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
@@ -979,9 +987,8 @@ WHERE tip.header_id = (
 
         $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
 
-        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
-        $stmt->execute(['hash' => $tipHash->getBinary()]);
-        $id = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $this->fetchLftRgtByHash->execute(['hash' => $tipHash->getBinary()]);
+        $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
 
         $this->dbh->beginTransaction();
 
@@ -1027,23 +1034,19 @@ WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
      */
     public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000)
     {
-        $stmt = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
-        if ($stmt->execute(['hash' => $hash->getBinary()])) {
-            $id = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $this->fetchLftRgtByHash->execute(['hash' => $hash->getBinary()]);
+        $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
 
-            $stmt = $this->dbh->prepare('
-            SELECT
-                   h.version
-            FROM   iindex i, headerIndex h
-            WHERE  h.id = i.header_id
-            AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
+        $stmt = $this->dbh->prepare('
+        SELECT
+               h.version
+        FROM   iindex i, headerIndex h
+        WHERE  h.id = i.header_id
+        AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
 
-            $stmt->execute(['lft'=>$id['lft'],'rgt'=>$id['rgt']]);
-            $stream = $stmt->fetchAll(\PDO::FETCH_COLUMN);
-            return $stream;
-        }
-
-        throw new \RuntimeException('findSuperMajorityInfoByHash: Failed to lookup hash');
+        $stmt->execute(['lft'=>$id['lft'],'rgt'=>$id['rgt']]);
+        $stream = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        return $stream;
     }
 
     /**
