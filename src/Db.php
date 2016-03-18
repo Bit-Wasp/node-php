@@ -508,7 +508,7 @@ class Db implements DbInterface
 
         $this->transaction(function () use ($resizeIndex, $nTimesTwo, $myLeft, $index, $leftOffset, $rightOffset) {
             $resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft]);
-            //$resizeIndex->closeCursor();
+            $resizeIndex->closeCursor();
 
             $headerValues = [];
             $headerQuery = [];
