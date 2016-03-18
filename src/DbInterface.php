@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
@@ -111,15 +112,23 @@ interface DbInterface
     /**
      * @param int $blockId
      * @param BlockInterface $block
-     * @return true
+     * @param HashStorage $hashStorage
+     * @return bool
      */
-    public function insertBlockTransactions($blockId, BlockInterface $block);
+    public function insertBlockTransactions($blockId, BlockInterface $block, HashStorage $hashStorage);
 
     /**
      * @param OutPointInterface[] $deleteOutPoints
      * @param Utxo[] $newUtxos
      */
     public function updateUtxoSet(array $deleteOutPoints, array $newUtxos);
+
+    /**
+     * @param HeadersBatch $batch
+     * @return bool
+     * @throws \Exception
+     */
+    public function insertHeaderBatch(HeadersBatch $batch);
 
     /**
      * We use this to help other nodes sync headers. Identify last common

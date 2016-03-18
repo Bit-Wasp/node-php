@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;
 
@@ -28,4 +29,9 @@ class BlockData
      * @var UtxoView
      */
     public $utxoView;
+
+    /**
+     * @var HashStorage
+     */
+    public $hashStorage;
 }

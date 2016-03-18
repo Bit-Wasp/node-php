@@ -348,7 +348,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             if ($this->config->getItem('config', 'index_utxos', true)) {
                 $utxos = $this->node->utxos();
                 $utxos->update($chainState, $block, $blockData);
-            }
+            }   
         });
 
         $this->manager->on('inbound', function (Peer $peer) use ($container) {

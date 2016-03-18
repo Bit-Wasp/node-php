@@ -293,9 +293,10 @@ class Db implements DbInterface
     /**
      * @param int $blockId
      * @param BlockInterface $block
+     * @param HashStorage $hashStorage
      * @return bool
      */
-    public function insertBlockTransactions($blockId, BlockInterface $block)
+    public function insertBlockTransactions($blockId, BlockInterface $block, HashStorage $hashStorage)
     {
         $txListBind = [];
         $txListData = [];
@@ -315,7 +316,7 @@ class Db implements DbInterface
 
         $transactions = $block->getTransactions();
         foreach ($transactions as $i => $tx) {
-            $hash = $tx->getTxId()->getBinary();
+            $hash = $hashStorage[$tx]->getBinary();
             $temp[$i] = $hash;
             $valueOut = $tx->getValueOut();
             $nOut = count($tx->getOutputs());

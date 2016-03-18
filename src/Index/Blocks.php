@@ -11,6 +11,7 @@ use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
@@ -111,6 +112,7 @@ class Blocks extends EventEmitter
         $unknown = [];
         $utxos = [];
         $remainingNew = [];
+        $hashStorage = new HashStorage();
 
         // Record every Outpoint required for the block.
         foreach ($block->getTransactions() as $t => $tx) {
@@ -127,6 +129,7 @@ class Blocks extends EventEmitter
         // Cancel outpoints which were used in a subsequent transaction
         foreach ($block->getTransactions() as $tx) {
             $hash = $tx->getTxId();
+            $hashStorage->attach($tx, $hash);
             $hashBin = $hash->getBinary();
             foreach ($tx->getOutputs() as $i => $out) {
                 $lookup = $hashBin . $i;
@@ -147,7 +150,7 @@ class Blocks extends EventEmitter
             $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32, $this->math), substr($str, 32));
         }
 
-        return [$required, $utxos, $remainingNew];
+        return [$required, $utxos, $remainingNew, $hashStorage];
     }
 
     /**
@@ -157,7 +160,7 @@ class Blocks extends EventEmitter
     public function prepareBatch(BlockInterface $block)
     {
         $blockData = new BlockData();
-        list ($blockData->requiredOutpoints, $blockData->parsedUtxos, $blockData->remainingNew) = $this->parseUtxos($block);
+        list ($blockData->requiredOutpoints, $blockData->parsedUtxos, $blockData->remainingNew, $blockData->hashStorage) = $this->parseUtxos($block);
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
             $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
@@ -231,10 +234,10 @@ class Blocks extends EventEmitter
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
 
-        $this->db->transaction(function () use ($hash, $block) {
+        $this->db->transaction(function () use ($hash, $block, $blockData) {
             $blockId = $this->db->insertToBlockIndex($hash);
             if ($this->config->getItem('config', 'index_transactions', true)) {
-                $this->db->insertBlockTransactions($blockId, $block);
+                $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }
         });
 

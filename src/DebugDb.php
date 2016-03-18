@@ -6,8 +6,8 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
+use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -40,6 +40,17 @@ class DebugDb implements DbInterface
         return $this->db->wipe();
     }
 
+    /**
+     * @param HeadersBatch $batch
+     * @return bool
+     * @throws \Exception
+     */
+    public function insertHeaderBatch(HeadersBatch $batch)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->insertHeaderBatch($batch);
+    }
+
     public function resetBlocksOnly()
     {
         echo __FUNCTION__ . PHP_EOL;
@@ -56,18 +67,6 @@ class DebugDb implements DbInterface
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->createIndexGenesis($header);
-    }
-
-    public function createBlockIndexGenesis(BlockIndexInterface $index)
-    {
-        echo __FUNCTION__ . PHP_EOL;
-        return $this->db->createBlockIndexGenesis($index);
-    }
-
-    public function insertBlock(BufferInterface $blockHash, BlockInterface $block)
-    {
-        echo __FUNCTION__ . PHP_EOL;
-        return $this->db->insertBlock($blockHash, $block);
     }
 
     public function fetchIndex(BufferInterface $hash)
@@ -130,10 +129,10 @@ class DebugDb implements DbInterface
         return $this->db->insertToBlockIndex($index);
     }
 
-    public function insertBlockTransactions($blockId, BlockInterface $block)
+    public function insertBlockTransactions($blockId, BlockInterface $block, HashStorage $hashStorage)
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->insertBlockTransactions($blockId, $block);
+        return $this->db->insertBlockTransactions($blockId, $block, $hashStorage);
     }
 
     public function updateUtxoSet(array $deleteOutPoints, array $newUtxos)
