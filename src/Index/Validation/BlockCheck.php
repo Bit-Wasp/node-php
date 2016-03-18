@@ -181,14 +181,12 @@ class BlockCheck implements BlockCheckInterface
         // Must be at least one transaction input and output
         $params = $this->consensus->getParams();
         $inputs = $transaction->getInputs();
-        $nInputs = count($inputs);
-        if (0 === $nInputs) {
+        if (0 === count($inputs)) {
             throw new \RuntimeException('CheckTransaction: no inputs');
         }
 
         $outputs = $transaction->getOutputs();
-        $nOutputs = count($outputs);
-        if (0 === $nOutputs) {
+        if (0 === count($outputs)) {
             throw new \RuntimeException('CheckTransaction: no outputs');
         }
 
@@ -219,22 +217,26 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param BlockInterface $block
+     * @param bool $checkSize
+     * @param bool $checkMerkleRoot
      * @return $this
      */
-    public function check(BlockInterface $block)
+    public function check(BlockInterface $block, $checkSize = true, $checkMerkleRoot = true)
     {
         $params = $this->consensus->getParams();
         $header = $block->getHeader();
-        if ($block->getMerkleRoot() != $header->getMerkleRoot()) {
+
+        if ($checkMerkleRoot && $block->getMerkleRoot() != $header->getMerkleRoot()) {
             throw new \RuntimeException('Blocks::check(): failed to verify merkle root');
         }
 
         $transactions = $block->getTransactions();
         $txCount = count($transactions);
-        if (0 === $txCount || $block->getBuffer()->getSize() > $params->maxBlockSizeBytes()) {
+
+        if ($checkSize && (0 === $txCount || $block->getBuffer()->getSize() > $params->maxBlockSizeBytes())) {
             throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
         }
-
+        
         // The first transaction is coinbase, and only the first transaction is coinbase.
         if (!$transactions[0]->isCoinbase()) {
             throw new \RuntimeException('Blocks::check(): First transaction was not coinbase');
@@ -248,7 +250,7 @@ class BlockCheck implements BlockCheckInterface
 
         $nSigOps = 0;
         foreach ($transactions as $transaction) {
-            $this->checkTransaction($transaction);
+            $this->checkTransaction($transaction, $checkSize);
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 

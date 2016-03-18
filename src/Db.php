@@ -973,9 +973,9 @@ WHERE tip.header_id = (
 
         $queryValues = [];
         $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+        for ($i = 0; $i < $requiredCount; $i++) {
+            $queryValues['hashParent' . $i ] = $outpoints[$i]->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoints[$i]->getVout();
 
             if (0 === $i) {
                 $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';

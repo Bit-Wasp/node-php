@@ -18,7 +18,6 @@ use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
-use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
@@ -34,6 +33,11 @@ class Blocks extends EventEmitter
      * @var ChainsInterface
      */
     private $chains;
+
+    /**
+     * @var Forks
+     */
+    private $forks;
 
     /**
      * @var Consensus
@@ -105,13 +109,12 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
-     * @return array
+     * @return BlockData
      */
     public function parseUtxos(BlockInterface $block)
     {
+        $blockData = new BlockData();
         $unknown = [];
-        $utxos = [];
-        $remainingNew = [];
         $hashStorage = new HashStorage();
 
         // Record every Outpoint required for the block.
@@ -122,35 +125,35 @@ class Blocks extends EventEmitter
 
             foreach ($tx->getInputs() as $in) {
                 $outpoint = $in->getOutPoint();
-                $unknown[$outpoint->getTxId()->getBinary() . $outpoint->getVout()] = $t;
+                $unknown[$outpoint->getTxId()->getBinary() . $outpoint->getVout()] = $outpoint;
             }
         }
 
-        // Cancel outpoints which were used in a subsequent transaction
         foreach ($block->getTransactions() as $tx) {
             $hash = $tx->getTxId();
             $hashStorage->attach($tx, $hash);
             $hashBin = $hash->getBinary();
             foreach ($tx->getOutputs() as $i => $out) {
                 $lookup = $hashBin . $i;
-                $utxo = new Utxo(new OutPoint($hash, $i), $out);
                 if (isset($unknown[$lookup])) {
+                    // Remove unknown outpoints which consume this output
+                    $outpoint = $unknown[$lookup];
+                    $utxo = new Utxo($outpoint, $out);
                     unset($unknown[$lookup]);
                 } else {
-                    $remainingNew[] = $utxo;
+                    // Record new utxos which are not consumed in the same block
+                    $utxo = new Utxo(new OutPoint($hash, $i), $out);
+                    $blockData->remainingNew[] = $utxo;
                 }
 
-                $utxos[] = $utxo;
+                // All utxos produced are stored
+                $blockData->parsedUtxos[] = $utxo;
             }
         }
 
-        // Restore our list of unknown outpoints
-        $required = [];
-        foreach ($unknown as $str => $txidx) {
-            $required[] = new OutPoint(new Buffer(substr($str, 0, 32), 32, $this->math), substr($str, 32));
-        }
-
-        return [$required, $utxos, $remainingNew, $hashStorage];
+        $blockData->requiredOutpoints = array_values($unknown);
+        $blockData->hashStorage = $hashStorage;
+        return $blockData;
     }
 
     /**
@@ -159,21 +162,14 @@ class Blocks extends EventEmitter
      */
     public function prepareBatch(BlockInterface $block)
     {
-        $blockData = new BlockData();
-        list ($blockData->requiredOutpoints, $blockData->parsedUtxos, $blockData->remainingNew, $blockData->hashStorage) = $this->parseUtxos($block);
-
+        $blockData = $this->parseUtxos($block);
         if ($this->config->getItem('config', 'index_utxos', true)) {
             $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
         } else {
             $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);
         }
 
-        $allUtxos = $blockData->parsedUtxos;
-        foreach ($remaining as $utxo) {
-            $allUtxos[] = $utxo;
-        }
-
-        $blockData->utxoView = new UtxoView($allUtxos);
+        $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
         return $blockData;
     }
 
@@ -198,8 +194,13 @@ class Blocks extends EventEmitter
         $blockData = $this->prepareBatch($block);
         $view = $blockData->utxoView;
 
-        $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
-        $forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+        if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
+            $forks = $this->forks;
+        } else {
+            $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
+            $forks = $this->forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+        }
+
         $flags = $forks->getFlags();
         $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
@@ -242,6 +243,7 @@ class Blocks extends EventEmitter
         });
 
         $state->updateLastBlock($index);
+        $this->forks->next($index);
         $this->emit('block', [$state, $block, $blockData]);
 
         return $index;
