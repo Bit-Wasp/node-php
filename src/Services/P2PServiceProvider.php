@@ -241,9 +241,11 @@ class P2PServiceProvider implements ServiceProviderInterface
         $blockIndex = $node->blocks();
 
         $checkSignatures = (bool) $this->config->getItem('config', 'check_signatures', true);
+        $checkSize = (bool) $this->config->getItem('config', 'check_block_size', true);
+        $checkMerkleRoot = (bool) $this->config->getItem('config', 'check_merkle_root', true);
 
         try {
-            $index = $blockIndex->accept($block, $headerIdx, $checkSignatures);
+            $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
             unset($state);
 
             $chainsIdx->checkTips();

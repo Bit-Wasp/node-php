@@ -177,9 +177,11 @@ class Blocks extends EventEmitter
      * @param BlockInterface $block
      * @param Headers $headers
      * @param bool $checkSignatures
+     * @param bool $checkMerkleRoot
+     * @param bool $checkSize
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true)
+    public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
         $state = $this->chains->best();
 
@@ -188,7 +190,7 @@ class Blocks extends EventEmitter
 
         $this
             ->blockCheck
-            ->check($block)
+            ->check($block, $checkSize, $checkMerkleRoot)
             ->checkContextual($block, $state->getLastBlock());
 
         $blockData = $this->prepareBatch($block);
