@@ -113,6 +113,11 @@ class Db implements DbInterface
     /**
      * @var \PDOStatement
      */
+    private $fetchSuperMajorityVersions;
+
+    /**
+     * @var \PDOStatement
+     */
     private $insertToBlockIndexStmt;
 
     /**
@@ -134,6 +139,7 @@ class Db implements DbInterface
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
         $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
+        $this->fetchSuperMajorityVersions = $this->dbh->prepare('SELECT h.version FROM   iindex i, headerIndex h WHERE  h.id = i.header_id AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
 
         $this->updateIndicesStmt = $this->dbh->prepare('
                 UPDATE iindex  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
@@ -500,64 +506,57 @@ class Db implements DbInterface
         $leftOffset = $myLeft;
         $rightOffset = $myLeft + $nTimesTwo;
 
-        $this->dbh->beginTransaction();
-        try {
-            if ($resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft])) {
-                $resizeIndex->closeCursor();
+        $this->transaction(function () use ($resizeIndex, $nTimesTwo, $myLeft, $index, $leftOffset, $rightOffset) {
+            $resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft]);
+            //$resizeIndex->closeCursor();
 
-                $headerValues = [];
-                $headerQuery = [];
+            $headerValues = [];
+            $headerQuery = [];
 
-                $indexValues = [];
-                $indexQuery = [];
+            $indexValues = [];
+            $indexQuery = [];
 
-                $c = 0;
-                foreach ($index as $i) {
-                    $headerQuery[] = "(:hash$c , :height$c , :work$c ,
-                    :version$c , :prevBlock$c , :merkleRoot$c ,
-                    :nBits$c , :nTimestamp$c , :nNonce$c  )";
+            $c = 0;
+            foreach ($index as $i) {
+                $headerQuery[] = "(:hash$c , :height$c , :work$c ,
+                :version$c , :prevBlock$c , :merkleRoot$c ,
+                :nBits$c , :nTimestamp$c , :nNonce$c  )";
 
-                    $headerValues['hash' . $c] = $i->getHash()->getBinary();
-                    $headerValues['height' . $c] = $i->getHeight();
-                    $headerValues['work' . $c] = $i->getWork();
+                $headerValues['hash' . $c] = $i->getHash()->getBinary();
+                $headerValues['height' . $c] = $i->getHeight();
+                $headerValues['work' . $c] = $i->getWork();
 
-                    $header = $i->getHeader();
-                    $headerValues['version' . $c] = $header->getVersion();
-                    $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
-                    $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
-                    $headerValues['nBits' . $c] = $header->getBits()->getInt();
-                    $headerValues['nTimestamp' . $c] = $header->getTimestamp();
-                    $headerValues['nNonce' . $c] = $header->getNonce();
+                $header = $i->getHeader();
+                $headerValues['version' . $c] = $header->getVersion();
+                $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
+                $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
+                $headerValues['nBits' . $c] = $header->getBits()->getInt();
+                $headerValues['nTimestamp' . $c] = $header->getTimestamp();
+                $headerValues['nNonce' . $c] = $header->getNonce();
 
-                    $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
-                    $indexValues['lft' . $c] = $leftOffset + 1 + $c;
-                    $indexValues['rgt' . $c] = $rightOffset - $c;
-                    $c++;
-                }
-
-                $insertHeaders = $this->dbh->prepare('
-                  INSERT INTO headerIndex  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
-                  VALUES ' . implode(', ', $headerQuery));
-                $insertHeaders->execute($headerValues);
-
-                $lastId = (int)$this->dbh->lastInsertId();
-                $count = count($index);
-                for ($i = 0; $i < $count; $i++) {
-                    $rowId = $i + $lastId;
-                    $indexValues['header_id' . $i] = $rowId;
-                }
-
-                $insertIndices = $this->dbh->prepare('INSERT INTO iindex  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
-                $insertIndices->execute($indexValues);
-                $this->dbh->commit();
-
-                return true;
-
+                $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
+                $indexValues['lft' . $c] = $leftOffset + 1 + $c;
+                $indexValues['rgt' . $c] = $rightOffset - $c;
+                $c++;
             }
-        } catch (\Exception $e) {
-            $this->dbh->rollBack();
-            throw $e;
-        }
+
+            $insertHeaders = $this->dbh->prepare('
+              INSERT INTO headerIndex  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+              VALUES ' . implode(', ', $headerQuery));
+            $insertHeaders->execute($headerValues);
+
+            $lastId = (int)$this->dbh->lastInsertId();
+            $count = count($index);
+            for ($i = 0; $i < $count; $i++) {
+                $rowId = $i + $lastId;
+                $indexValues['header_id' . $i] = $rowId;
+            }
+
+            $insertIndices = $this->dbh->prepare('INSERT INTO iindex  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
+            $insertIndices->execute($indexValues);
+
+            return true;
+        });
     }
 
     /**
@@ -990,10 +989,7 @@ WHERE tip.header_id = (
         $this->fetchLftRgtByHash->execute(['hash' => $tipHash->getBinary()]);
         $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
 
-        $this->dbh->beginTransaction();
-
-        try {
-            $fetchUtxoStmt = $this->dbh->prepare('
+        $fetchUtxoStmt = $this->dbh->prepare('
 SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
 JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
 JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
@@ -1002,29 +998,22 @@ JOIN block_transactions bt on (bt.transaction_hash = t.id)
 JOIN iindex i on (i.header_id = bt.block_hash)
 WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
 ');
-            $queryValues['rgt'] = $id['rgt'];
-            $queryValues['lft'] = $id['lft'];
+        $queryValues['rgt'] = $id['rgt'];
+        $queryValues['lft'] = $id['lft'];
 
-            $fetchUtxoStmt->execute($queryValues);
-            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+        $fetchUtxoStmt->execute($queryValues);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $this->dbh->commit();
-
-            $outputSet = [];
-            foreach ($rows as $utxo) {
-                $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-            }
-
-            if (count($outputSet) < $requiredCount) {
-                throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
-            }
-
-            return $outputSet;
-
-        } catch (\Exception $e) {
-            $this->dbh->rollBack();
-            throw $e;
+        $outputSet = [];
+        foreach ($rows as $utxo) {
+            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
+
+        if (count($outputSet) < $requiredCount) {
+            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+        }
+
+        return $outputSet;
     }
 
     /**
@@ -1037,15 +1026,8 @@ WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
         $this->fetchLftRgtByHash->execute(['hash' => $hash->getBinary()]);
         $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
 
-        $stmt = $this->dbh->prepare('
-        SELECT
-               h.version
-        FROM   iindex i, headerIndex h
-        WHERE  h.id = i.header_id
-        AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
-
-        $stmt->execute(['lft'=>$id['lft'],'rgt'=>$id['rgt']]);
-        $stream = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $this->fetchSuperMajorityVersions->execute(['lft' => $id['lft'], 'rgt' => $id['rgt']]);
+        $stream = $this->fetchSuperMajorityVersions->fetchAll(\PDO::FETCH_COLUMN);
         return $stream;
     }
 
@@ -1059,8 +1041,8 @@ WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
         $this->dbh->beginTransaction();
 
         try {
-            $this->dbh->commit();
             $function();
+            $this->dbh->commit();
         } catch (\Exception $e) {
             $this->dbh->rollBack();
             throw $e;
