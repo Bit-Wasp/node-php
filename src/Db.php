@@ -122,6 +122,16 @@ class Db implements DbInterface
     private $insertToBlockIndexStmt;
 
     /**
+     * @var \PDOStatement
+     */
+    private $loadChainByCoord;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $loadLastBlockByCoord;
+
+    /**
      * Db constructor.
      * @param ConfigProviderInterface $config
      */
@@ -179,7 +189,8 @@ class Db implements DbInterface
               GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
             ');
-        $this->loadTipStmt = $this->dbh->prepare('SELECT h.* from iindex i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+        $this->loadTipStmt = $this->dbh->prepare('SELECT * from iindex i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+        $this->loadChainByCoord = $this->dbh->prepare("SELECT h.hash FROM iindex i JOIN headerIndex h on (h.id = i.header_id) WHERE i.lft <= :lft AND i.rgt >= :rgt");
         $this->fetchChainStmt = $this->dbh->prepare('
                SELECT h.hash
                FROM     iindex AS node,
@@ -194,6 +205,14 @@ class Db implements DbInterface
             WHERE node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
             ORDER BY parent.rgt
             LIMIT 1');
+        $this->loadLastBlockByCoord = $this->dbh->prepare('
+            select node.*, h.* from iindex node 
+            join blockIndex b on (b.hash = node.header_id)
+            join headerIndex h on (h.id = b.id) 
+            where node.lft <= :lft and node.rgt >= :rgt 
+            order by node.header_id desc
+            limit 1
+        ');
 
     }
 
@@ -318,7 +337,7 @@ class Db implements DbInterface
         $this->insertBlockStmt->execute(['hash' => $blockHash->getBinary(), 'block' => $blockSerializer->serialize($block)->getBinary()]);
         return $this->dbh->lastInsertId();
     }
-    
+
     /**
      * @param int $blockId
      * @param BlockInterface $block
@@ -446,51 +465,6 @@ class Db implements DbInterface
                 $insertUtxos->execute($utxoValues);
             }
         });
-    }
-
-
-    /**
-     * @param OutPointInterface[] $outpoints
-     * @return Utxo[]
-     * @throws \Exception
-     */
-    public function fetchUtxoDbList(array $outpoints)
-    {
-        $requiredCount = count($outpoints);
-        if (0 === count($outpoints)) {
-            return [];
-        }
-
-        $queryValues = [];
-        $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
-
-            if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
-            } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
-            }
-        }
-
-        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
-
-        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN ('. $innerJoin . ') ou where ou.nOutput = u.nOutput AND ou.hashPrevOut = u.hashPrevOut');
-        $fetchUtxoStmt->execute($queryValues);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        $outputSet = [];
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
-        }
-
-        return $outputSet;
-
     }
 
     /**
@@ -777,8 +751,6 @@ class Db implements DbInterface
     public function fetchChainState(Headers $headers)
     {
         $loadTip = $this->loadTipStmt;
-        $fetchTipChain = $this->fetchChainStmt;
-        $loadLast = $this->loadLastBlockStmt;
 
         $math = Bitcoin::getMath();
 
@@ -799,13 +771,11 @@ class Db implements DbInterface
                     )
                 );
 
-                $fetchTipChain->bindValue(':id', $index['id']);
-                $fetchTipChain->execute();
-                $map = $fetchTipChain->fetchAll(\PDO::FETCH_COLUMN);
+                $this->loadChainByCoord->execute(['lft' => $index['lft'], 'rgt' => $index['rgt']]);
+                $map = $this->loadChainByCoord->fetchAll(\PDO::FETCH_COLUMN);
 
-                $loadLast->bindValue(':id', $index['id']);
-                $loadLast->execute();
-                $block = $loadLast->fetchAll(\PDO::FETCH_ASSOC);
+                $this->loadLastBlockByCoord->execute(['lft' => $index['lft'], 'rgt' => $index['rgt']]);
+                $block = $this->loadLastBlockByCoord->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (count($block) === 1) {
                     $block = $block[0];
@@ -974,6 +944,60 @@ WHERE tip.header_id = (
     }
 
     /**
+     * @param OutPointInterface[] $outpoints
+     * @param array $queryValues
+     * @return mixed
+     */
+    private function createOutpointsJoinSql(array $outpoints, array & $queryValues)
+    {
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+
+            if (0 === $i) {
+                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
+            } else {
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
+            }
+        }
+
+        return implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+    }
+
+    /**
+     * @param OutPointInterface[] $outpoints
+     * @return Utxo[]
+     * @throws \Exception
+     */
+    public function fetchUtxoDbList(array $outpoints)
+    {
+        $requiredCount = count($outpoints);
+        if (0 === count($outpoints)) {
+            return [];
+        }
+
+        $queryValues = [];
+        $innerJoin = $this->createOutpointsJoinSql($outpoints, $queryValues);
+
+        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN ('. $innerJoin . ') ou where ou.nOutput = u.nOutput AND ou.hashPrevOut = u.hashPrevOut');
+        $fetchUtxoStmt->execute($queryValues);
+        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $outputSet = [];
+        foreach ($rows as $utxo) {
+            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) < $requiredCount) {
+            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+        }
+
+        return $outputSet;
+
+    }
+
+    /**
      * @param BufferInterface $tipHash
      * @param OutPointInterface[] $outpoints
      * @return Utxo[]
@@ -987,19 +1011,7 @@ WHERE tip.header_id = (
         }
 
         $queryValues = [];
-        $joinList = [];
-        for ($i = 0; $i < $requiredCount; $i++) {
-            $queryValues['hashParent' . $i ] = $outpoints[$i]->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoints[$i]->getVout();
-
-            if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
-            } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
-            }
-        }
-
-        $innerJoin = implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+        $innerJoin = $this->createOutpointsJoinSql($outpoints, $queryValues);
 
         $this->fetchLftRgtByHash->execute(['hash' => $tipHash->getBinary()]);
         $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);

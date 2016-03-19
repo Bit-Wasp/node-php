@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Mar 12, 2016 at 08:27 PM
+-- Generation Time: Mar 19, 2016 at 11:18 PM
 -- Server version: 5.6.28-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.1
 
@@ -45,8 +45,9 @@ CREATE TABLE IF NOT EXISTS `active_fork` (
 
 CREATE TABLE IF NOT EXISTS `blockIndex` (
   `id` int(9) NOT NULL,
-  `hash` varchar(32) NOT NULL,
-  `flags` int(32) NOT NULL
+  `hash` int(19) NOT NULL,
+  `flags` int(32) NOT NULL,
+  `block` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -90,6 +91,18 @@ CREATE TABLE IF NOT EXISTS `iindex` (
   `header_id` int(11) NOT NULL,
   `lft` int(11) NOT NULL,
   `rgt` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `peers`
+--
+
+CREATE TABLE IF NOT EXISTS `peers` (
+  `id` int(9) NOT NULL,
+  `ip` varchar(15) NOT NULL,
+  `port` int(6) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
