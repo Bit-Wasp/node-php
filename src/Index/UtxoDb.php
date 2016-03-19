@@ -2,12 +2,12 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
-
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
+
 class UtxoDb
 {
     /**
@@ -40,5 +40,4 @@ class UtxoDb
     {
         $this->db->updateUtxoSet($blockData->requiredOutpoints, $blockData->remainingNew);
     }
-
 }

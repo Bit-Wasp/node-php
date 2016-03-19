@@ -5,6 +5,8 @@ namespace BitWasp\Bitcoin\Node\Index\Validation;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
 interface BlockCheckInterface
@@ -40,16 +42,19 @@ interface BlockCheckInterface
 
     /**
      * @param TransactionInterface $transaction
+     * @param CachingTransactionSerializer $txSerializer
      * @param bool|true $checkSize
      * @return $this
      */
-    public function checkTransaction(TransactionInterface $transaction, $checkSize = true);
+    public function checkTransaction(TransactionInterface $transaction, CachingTransactionSerializer $txSerializer, $checkSize = true);
 
     /**
      * @param BlockInterface $block
-     * @return $this
+     * @param CachingTransactionSerializer $txSerializer
+     * @param BlockSerializerInterface $blockSerializer
+     * @return mixed
      */
-    public function check(BlockInterface $block);
+    public function check(BlockInterface $block, CachingTransactionSerializer $txSerializer, BlockSerializerInterface $blockSerializer);
 
     /**
      * @param UtxoView $view

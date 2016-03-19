@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
@@ -15,7 +16,10 @@ use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
+use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
+use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\BufferInterface;
@@ -109,9 +113,10 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
+     * @param CachingTransactionSerializer $txSerializer
      * @return BlockData
      */
-    public function parseUtxos(BlockInterface $block)
+    public function parseUtxos(BlockInterface $block, CachingTransactionSerializer $txSerializer)
     {
         $blockData = new BlockData();
         $unknown = [];
@@ -130,7 +135,9 @@ class Blocks extends EventEmitter
         }
 
         foreach ($block->getTransactions() as $tx) {
-            $hash = $tx->getTxId();
+            /** @var BufferInterface $buffer */
+            $buffer = $txSerializer->serialize($tx);
+            $hash = Hash::sha256d($buffer)->flip();
             $hashStorage->attach($tx, $hash);
             $hashBin = $hash->getBinary();
             foreach ($tx->getOutputs() as $i => $out) {
@@ -158,11 +165,12 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
+     * @param CachingTransactionSerializer $txSerializer
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block)
+    public function prepareBatch(BlockInterface $block, CachingTransactionSerializer $txSerializer)
     {
-        $blockData = $this->parseUtxos($block);
+        $blockData = $this->parseUtxos($block, $txSerializer);
         if ($this->config->getItem('config', 'index_utxos', true)) {
             $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
         } else {
@@ -188,12 +196,15 @@ class Blocks extends EventEmitter
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader());
 
+        $txSerializer = new CachingTransactionSerializer();
+        $blockSerializer = new BlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
+        
         $this
             ->blockCheck
-            ->check($block, $checkSize, $checkMerkleRoot)
+            ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
             ->checkContextual($block, $state->getLastBlock());
 
-        $blockData = $this->prepareBatch($block);
+        $blockData = $this->prepareBatch($block, $txSerializer);
         $view = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
@@ -237,8 +248,9 @@ class Blocks extends EventEmitter
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
 
-        $this->db->transaction(function () use ($hash, $block, $blockData) {
-            $blockId = $this->db->insertToBlockIndex($hash);
+        $this->db->transaction(function () use ($hash, $block, $blockData, $blockSerializer) {
+            $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
+            
             if ($this->config->getItem('config', 'index_transactions', true)) {
                 $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }

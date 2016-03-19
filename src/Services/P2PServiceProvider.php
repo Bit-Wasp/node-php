@@ -251,11 +251,10 @@ class P2PServiceProvider implements ServiceProviderInterface
             $this->blockDownload->received($best, $peer, $index->getHash());
 
             $txcount = count($block->getTransactions());
-            $size = number_format($block->getBuffer()->getSize() / 1024, 3) . " kb";
             $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
                 return $r + count($v->getInputs());
             }, 0);
-            $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'size' => $size, 'nTx' => $txcount, 'nSig' => $nSig]]);
+            $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'nTx' => $txcount, 'nSig' => $nSig]]);
         } catch (\Exception $e) {
             $header = $block->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
@@ -349,7 +348,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             if ($this->config->getItem('config', 'index_utxos', true)) {
                 $utxos = $this->node->utxos();
                 $utxos->update($chainState, $block, $blockData);
-            }   
+            }
         });
 
         $this->manager->on('inbound', function (Peer $peer) use ($container) {
@@ -411,18 +410,18 @@ class P2PServiceProvider implements ServiceProviderInterface
                     ->connector
                     ->connect($host)
                     ->then(function (Peer $peer) use ($goodPeer) {
-                    $check = $this->checkAcceptablePeer($peer);
+                        $check = $this->checkAcceptablePeer($peer);
 
-                    if (false === $check) {
-                        $peer->close();
+                        if (false === $check) {
+                            $peer->close();
+                            $goodPeer->reject();
+                        } else {
+                            $goodPeer->resolve($peer);
+                        }
+
+                    }, function ($e) use ($goodPeer) {
                         $goodPeer->reject();
-                    } else {
-                        $goodPeer->resolve($peer);
-                    }
-
-                }, function ($e) use ($goodPeer) {
-                    $goodPeer->reject();
-                });
+                    });
 
                 return $goodPeer->promise();
             })

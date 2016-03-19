@@ -6,12 +6,18 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use BitWasp\Bitcoin\Exceptions\MerkleTreeEmpty;
 use BitWasp\Bitcoin\Locktime;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
+use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\ScriptFactory;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
+use Pleo\Merkle\FixedSizeTree;
 
 class BlockCheck implements BlockCheckInterface
 {
@@ -173,10 +179,11 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param TransactionInterface $transaction
+     * @param CachingTransactionSerializer $txSerializer
      * @param bool|true $checkSize
      * @return $this
      */
-    public function checkTransaction(TransactionInterface $transaction, $checkSize = true)
+    public function checkTransaction(TransactionInterface $transaction, CachingTransactionSerializer $txSerializer, $checkSize = true)
     {
         // Must be at least one transaction input and output
         $params = $this->consensus->getParams();
@@ -190,7 +197,7 @@ class BlockCheck implements BlockCheckInterface
             throw new \RuntimeException('CheckTransaction: no outputs');
         }
 
-        if ($checkSize && $transaction->getBuffer()->getSize() > $params->maxBlockSizeBytes()) {
+        if ($checkSize && $txSerializer->serialize($transaction)->getSize() > $params->maxBlockSizeBytes()) {
             throw new \RuntimeException('CheckTransaction: tx size exceeds max block size');
         }
 
@@ -217,23 +224,73 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param BlockInterface $block
+     * @param CachingTransactionSerializer $txSerializer
+     * @return Buffer
+     * @throws MerkleTreeEmpty
+     */
+    public function calcMerkleRoot(BlockInterface $block, CachingTransactionSerializer $txSerializer)
+    {
+        $hashFxn = function ($value) {
+            return hash('sha256', hash('sha256', $value, true), true);
+        };
+
+        $txCount = count($block->getTransactions());
+
+        if ($txCount === 0) {
+            // TODO: Probably necessary. Should always have a coinbase at least.
+            throw new MerkleTreeEmpty('Cannot compute Merkle root of an empty tree');
+        }
+
+        if ($txCount === 1) {
+            $transaction = $block->getTransaction(0);
+            $serialized = $txSerializer->serialize($transaction);
+            /** @var BufferInterface $serialized */
+            $binary = $hashFxn($serialized->getBinary());
+
+        } else {
+            // Create a fixed size Merkle Tree
+            $tree = new FixedSizeTree($txCount + ($txCount % 2), $hashFxn);
+
+            // Compute hash of each transaction
+            $last = '';
+            foreach ($block->getTransactions() as $i => $transaction) {
+                $last = $txSerializer->serialize($transaction)->getBinary();
+                $tree->set($i, $last);
+            }
+
+            // Check if we need to repeat the last hash (odd number of transactions)
+            if (!$this->math->isEven($txCount)) {
+                $tree->set($txCount, $last);
+            }
+
+            $binary = $tree->hash();
+        }
+
+        return (new Buffer($binary))->flip();
+    }
+
+    /**
+     * @param BlockInterface $block
+     * @param CachingTransactionSerializer $txSerializer
+     * @param BlockSerializerInterface $blockSerializer
      * @param bool $checkSize
      * @param bool $checkMerkleRoot
      * @return $this
+     * @throws MerkleTreeEmpty
      */
-    public function check(BlockInterface $block, $checkSize = true, $checkMerkleRoot = true)
+    public function check(BlockInterface $block, CachingTransactionSerializer $txSerializer, BlockSerializerInterface $blockSerializer, $checkSize = true, $checkMerkleRoot = true)
     {
         $params = $this->consensus->getParams();
         $header = $block->getHeader();
 
-        if ($checkMerkleRoot && $block->getMerkleRoot() != $header->getMerkleRoot()) {
+        if ($checkMerkleRoot && $this->calcMerkleRoot($block, $txSerializer)->equals($header->getMerkleRoot()) === false) {
             throw new \RuntimeException('Blocks::check(): failed to verify merkle root');
         }
 
         $transactions = $block->getTransactions();
         $txCount = count($transactions);
 
-        if ($checkSize && (0 === $txCount || $block->getBuffer()->getSize() > $params->maxBlockSizeBytes())) {
+        if ($checkSize && (0 === $txCount || $blockSerializer->serialize($block)->getSize() > $params->maxBlockSizeBytes())) {
             throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
         }
         
@@ -250,7 +307,7 @@ class BlockCheck implements BlockCheckInterface
 
         $nSigOps = 0;
         foreach ($transactions as $transaction) {
-            $this->checkTransaction($transaction, $checkSize);
+            $this->checkTransaction($transaction, $txSerializer, $checkSize);
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 

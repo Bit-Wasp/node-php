@@ -21,6 +21,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
@@ -148,6 +149,7 @@ class Db implements DbInterface
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
         $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :refHash ');
+        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash , block ) select h.id, :block from headerIndex h where h.hash = :hash');
         $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
                FROM       headerIndex  i
@@ -304,6 +306,19 @@ class Db implements DbInterface
         return $this->dbh->lastInsertId();
     }
 
+    /**
+     * @param BufferInterface $blockHash
+     * @param BlockInterface $block
+     * @param BlockSerializerInterface $blockSerializer
+     * @return string
+     */
+    public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
+    {
+        // Insert the block header ID
+        $this->insertBlockStmt->execute(['hash' => $blockHash->getBinary(), 'block' => $blockSerializer->serialize($block)->getBinary()]);
+        return $this->dbh->lastInsertId();
+    }
+    
     /**
      * @param int $blockId
      * @param BlockInterface $block

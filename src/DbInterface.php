@@ -12,6 +12,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;
@@ -129,6 +130,13 @@ interface DbInterface
      * @throws \Exception
      */
     public function insertHeaderBatch(HeadersBatch $batch);
+
+    /**
+     * @param BufferInterface $hash
+     * @param BlockInterface $block
+     * @return int
+     */
+    public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer);
 
     /**
      * We use this to help other nodes sync headers. Identify last common
