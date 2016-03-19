@@ -39,7 +39,7 @@ class CachingTransactionSerializer implements TransactionSerializerInterface
             return $this->storage[$tx];
         } else {
             $serialized = $this->txSerializer->serialize($tx);
-            $this->storage->attach($tx);
+            $this->storage->attach($tx, $serialized);
             return $serialized;
         }
     }
