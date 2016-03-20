@@ -50,6 +50,14 @@ class ChainCacheTest extends BitcoinNodeTest
         $this->assertTrue($result, 'cache item exists');
     }
 
+    public function testCount()
+    {
+        $hash = str_pad("", 32, "\x01");
+        $cache = new ChainCache([$hash]);
+
+        $this->assertEquals(1, count($cache));
+    }
+
     public function testAddingToCache()
     {
         $hash = str_pad("", 32, "\x01");
