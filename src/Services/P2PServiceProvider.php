@@ -207,7 +207,8 @@ class P2PServiceProvider implements ServiceProviderInterface
                 $headers->applyBatch($batch);
                 $chains->checkTips();
                 $chainState = $batch->getTip();
-                $indexLast = end($batch->getIndices());
+                $indices = $batch->getIndices();
+                $indexLast = end($indices);
 
                 $this->peerStates->fetch($peer)->updateBlockAvailability($chainState, $indexLast->getHash());
 
