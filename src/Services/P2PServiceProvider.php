@@ -339,7 +339,7 @@ class P2PServiceProvider implements ServiceProviderInterface
 
             $chain = $this->node->chain();
             $height = $chain->getChain()->getIndex()->getHeight();
-            $height = ($height != 0) ? $height - 1 : $height;
+            //$height = ($height != 0) ? $height - 1 : $height;
 
             $peer->getheaders($chain->getLocator($height));
         });
