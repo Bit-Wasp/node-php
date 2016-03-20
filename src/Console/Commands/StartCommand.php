@@ -22,6 +22,8 @@ use BitWasp\Bitcoin\Node\Services\UserControlServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocketServiceProvider;
 use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use Pimple\Container;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class StartCommand extends AbstractCommand
 {
@@ -37,9 +39,11 @@ class StartCommand extends AbstractCommand
     }
 
     /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
      * @return int
      */
-    protected function execute()
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
         $config = (new ConfigLoader())->load();
 
