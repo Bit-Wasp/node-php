@@ -2,6 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Console;
 
+use BitWasp\Bitcoin\Node\Console\Commands\BlockVelocityCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\Config\ConfigDefault;
 use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\DbCommand;
@@ -30,7 +31,7 @@ class Application extends ConsoleApplication
         $commands[] = new StopCommand();
         $commands[] = new WatchCommand();
         $commands[] = new WebSocketCommand();
-
+        $commands[] = new BlockVelocityCommand();
         $commands[] = new ControlCommand(new InfoCommand());
         $commands[] = new ControlCommand(new ChainsCommand());
         $commands[] = new ControlCommand(new GetTxCommand());

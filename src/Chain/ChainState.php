@@ -42,12 +42,8 @@ class ChainState implements ChainStateInterface
      */
     public function updateLastBlock(BlockIndexInterface $index)
     {
-        if ($this->lastBlock->getHash() != $index->getHeader()->getPrevBlock()) {
+        if (!$this->lastBlock->isNext($index)) {
             throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
-        }
-
-        if ($this->lastBlock->getHeight() != ($index->getHeight() - 1)) {
-            throw new \RuntimeException('UpdateLastBlock: Incorrect chain height' . ($index->getHeight() - 1));
         }
 
         $this->lastBlock = $index;

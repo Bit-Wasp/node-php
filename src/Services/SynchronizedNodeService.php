@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use Pimple\Container;

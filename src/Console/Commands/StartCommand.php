@@ -63,7 +63,7 @@ class StartCommand extends AbstractCommand
         $params = new Params($math);
         $loop = \React\EventLoop\Factory::create();
 
-        $db = new Db($config);
+        $db = Db::create($config);
         $node = new BitcoinNode($config, $params, $db);
 
         // Configure commands exposed by UserControl & WebSocket

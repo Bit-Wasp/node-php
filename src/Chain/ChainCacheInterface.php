@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Buffertools\BufferInterface;
 
-interface ChainCacheInterface
+interface ChainCacheInterface extends \Countable
 {
     /**
      * @param BufferInterface $hash

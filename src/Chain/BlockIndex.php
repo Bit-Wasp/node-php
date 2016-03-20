@@ -72,4 +72,21 @@ class BlockIndex implements BlockIndexInterface
     {
         return $this->header;
     }
+
+    /**
+     * @param BlockIndexInterface $index
+     * @return bool
+     */
+    public function isNext(BlockIndexInterface $index)
+    {
+        if (false === $this->hash->equals($index->getHeader()->getPrevBlock())) {
+            return false;
+        }
+
+        if (false === ($index->getHeight() === $this->height - 1)) {
+            return false;
+        }
+
+        return true;
+    }
 }

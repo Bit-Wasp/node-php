@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Index;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
+use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
@@ -15,6 +16,7 @@ use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheckInterface;
 use BitWasp\Buffertools\Buffer;
@@ -130,17 +132,17 @@ class Headers extends EventEmitter
         $countHeaders = count($headers);
         $bestPrev = new Buffer();
         $firstUnknown = null;
+        $hashStorage = new HashStorage();
         foreach ($headers as $i => &$head) {
             if ($this->chains->isKnownHeader($head->getPrevBlock())) {
                 $bestPrev = $head->getPrevBlock();
             }
 
-            $hash = $head->getHash();
+            $hash = Hash::sha256d($head->getBuffer())->flip();
+            $hashStorage->attach($head, $hash);
             if ($firstUnknown === null && !$this->chains->isKnownHeader($hash)) {
                 $firstUnknown = $i;
             }
-
-            $head = [$hash, $head];
         }
 
         if (!$bestPrev instanceof BufferInterface) {
@@ -167,7 +169,8 @@ class Headers extends EventEmitter
                  * @var BufferInterface $hash
                  * @var BlockHeaderInterface $header
                  */
-                list ($hash, $header) = $headers[$i];
+                $header = $headers[$i];
+                $hash = $hashStorage[$header];
 
                 $this->headerCheck->check($hash, $header);
 

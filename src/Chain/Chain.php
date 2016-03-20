@@ -127,12 +127,8 @@ class Chain extends EventEmitter implements ChainInterface
      */
     public function updateTip(BlockIndexInterface $index)
     {
-        if (!$this->index->getHash()->equals($index->getHeader()->getPrevBlock())) {
-            throw new \RuntimeException('Header: Header does not extend this chain');
-        }
-
-        if (($index->getHeight() - 1) != $this->index->getHeight()) {
-            throw new \RuntimeException('Header: Incorrect chain height');
+        if (!$this->index->isNext($index)) {
+            throw new \InvalidArgumentException('Provided Index does not elongate this Chain');
         }
 
         $this->chainCache->add($index);

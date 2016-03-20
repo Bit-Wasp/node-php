@@ -26,12 +26,4 @@ interface HeaderCheckInterface
      * @return $this
      */
     public function checkContextual(ChainInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks);
-
-    /**
-     * @param BlockIndexInterface $prevIndex
-     * @param BufferInterface $hash
-     * @param BlockHeaderInterface $header
-     * @return BlockIndexInterface
-     */
-    public function makeIndex(BlockIndexInterface $prevIndex, BufferInterface $hash, BlockHeaderInterface $header);
 }

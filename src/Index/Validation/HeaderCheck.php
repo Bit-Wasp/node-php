@@ -5,7 +5,6 @@ namespace BitWasp\Bitcoin\Node\Index\Validation;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
-use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\Forks;
@@ -58,6 +57,7 @@ class HeaderCheck implements HeaderCheckInterface
             if ($checkPow) {
                 $this->pow->check($hash, $header->getBits()->getInt());
             }
+
         } catch (\Exception $e) {
             throw new \RuntimeException('Headers::check() - failed validating header proof-of-work');
         }
@@ -78,30 +78,13 @@ class HeaderCheck implements HeaderCheckInterface
 
         $header = $index->getHeader();
         if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {
-            throw new \RuntimeException('Headers::CheckContextual2(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
+            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
         }
 
-        $version = $index->getHeader()->getVersion();
-        if ($this->math->cmp($version, $forks->getMajorityVersion()) < 0) {
+        if ($this->math->cmp($header->getVersion(), $forks->getMajorityVersion()) < 0) {
             throw new \RuntimeException('Rejected version');
         }
 
         return $this;
-    }
-
-    /**
-     * @param BlockIndexInterface $prevIndex
-     * @param BufferInterface $hash
-     * @param BlockHeaderInterface $header
-     * @return BlockIndexInterface
-     */
-    public function makeIndex(BlockIndexInterface $prevIndex, BufferInterface $hash, BlockHeaderInterface $header)
-    {
-        return new BlockIndex(
-            $hash,
-            $this->math->add($prevIndex->getHeight(), 1),
-            $this->math->add($this->pow->getWork($header->getBits()), $prevIndex->getWork()),
-            $header
-        );
     }
 }

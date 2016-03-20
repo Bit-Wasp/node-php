@@ -135,7 +135,7 @@ class Db implements DbInterface
      * Db constructor.
      * @param ConfigProviderInterface $config
      */
-    public function __construct(ConfigProviderInterface $config)
+    public function __construct(ConfigProviderInterface $config, \PDO $pdo)
     {
         $driver = $config->getItem('db', 'driver');
         $host = $config->getItem('db', 'host');
@@ -214,6 +214,22 @@ class Db implements DbInterface
             limit 1
         ');
 
+    }
+
+    /**
+     * @param ConfigProviderInterface $config
+     * @return Db
+     */
+    public static function create(ConfigProviderInterface $config)
+    {
+        $driver = $config->getItem('db', 'driver');
+        $host = $config->getItem('db', 'host');
+        $username = $config->getItem('db', 'username');
+        $password = $config->getItem('db', 'password');
+        $database = $config->getItem('db', 'database');
+
+        $dbh = new \PDO("$driver:host=$host;dbname=$database", $username, $password);
+        return new self($config, $dbh);
     }
 
     /**

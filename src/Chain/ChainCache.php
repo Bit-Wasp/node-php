@@ -28,6 +28,14 @@ class ChainCache implements ChainCacheInterface
     }
 
     /**
+     * @return int
+     */
+    public function count()
+    {
+        return count($this->hashByHeight);
+    }
+
+    /**
      * @param BufferInterface $hash
      * @return bool
      */
@@ -68,7 +76,7 @@ class ChainCache implements ChainCacheInterface
      */
     public function add(BlockIndexInterface $index)
     {
-        if ($index->getHeader()->getPrevBlock() != $this->getHash($index->getHeight() - 1)) {
+        if (!$index->getHeader()->getPrevBlock()->equals($this->getHash($index->getHeight() - 1))) {
             throw new \RuntimeException('ChainCache: New BlockIndex does not refer to last');
         }
 
