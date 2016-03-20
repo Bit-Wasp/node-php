@@ -71,4 +71,31 @@ class ChainCacheTest extends BitcoinNodeTest
 
         $cache->add($next);
     }
+
+    /**
+     * @expectedException \RuntimeException
+     * @expectedExceptionMessage ChainCache: New BlockIndex does not refer to last
+     */
+    public function testFailsAddingToCache()
+    {
+        $hash = str_pad("", 32, "\x01");
+        $another = str_pad("", 32, "\x80");
+        $cache = new ChainCache([$hash]);
+
+        $next = new BlockIndex(
+            new Buffer(str_pad("", 32, "\x41")),
+            1,
+            '1',
+            new BlockHeader(
+                1,
+                new Buffer($another),
+                new Buffer('', 32),
+                0,
+                new Buffer(),
+                0
+            )
+        );
+
+        $cache->add($next);
+    }
 }
