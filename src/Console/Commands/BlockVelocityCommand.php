@@ -44,7 +44,7 @@ class BlockVelocityCommand extends AbstractCommand
             }
         });
 
-        $period = $input->getArgument('t');
+        $period = $input->getArgument('interval');
         $loop->addPeriodicTimer($period, function () use (&$batch, $period) {
             $velocity = $batch / $period;
             echo " count: " . $batch . " - or " . $velocity . " per second " . PHP_EOL;
