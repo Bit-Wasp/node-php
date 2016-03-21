@@ -159,8 +159,7 @@ class Headers extends EventEmitter
         }
 
         /* @var ChainStateInterface $chainState */
-        $chain = $chainState->getChain();
-        $prevIndex = $chain->getIndex();
+        $prevIndex = $chainState->getIndex();
 
         $batch = [];
         if ($firstUnknown !== null) {
@@ -185,7 +184,7 @@ class Headers extends EventEmitter
                 );
 
                 $forks->next($index);
-                $this->headerCheck->checkContextual($chain, $index, $prevIndex, $forks);
+                $this->headerCheck->checkContextual($chainState, $index, $prevIndex, $forks);
 
                 $batch[] = $index;
                 $prevIndex = $index;

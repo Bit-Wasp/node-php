@@ -19,7 +19,7 @@ class GetBlockHashCommand extends Command
             throw new \RuntimeException('Invalid height');
         }
 
-        $chain = $node->chain()->getChain();
+        $chain = $node->chain();
         $hash = $chain->getHashFromHeight($params[self::PARAM_HEIGHT]);
 
         return [

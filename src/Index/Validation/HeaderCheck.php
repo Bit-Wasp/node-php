@@ -6,7 +6,7 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Buffertools\BufferInterface;
@@ -66,13 +66,13 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param ChainInterface $chain
+     * @param ChainStateInterface $chain
      * @param BlockIndexInterface $index
      * @param BlockIndexInterface $prevIndex
      * @param Forks $forks
      * @return $this
      */
-    public function checkContextual(ChainInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
+    public function checkContextual(ChainStateInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
     {
         $work = $this->consensus->getWorkRequired($chain, $prevIndex);
 

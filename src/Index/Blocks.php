@@ -28,6 +28,22 @@ use Packaged\Config\ConfigProviderInterface;
 
 class Blocks extends EventEmitter
 {
+
+    /**
+     * @var DbInterface
+     */
+    private $db;
+
+    /**
+     * @var \BitWasp\Bitcoin\Math\Math
+     */
+    private $math;
+
+    /**
+     * @var ConfigProviderInterface
+     */
+    private $config;
+    
     /**
      * @var BlockCheckInterface
      */
@@ -47,22 +63,7 @@ class Blocks extends EventEmitter
      * @var Consensus
      */
     private $consensus;
-
-    /**
-     * @var DbInterface
-     */
-    private $db;
-
-    /**
-     * @var ConfigProviderInterface
-     */
-    private $config;
-
-    /**
-     * @var \BitWasp\Bitcoin\Math\Math
-     */
-    private $math;
-
+    
     /**
      * Blocks constructor.
      * @param DbInterface $db

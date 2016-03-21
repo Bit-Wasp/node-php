@@ -17,7 +17,7 @@ class InfoCommand extends Command
         $nChain = count($chains);
 
         return [
-            'best_header' => $this->convertIndexToArray($chains->best()->getChainIndex()),
+            'best_header' => $this->convertIndexToArray($chains->best()->getIndex()),
             'best_block' => $this->convertIndexToArray($chains->best()->getLastBlock()),
             'nChain' => $nChain
         ];

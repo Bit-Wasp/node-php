@@ -172,7 +172,7 @@ class P2PServiceProvider implements ServiceProviderInterface
     {
         /** @var DbInterface $db */
         $db = $this->container['db'];
-        $chain = $this->node->chain()->getChain();
+        $chain = $this->node->chain();
 
         $math = Bitcoin::getMath();
         if ($math->cmp($chain->getIndex()->getHeader()->getTimestamp(), (time() - 60 * 60 * 24)) >= 0) {
@@ -339,7 +339,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             $this->peersOutbound->add($peer);
 
             $chain = $this->node->chain();
-            $height = $chain->getChain()->getIndex()->getHeight();
+            $height = $chain->getIndex()->getHeight();
             //$height = ($height != 0) ? $height - 1 : $height;
 
             $peer->getheaders($chain->getLocator($height));

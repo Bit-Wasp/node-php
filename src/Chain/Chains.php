@@ -53,20 +53,6 @@ class Chains extends EventEmitter implements ChainsInterface
     }
 
     /**
-     * @return ChainInterface[]
-     */
-    public function getChains()
-    {
-        /** @var ChainInterface[] $chains */
-        $chains = [];
-        foreach ($this->states as $state) {
-            $chains[] = $state->getChain();
-        }
-
-        return $chains;
-    }
-
-    /**
      * @return int
      */
     public function count()
@@ -82,8 +68,8 @@ class Chains extends EventEmitter implements ChainsInterface
     public function compareChainStateWork(ChainStateInterface $a, ChainStateInterface $b)
     {
         return $this->adapter->getMath()->cmp(
-            $a->getChain()->getIndex()->getWork(),
-            $b->getChain()->getIndex()->getWork()
+            $a->getIndex()->getWork(),
+            $b->getIndex()->getWork()
         );
     }
 
@@ -98,9 +84,9 @@ class Chains extends EventEmitter implements ChainsInterface
         $greatestWork = end($tips);
 
         /** @var ChainState $greatestWork */
-        if (!isset($this->best) || $this->bestIndex !== $greatestWork->getChainIndex()) {
+        if (!isset($this->best) || $this->bestIndex !== $greatestWork->getIndex()) {
             $this->best = $greatestWork;
-            $this->bestIndex = $greatestWork->getChainIndex();
+            $this->bestIndex = $greatestWork->getIndex();
             $this->emit('newtip', [$greatestWork]);
         }
     }
@@ -113,7 +99,7 @@ class Chains extends EventEmitter implements ChainsInterface
         $this->states[] = $state;
 
         // Implement
-        $state->getChain()->on('tip', function (BlockIndexInterface $index) use ($state) {
+        $state->on('tip', function (BlockIndexInterface $index) use ($state) {
             $math = $this->adapter->getMath();
             if ($math->cmp($math->mod($index->getHeight(), $this->params->powRetargetInterval()), 0) === 0) {
                 $this->emit('retarget', [$state, $index]);
@@ -139,12 +125,12 @@ class Chains extends EventEmitter implements ChainsInterface
      */
     public function isKnownHeader(BufferInterface $hash)
     {
-        return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
+        return array_reduce($this->states, function ($foundState, ChainStateInterface $state) use ($hash) {
             if ($foundState instanceof ChainState) {
                 return $foundState;
             }
 
-            if ($state->getChain()->containsHash($hash)) {
+            if ($state->containsHash($hash)) {
                 return $state;
             }
 
@@ -158,12 +144,12 @@ class Chains extends EventEmitter implements ChainsInterface
      */
     public function isTip(BufferInterface $hash)
     {
-        return array_reduce($this->states, function ($foundState, ChainState $state) use ($hash) {
+        return array_reduce($this->states, function ($foundState, ChainStateInterface $state) use ($hash) {
             if ($foundState instanceof ChainState) {
                 return $foundState;
             }
 
-            if ($state->getChainIndex()->getHash() == $hash) {
+            if ($state->getIndex()->getHash()->equals($hash)) {
                 return $state;
             }
 

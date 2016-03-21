@@ -34,7 +34,7 @@ class SynchronizedNodeService implements ServiceProviderInterface
      */
     public function onNewTip(ChainStateInterface $tip)
     {
-        $index = $tip->getChainIndex();
+        $index = $tip->getIndex();
         $header = $index->getHeader();
         $this->socket->send(json_encode([
             'height' => $index->getHeight(),

@@ -6,7 +6,6 @@ use BitWasp\Bitcoin\Amount;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
 class Consensus implements ConsensusInterface
@@ -102,11 +101,11 @@ class Consensus implements ConsensusInterface
     }
 
     /**
-     * @param ChainInterface $chain
+     * @param ChainStateInterface $chain
      * @param BlockIndexInterface $prevIndex
      * @return int|string
      */
-    public function getWorkRequired(ChainInterface $chain, BlockIndexInterface $prevIndex)
+    public function getWorkRequired(ChainStateInterface $chain, BlockIndexInterface $prevIndex)
     {
         $math = $this->math;
 
@@ -127,6 +126,6 @@ class Consensus implements ConsensusInterface
      */
     public function getWorkForNextTip(ChainStateInterface $state)
     {
-        return $this->getWorkRequired($state->getChain(), $state->getChainIndex());
+        return $this->getWorkRequired($state, $state->getIndex());
     }
 }

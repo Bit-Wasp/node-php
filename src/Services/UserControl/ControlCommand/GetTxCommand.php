@@ -20,9 +20,8 @@ class GetTxCommand extends Command
             throw new \RuntimeException('Invalid txid field');
         }
 
-        $chain = $node->chain()->getChain();
         $txid = Buffer::hex($params[self::PARAM_TXID], 32);
-        $tx = $chain->fetchTransaction($node->transactions(), $txid);
+        $tx = $node->chain()->fetchTransaction($node->transactions(), $txid);
 
         return [
             'tx' => $this->convertTransactionToArray($tx)

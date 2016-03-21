@@ -68,7 +68,7 @@ class SelfTestNode extends BitcoinNode
 
             $math = Bitcoin::getMath();
             $best = $this->chain();
-            $height = $best->getChainIndex()->getHeight();
+            $height = $best->getIndex()->getHeight();
             echo "Height: $height\n";
 
             $testing = false;
@@ -76,23 +76,23 @@ class SelfTestNode extends BitcoinNode
                 echo "Induce fork first time\n";
                 $testing = true;
                 $nheight = 2;
-                $hash = $best->getChain()->getChainCache()->getHash($nheight);
+                $hash = $best->getChainCache()->getHash($nheight);
                 $index = $this->headers->fetch($hash);
             } elseif ($this->i == 9 || $this->i == 10 || $this->i == 11) {
                 echo "Induce by 3\n";
                 $testing = true;
                 $best = $this->forkState;
-                $index = $best->getChainIndex();
+                $index = $best->getIndex();
                 ;
             } elseif ($math->cmp($this->i, 14) > 0 && $math->cmp($this->i, 30)<0) {
                 echo "Induce fork by 10\n";
                 $testing = true;
                 $best = $this->forkState;
-                $index = $best->getChainIndex();
+                $index = $best->getIndex();
                 ;
             } else {
                 echo "Elongate tip\n";
-                $index = $best->getChainIndex();
+                $index = $best->getIndex();
             }
 
             $bestHeader = $index->getHeader();

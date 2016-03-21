@@ -8,7 +8,6 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
@@ -134,6 +133,7 @@ interface DbInterface
     /**
      * @param BufferInterface $hash
      * @param BlockInterface $block
+     * @param BlockSerializerInterface $blockSerializer
      * @return int
      */
     public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer);
@@ -142,11 +142,11 @@ interface DbInterface
      * We use this to help other nodes sync headers. Identify last common
      * hash in our chain
      *
-     * @param ChainInterface $activeChain
+     * @param ChainStateInterface $activeChain
      * @param BlockLocator $locator
      * @return BufferInterface
      */
-    public function findFork(ChainInterface $activeChain, BlockLocator $locator);
+    public function findFork(ChainStateInterface $activeChain, BlockLocator $locator);
 
     /**
      * Here, we return max 2000 headers following $hash.

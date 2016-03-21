@@ -28,12 +28,12 @@ class ZmqDebug implements DebugInterface
         });
 
         $node->chains()->on('newtip', function (ChainStateInterface $tip) {
-            $index = $tip->getChainIndex();
+            $index = $tip->getIndex();
             $this->log('chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work' => $index->getWork()]);
         });
 
         $node->chains()->on('retarget', function (ChainStateInterface $tip) {
-            $index = $tip->getChainIndex();
+            $index = $tip->getIndex();
             $this->log('chain.retarget', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
         });
     }

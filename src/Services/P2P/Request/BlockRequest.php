@@ -31,18 +31,17 @@ class BlockRequest
      */
     private function relativeNextInventory(ChainStateInterface $state, BufferInterface $startHash)
     {
-        $best = $state->getChain();
-        if (!$best->containsHash($startHash)) {
+        if (!$state->containsHash($startHash)) {
             throw new \RuntimeException('Hash not found in this chain');
         }
 
-        $startHeight = $best->getHeightFromHash($startHash) + 1;
-        $stopHeight = min($startHeight + self::DOWNLOAD_AMOUNT, $best->getIndex()->getHeight());
+        $startHeight = $state->getHeightFromHash($startHash) + 1;
+        $stopHeight = min($startHeight + self::DOWNLOAD_AMOUNT, $state->getIndex()->getHeight());
         $nInFlight = count($this->inFlight);
 
         $request = [];
         for ($i = $startHeight; $i < $stopHeight && $nInFlight < self::MAX_IN_FLIGHT; $i++) {
-            $request[] = Inventory::block($best->getHashFromHeight($i));
+            $request[] = Inventory::block($state->getHashFromHeight($i));
             $nInFlight++;
         }
 

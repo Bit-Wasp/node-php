@@ -20,8 +20,7 @@ class GetHeaderCommand extends Command
             throw new \RuntimeException('Invalid hash');
         }
 
-        $chain = $node->chain()->getChain();
-        $index = $chain->fetchIndex(Buffer::hex($params[self::PARAM_HASH]));
+        $index = $node->chain()->fetchIndex(Buffer::hex($params[self::PARAM_HASH]));
 
         return [
             'header' => $this->convertIndexToArray($index)

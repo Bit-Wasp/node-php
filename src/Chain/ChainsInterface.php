@@ -13,11 +13,6 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
     public function getStates();
 
     /**
-     * @return ChainInterface[]
-     */
-    public function getChains();
-
-    /**
      * @param ChainStateInterface $a
      * @param ChainStateInterface $b
      * @return int

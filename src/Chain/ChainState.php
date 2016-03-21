@@ -3,15 +3,35 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
+use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Node\Index\Transactions;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
+use Evenement\EventEmitter;
 
-class ChainState implements ChainStateInterface
+class ChainState extends EventEmitter implements ChainStateInterface
 {
+
     /**
-     * @var ChainInterface
+     * @var Math
      */
-    private $chain;
+    private $math;
+
+    /**
+     * @var Headers
+     */
+    private $headers;
+
+    /**
+     * @var BlockIndexInterface
+     */
+    private $index;
+
+    /**
+     * @var ChainCacheInterface
+     */
+    private $chainCache;
 
     /**
      * @var BlockIndexInterface
@@ -25,22 +45,83 @@ class ChainState implements ChainStateInterface
 
     /**
      * ChainState constructor.
-     * @param ChainInterface $chain
+     * @param array $map
+     * @param BlockIndexInterface $index
+     * @param Headers $headers
+     * @param Math $math
      * @param BlockIndexInterface $lastBlock
      */
-    public function __construct(ChainInterface $chain, BlockIndexInterface $lastBlock)
+    public function __construct(array $map, BlockIndexInterface $index, Headers $headers, Math $math, BlockIndexInterface $lastBlock)
     {
-        $this->chain = $chain;
-        $this->lastBlockCache = new GuidedChainCache($this->chain->getChainCache(), $lastBlock->getHeight());
+        $this->math = $math;
+        $this->index = $index;
+        $this->headers = $headers;
+        $this->chainCache = new ChainCache($map);
+        $this->lastBlockCache = new GuidedChainCache($this->chainCache, $lastBlock->getHeight());
         $this->lastBlock = $lastBlock;
     }
 
+
     /**
-     * @param BlockIndexInterface $blockIndex
+     * @param BufferInterface $hash
+     * @return bool
      */
-    public function updateTip(BlockIndexInterface $blockIndex)
+    public function containsHash(BufferInterface $hash)
     {
-        $this->chain->updateTip($blockIndex);
+        return $this->chainCache->containsHash($hash);
+    }
+
+    /**
+     * @param BufferInterface $hash
+     * @return BlockIndexInterface
+     */
+    public function fetchIndex(BufferInterface $hash)
+    {
+        if (!$this->chainCache->containsHash($hash)) {
+            throw new \RuntimeException('Index by this hash not known');
+        }
+
+        return $this->headers->fetch($hash);
+    }
+
+    /**
+     * @param int $height
+     * @return BlockIndexInterface
+     */
+    public function fetchAncestor($height)
+    {
+        return $this->fetchIndex($this->getHashFromHeight($height));
+    }
+
+    /**
+     * @return ChainCacheInterface
+     */
+    public function getChainCache()
+    {
+        return $this->chainCache;
+    }
+
+    /**
+     * @param BufferInterface $txid
+     * @return \BitWasp\Bitcoin\Transaction\Transaction
+     */
+    public function fetchTransaction(Transactions $txIndex, BufferInterface $txid)
+    {
+        return $txIndex->fetch($this->getIndex()->getHash(), $txid);
+    }
+
+    /**
+     * @param BlockIndexInterface $index
+     */
+    public function updateTip(BlockIndexInterface $index)
+    {
+        if (!$this->index->isNext($index)) {
+            throw new \InvalidArgumentException('Provided Index does not elongate this Chain');
+        }
+
+        $this->chainCache->add($index);
+        $this->index = $index;
+        $this->emit('tip', [$index]);
     }
 
     /**
@@ -53,19 +134,29 @@ class ChainState implements ChainStateInterface
     }
 
     /**
-     * @return ChainInterface
+     * @param BufferInterface $hash
+     * @return int
      */
-    public function getChain()
+    public function getHeightFromHash(BufferInterface $hash)
     {
-        return $this->chain;
+        return $this->chainCache->getHeight($hash);
     }
 
     /**
+     * @param int $height
+     * @return BufferInterface
+     */
+    public function getHashFromHeight($height)
+    {
+        return $this->chainCache->getHash($height);
+    }
+    
+    /**
      * @return BlockIndexInterface
      */
-    public function getChainIndex()
+    public function getIndex()
     {
-        return $this->chain->getIndex();
+        return $this->index;
     }
 
     /**
@@ -89,7 +180,7 @@ class ChainState implements ChainStateInterface
      */
     public function blocksLeftToSync()
     {
-        return ($this->chain->getIndex()->getHeight() - $this->lastBlock->getHeight());
+        return ($this->index->getHeight() - $this->lastBlock->getHeight());
     }
 
     /**
@@ -110,7 +201,7 @@ class ChainState implements ChainStateInterface
     {
         $step = 1;
         $hashes = [];
-        $headerHash = $this->chain->getHashFromHeight($height);
+        $headerHash = $this->getHashFromHeight($height);
 
         while (true) {
             $hashes[] = $headerHash;
@@ -119,7 +210,7 @@ class ChainState implements ChainStateInterface
             }
 
             $height = max($height - $step, 0);
-            $headerHash = $this->chain->getHashFromHeight($height);
+            $headerHash = $this->getHashFromHeight($height);
             if (count($hashes) >= 10) {
                 $step *= 2;
             }
@@ -143,7 +234,7 @@ class ChainState implements ChainStateInterface
      */
     public function getHeadersLocator(BufferInterface $hashStop = null)
     {
-        return $this->getLocator($this->chain->getIndex()->getHeight(), $hashStop);
+        return $this->getLocator($this->index->getHeight(), $hashStop);
     }
 
     /**

@@ -23,8 +23,7 @@ class ChainsCommand extends Command
     {
         $chains = [];
         foreach ($node->chains()->getStates() as $state) {
-            $chain = $state->getChain();
-            $bestHeaderIdx = $chain->getIndex();
+            $bestHeaderIdx = $state->getIndex();
             $bestBlockIdx = $state->getLastBlock();
 
             $chains[] = [

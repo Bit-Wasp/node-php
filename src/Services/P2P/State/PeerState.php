@@ -100,8 +100,7 @@ class PeerState extends AbstractState
      */
     public function updateBlockAvailability(ChainStateInterface $state, BufferInterface $hash)
     {
-        $chain = $state->getChain();
-        if ($chain->containsHash($hash)) {
+        if ($state->containsHash($hash)) {
             $this->save(self::INDEXBESTKNOWNBLOCK, $hash);
         } else {
             $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);

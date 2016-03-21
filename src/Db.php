@@ -14,8 +14,6 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\Chain;
-use BitWasp\Bitcoin\Node\Chain\ChainInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
@@ -115,6 +113,11 @@ class Db implements DbInterface
      * @var \PDOStatement
      */
     private $fetchSuperMajorityVersions;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $insertBlockStmt;
 
     /**
      * @var \PDOStatement
@@ -493,7 +496,7 @@ class Db implements DbInterface
         $fetchParent = $this->fetchLftStmt;
         $resizeIndex = $this->updateIndicesStmt;
 
-        $fetchParent->bindValue(':prevBlock', $batch->getTip()->getChainIndex()->getHash()->getBinary());
+        $fetchParent->bindValue(':prevBlock', $batch->getTip()->getIndex()->getHash()->getBinary());
         if ($fetchParent->execute()) {
             foreach ($fetchParent->fetchAll() as $record) {
                 $myLeft = $record['lft'];
@@ -746,12 +749,10 @@ class Db implements DbInterface
             );
 
             return new ChainState(
-                new Chain(
-                    $map,
-                    $index,
-                    $headers,
-                    $math
-                ),
+                $map,
+                $index,
+                $headers,
+                $math,
                 $lastBlock
             );
 
@@ -812,12 +813,10 @@ class Db implements DbInterface
                 }
 
                 $states[] = new ChainState(
-                    new Chain(
-                        $map,
-                        $bestHeader,
-                        $headers,
-                        $math
-                    ),
+                    $map,
+                    $bestHeader,
+                    $headers,
+                    $math,
                     $lastBlock
                 );
             }
@@ -833,11 +832,11 @@ class Db implements DbInterface
      * We use this to help other nodes sync headers. Identify last common
      * hash in our chain
      *
-     * @param ChainInterface $activeChain
+     * @param ChainStateInterface $activeChain
      * @param BlockLocator $locator
      * @return BufferInterface
      */
-    public function findFork(ChainInterface $activeChain, BlockLocator $locator)
+    public function findFork(ChainStateInterface $activeChain, BlockLocator $locator)
     {
         $hashes = [$activeChain->getIndex()->getHash()->getBinary()];
         foreach ($locator->getHashes() as $hash) {

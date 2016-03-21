@@ -52,14 +52,13 @@ class BlockDownloader
     }
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainStateInterface $chain
      * @param ChainCacheInterface $chainView
      * @param Peer $peer
      * @param Inventory[] $items
      */
-    public function advertised(ChainStateInterface $state, ChainCacheInterface $chainView, Peer $peer, array $items)
+    public function advertised(ChainStateInterface $chain, ChainCacheInterface $chainView, Peer $peer, array $items)
     {
-        $chain = $state->getChain();
         $fetch = [];
         $lastUnknown = null;
         foreach ($items as $inv) {
@@ -74,8 +73,8 @@ class BlockDownloader
         }
 
         if (null !== $lastUnknown) {
-            $peer->getheaders($state->getHeadersLocator($lastUnknown));
-            $this->peerState->fetch($peer)->updateBlockAvailability($state, $lastUnknown);
+            $peer->getheaders($chain->getHeadersLocator($lastUnknown));
+            $this->peerState->fetch($peer)->updateBlockAvailability($chain, $lastUnknown);
         }
 
         if (count($fetch) > 0) {
