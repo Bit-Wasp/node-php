@@ -138,22 +138,12 @@ class BlockCheck implements BlockCheckInterface
         // Check output values
         $value = 0;
         foreach ($outputs as $output) {
-            $this->checkAmount($output->getValue());
+            $this->consensus->checkAmount($output->getValue());
             $value = $this->math->add($value, $output->getValue());
-            $this->checkAmount($value);
+            $this->consensus->checkAmount($value);
         }
 
         return $this;
-    }
-
-    /**
-     * @param int $value
-     */
-    private function checkAmount($value)
-    {
-        if ($this->math->cmp($value, 0) < 0 || !$this->consensus->checkAmount($value)) {
-            throw new \RuntimeException('CheckOutputsAmount: invalid amount');
-        }
     }
 
     /**
@@ -339,13 +329,13 @@ class BlockCheck implements BlockCheckInterface
             }*/
 
             $valueIn = $this->math->add($valueIn, $utxo->getOutput()->getValue());
-            $this->checkAmount($valueIn);
+            $this->consensus->checkAmount($valueIn);
         }
 
         $valueOut = 0;
         foreach ($tx->getOutputs() as $output) {
             $valueOut = $this->math->add($valueOut, $output->getValue());
-            $this->checkAmount($valueOut);
+            $this->consensus->checkAmount($valueOut);
         }
 
         if ($this->math->cmp($valueIn, $valueOut) < 0) {
@@ -353,7 +343,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         $fee = $this->math->sub($valueIn, $valueOut);
-        $this->checkAmount($fee);
+        $this->consensus->checkAmount($fee);
 
         return $this;
     }

@@ -45,7 +45,8 @@ class Consensus implements ConsensusInterface
      */
     public function checkAmount($amount)
     {
-        return $this->math->cmp($amount, $this->math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
+        return $this->math->cmp($amount, 0) < 0
+        || $this->math->cmp($amount, $this->math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
     }
 
     /**
