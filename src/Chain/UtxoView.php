@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Chain\Utxo;
+namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;

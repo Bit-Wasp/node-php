@@ -8,13 +8,13 @@ use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\Forks;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\Forks;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
@@ -172,6 +172,7 @@ class Blocks extends EventEmitter
     public function prepareBatch(BlockInterface $block, CachingTransactionSerializer $txSerializer)
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
+        
         if ($this->config->getItem('config', 'index_utxos', true)) {
             $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
         } else {

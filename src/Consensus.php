@@ -97,7 +97,6 @@ class Consensus implements ConsensusInterface
         }
 
         return $math->parseCompact($new, false);
-
     }
 
     /**
@@ -118,14 +117,5 @@ class Consensus implements ConsensusInterface
         $heightLastRetarget = $math->sub($prevIndex->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
         return $this->calculateNextWorkRequired($prevIndex, $lastTime);
-    }
-
-    /**
-     * @param ChainStateInterface $state
-     * @return int|string
-     */
-    public function getWorkForNextTip(ChainStateInterface $state)
-    {
-        return $this->getWorkRequired($state, $state->getIndex());
     }
 }

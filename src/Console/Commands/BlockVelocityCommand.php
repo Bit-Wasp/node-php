@@ -16,7 +16,7 @@ class BlockVelocityCommand extends AbstractCommand
     {
         $this
             ->setName('block:velocity')
-            ->addArgument('t', InputArgument::OPTIONAL, 'Time between output', 5)
+            ->addArgument('interval', InputArgument::OPTIONAL, 'Time between output', 5)
             ->setDescription('Start the watch websocket');
     }
 
@@ -47,8 +47,8 @@ class BlockVelocityCommand extends AbstractCommand
         $period = $input->getArgument('t');
         $loop->addPeriodicTimer($period, function () use (&$batch, $period) {
             $velocity = $batch / $period;
+            echo " count: " . $batch . " - or " . $velocity . " per second " . PHP_EOL;
             $batch = 0;
-            echo "Average: " . $velocity . PHP_EOL;
         });
 
         $loop->run();

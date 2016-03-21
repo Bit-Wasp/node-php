@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 

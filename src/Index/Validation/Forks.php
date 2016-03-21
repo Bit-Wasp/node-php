@@ -1,9 +1,10 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Chain;
+namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 
 class Forks

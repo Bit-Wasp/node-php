@@ -3,7 +3,6 @@ namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
 interface ConsensusInterface
 {
@@ -30,10 +29,4 @@ interface ConsensusInterface
      * @return int|string
      */
     public function calculateNextWorkRequired(BlockIndexInterface $prevIndex, $timeFirstBlock);
-
-    /**
-     * @param ChainStateInterface $state
-     * @return int|string
-     */
-    public function getWorkForNextTip(ChainStateInterface $state);
 }

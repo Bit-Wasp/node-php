@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;

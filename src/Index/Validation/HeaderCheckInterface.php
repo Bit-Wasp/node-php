@@ -5,7 +5,6 @@ namespace BitWasp\Bitcoin\Node\Index\Validation;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Buffertools\BufferInterface;
 
 interface HeaderCheckInterface

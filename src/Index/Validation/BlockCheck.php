@@ -9,7 +9,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Exceptions\MerkleTreeEmpty;
 use BitWasp\Bitcoin\Locktime;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\ScriptFactory;

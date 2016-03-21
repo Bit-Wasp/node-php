@@ -7,7 +7,6 @@ use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Chain\Forks;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -67,6 +66,27 @@ class HeaderCheck implements HeaderCheckInterface
 
     /**
      * @param ChainStateInterface $chain
+     * @param BlockIndexInterface $prevIndex
+     * @return int|string
+     */
+    public function getWorkRequired(ChainStateInterface $chain, BlockIndexInterface $prevIndex)
+    {
+        $params = $this->consensus->getParams();
+        if ($this->math->cmp($this->math->mod($this->math->add($prevIndex->getHeight(), 1), $params->powRetargetInterval()), 0) !== 0) {
+            // No change in difficulty
+            return $prevIndex->getHeader()->getBits()->getInt();
+        }
+
+        // Re-target
+        $heightLastRetarget = $this->math->sub($prevIndex->getHeight(), $this->math->sub($params->powRetargetInterval(), 1));
+        $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
+
+        return $this->consensus->calculateNextWorkRequired($prevIndex, $lastTime);
+    }
+
+
+    /**
+     * @param ChainStateInterface $chain
      * @param BlockIndexInterface $index
      * @param BlockIndexInterface $prevIndex
      * @param Forks $forks
@@ -74,7 +94,7 @@ class HeaderCheck implements HeaderCheckInterface
      */
     public function checkContextual(ChainStateInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
     {
-        $work = $this->consensus->getWorkRequired($chain, $prevIndex);
+        $work = $this->getWorkRequired($chain, $prevIndex);
 
         $header = $index->getHeader();
         if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {

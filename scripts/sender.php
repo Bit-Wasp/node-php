@@ -1,10 +1,9 @@
 <?php
 
 require "vendor/autoload.php";
-use BitWasp\Buffertools\Buffer;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\TransactionFactory;
-use BitWasp\Bitcoin\Node\Chain\Utxo\UtxoView;
+use BitWasp\Buffertools\Buffer;
 
 $scriptPubKey = ScriptFactory::create()
     ->op('OP_1')
