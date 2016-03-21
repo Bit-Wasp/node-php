@@ -150,7 +150,7 @@ class ChainState extends EventEmitter implements ChainStateInterface
     {
         return $this->chainCache->getHash($height);
     }
-    
+
     /**
      * @return BlockIndexInterface
      */

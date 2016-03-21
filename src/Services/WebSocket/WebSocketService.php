@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\WebSocket;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 use Pimple\Container;
 use Ratchet\Http\HttpServer;
@@ -51,5 +50,4 @@ class WebSocketService
             $webSock
         );
     }
-
 }

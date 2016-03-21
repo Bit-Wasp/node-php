@@ -70,6 +70,7 @@ class Headers extends EventEmitter
         ProofOfWork $proofOfWork
     ) {
     
+
         $this->db = $db;
         $this->math = $ecAdapter->getMath();
         $this->chains = $chains;

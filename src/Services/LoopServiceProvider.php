@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
 use React\EventLoop\LoopInterface;
 
 class LoopServiceProvider extends GenericInstanceServiceProvider

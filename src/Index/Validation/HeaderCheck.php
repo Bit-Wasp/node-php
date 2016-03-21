@@ -39,6 +39,7 @@ class HeaderCheck implements HeaderCheckInterface
         ProofOfWork $proofOfWork
     ) {
     
+
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
         $this->pow = $proofOfWork;

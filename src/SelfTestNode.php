@@ -49,7 +49,7 @@ class SelfTestNode extends BitcoinNode
      */
     protected $pow;
 
-   /**
+    /**
      * @var ChainStateInterface
      */
     private $forkState;
@@ -81,7 +81,7 @@ class SelfTestNode extends BitcoinNode
                 $best = $this->forkState;
                 $index = $best->getIndex();
                 ;
-            } elseif ($math->cmp($this->i, 14) > 0 && $math->cmp($this->i, 30)<0) {
+            } elseif ($math->cmp($this->i, 14) > 0 && $math->cmp($this->i, 30) < 0) {
                 echo "Induce fork by 10\n";
                 $testing = true;
                 $best = $this->forkState;

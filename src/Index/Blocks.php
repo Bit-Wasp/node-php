@@ -43,7 +43,7 @@ class Blocks extends EventEmitter
      * @var ConfigProviderInterface
      */
     private $config;
-    
+
     /**
      * @var BlockCheckInterface
      */
@@ -63,7 +63,7 @@ class Blocks extends EventEmitter
      * @var Consensus
      */
     private $consensus;
-    
+
     /**
      * Blocks constructor.
      * @param DbInterface $db
@@ -79,6 +79,7 @@ class Blocks extends EventEmitter
         ChainsInterface $chains,
         Consensus $consensus
     ) {
+    
 
         $this->db = $db;
         $this->config = $config;
@@ -172,7 +173,7 @@ class Blocks extends EventEmitter
     public function prepareBatch(BlockInterface $block, CachingTransactionSerializer $txSerializer)
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
-        
+
         if ($this->config->getItem('config', 'index_utxos', true)) {
             $remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
         } else {
@@ -200,7 +201,7 @@ class Blocks extends EventEmitter
 
         $txSerializer = new CachingTransactionSerializer();
         $blockSerializer = new BlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
-        
+
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
@@ -252,7 +253,7 @@ class Blocks extends EventEmitter
 
         $this->db->transaction(function () use ($hash, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
-            
+
             if ($this->config->getItem('config', 'index_transactions', true)) {
                 $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }

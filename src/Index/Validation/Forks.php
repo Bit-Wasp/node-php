@@ -78,7 +78,7 @@ class Forks
      */
     public function __construct(ParamsInterface $params, BlockIndexInterface $index, array $versions)
     {
-        $this->versionCount = ['v1'=>0,'v2'=>0,'v3'=>0,'v4'=>0,'v5'=>0];
+        $this->versionCount = ['v1' => 0, 'v2' => 0, 'v3' => 0, 'v4' => 0, 'v5' => 0];
         foreach ($versions as $value) {
             $this->updateCount($value);
         }
@@ -283,11 +283,11 @@ class Forks
      */
     private function majorityVersion()
     {
-        if (($this->versionCount['v5'] /1000) > 0.95) {
+        if (($this->versionCount['v5'] / 1000) > 0.95) {
             return 5;
         }
 
-        if (($this->versionCount['v4'] /1000) > 0.95) {
+        if (($this->versionCount['v4'] / 1000) > 0.95) {
             return 4;
         }
 

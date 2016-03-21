@@ -10,7 +10,7 @@ class GuidedChainCache implements ChainCacheInterface
      * @var int
      */
     private $position;
-    
+
     /**
      * @var ChainCacheInterface
      */
@@ -25,24 +25,6 @@ class GuidedChainCache implements ChainCacheInterface
     {
         $this->traceCache = $traceCache;
         $this->position = $capHeight;
-    }
-
-    /**
-     * @param BufferInterface $hash
-     * @return bool
-     */
-    public function containsHash(BufferInterface $hash)
-    {
-        if (!$this->traceCache->containsHash($hash)) {
-            return false;
-        }
-
-        $lookupHeight = $this->traceCache->getHeight($hash);
-        if ($lookupHeight > $this->position) {
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -80,11 +62,21 @@ class GuidedChainCache implements ChainCacheInterface
     }
 
     /**
-     * @return BufferInterface
+     * @param BufferInterface $hash
+     * @return bool
      */
-    private function getNextHash()
+    public function containsHash(BufferInterface $hash)
     {
-        return $this->traceCache->getHash($this->position + 1);
+        if (!$this->traceCache->containsHash($hash)) {
+            return false;
+        }
+
+        $lookupHeight = $this->traceCache->getHeight($hash);
+        if ($lookupHeight > $this->position) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -97,5 +89,13 @@ class GuidedChainCache implements ChainCacheInterface
         }
 
         $this->position++;
+    }
+
+    /**
+     * @return BufferInterface
+     */
+    private function getNextHash()
+    {
+        return $this->traceCache->getHash($this->position + 1);
     }
 }

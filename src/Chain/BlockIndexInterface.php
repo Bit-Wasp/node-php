@@ -26,7 +26,7 @@ interface BlockIndexInterface
      * @return BlockHeaderInterface
      */
     public function getHeader();
-    
+
     /**
      * @param BlockIndexInterface $index
      * @return bool

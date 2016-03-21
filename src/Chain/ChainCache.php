@@ -37,15 +37,6 @@ class ChainCache implements ChainCacheInterface
 
     /**
      * @param BufferInterface $hash
-     * @return bool
-     */
-    public function containsHash(BufferInterface $hash)
-    {
-        return array_key_exists($hash->getBinary(), $this->heightByHash);
-    }
-
-    /**
-     * @param BufferInterface $hash
      * @return int
      */
     public function getHeight(BufferInterface $hash)
@@ -58,17 +49,12 @@ class ChainCache implements ChainCacheInterface
     }
 
     /**
-     * @param int $height
-     * @throws \RuntimeException
-     * @return BufferInterface
+     * @param BufferInterface $hash
+     * @return bool
      */
-    public function getHash($height)
+    public function containsHash(BufferInterface $hash)
     {
-        if (!array_key_exists($height, $this->hashByHeight)) {
-            throw new \RuntimeException('ChainCache: index at this height (' . $height . ') not known');
-        }
-
-        return new Buffer($this->hashByHeight[$height], 32);
+        return array_key_exists($hash->getBinary(), $this->heightByHash);
     }
 
     /**
@@ -83,5 +69,19 @@ class ChainCache implements ChainCacheInterface
         $binary = $index->getHash()->getBinary();
         $this->hashByHeight[] = $binary;
         $this->heightByHash[$binary] = $index->getHeight();
+    }
+
+    /**
+     * @param int $height
+     * @throws \RuntimeException
+     * @return BufferInterface
+     */
+    public function getHash($height)
+    {
+        if (!array_key_exists($height, $this->hashByHeight)) {
+            throw new \RuntimeException('ChainCache: index at this height (' . $height . ') not known');
+        }
+
+        return new Buffer($this->hashByHeight[$height], 32);
     }
 }

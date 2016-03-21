@@ -283,7 +283,7 @@ class BlockCheck implements BlockCheckInterface
         if ($checkSize && (0 === $txCount || $blockSerializer->serialize($block)->getSize() > $params->maxBlockSizeBytes())) {
             throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
         }
-        
+
         // The first transaction is coinbase, and only the first transaction is coinbase.
         if (!$transactions[0]->isCoinbase()) {
             throw new \RuntimeException('Blocks::check(): First transaction was not coinbase');

@@ -37,7 +37,7 @@ class DbCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setName('db:'.$this->dbName)
+            ->setName('db:' . $this->dbName)
             ->setDescription($this->dbDesc);
     }
 

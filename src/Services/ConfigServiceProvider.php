@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-
 use Packaged\Config\ConfigProviderInterface;
 
 class ConfigServiceProvider extends GenericInstanceServiceProvider

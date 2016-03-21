@@ -151,8 +151,8 @@ class Db implements DbInterface
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
-        $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft from iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
-        $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt from headerIndex h, iindex i where h.hash = :hash and i.header_id = h.id');
+        $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
+        $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt FROM headerIndex h, iindex i WHERE h.hash = :hash AND i.header_id = h.id');
         $this->fetchSuperMajorityVersions = $this->dbh->prepare('SELECT h.version FROM   iindex i, headerIndex h WHERE  h.id = i.header_id AND    i.lft < :lft AND i.rgt > :rgt ORDER BY i.rgt ASC LIMIT 1000');
 
         $this->updateIndicesStmt = $this->dbh->prepare('
@@ -161,8 +161,8 @@ class Db implements DbInterface
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
-        $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id from headerIndex where hash = :refHash ');
-        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash , block ) select h.id, :block from headerIndex h where h.hash = :hash');
+        $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
+        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash , block ) SELECT h.id, :block FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
                FROM       headerIndex  i
@@ -192,29 +192,29 @@ class Db implements DbInterface
               GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
             ');
-        $this->loadTipStmt = $this->dbh->prepare('SELECT * from iindex i JOIN headerIndex h on h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
-        $this->loadChainByCoord = $this->dbh->prepare("SELECT h.hash FROM iindex i JOIN headerIndex h on (h.id = i.header_id) WHERE i.lft <= :lft AND i.rgt >= :rgt");
+        $this->loadTipStmt = $this->dbh->prepare('SELECT * FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+        $this->loadChainByCoord = $this->dbh->prepare("SELECT h.hash FROM iindex i JOIN headerIndex h ON (h.id = i.header_id) WHERE i.lft <= :lft AND i.rgt >= :rgt");
         $this->fetchChainStmt = $this->dbh->prepare('
                SELECT h.hash
                FROM     iindex AS node,
                         iindex AS parent
-               JOIN     headerIndex  h on h.id = parent.header_id
+               JOIN     headerIndex  h ON h.id = parent.header_id
                WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
         $this->loadLastBlockStmt = $this->dbh->prepare('
-            SELECT h.* from iindex as node,
-                             iindex as parent
-            INNER JOIN blockIndex b on b.hash = parent.header_id
-            JOIN headerIndex h on h.id = parent.header_id
+            SELECT h.* FROM iindex AS node,
+                             iindex AS parent
+            INNER JOIN blockIndex b ON b.hash = parent.header_id
+            JOIN headerIndex h ON h.id = parent.header_id
             WHERE node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
             ORDER BY parent.rgt
             LIMIT 1');
         $this->loadLastBlockByCoord = $this->dbh->prepare('
-            select node.*, h.* from iindex node 
-            join blockIndex b on (b.hash = node.header_id)
-            join headerIndex h on (h.id = b.id) 
-            where node.lft <= :lft and node.rgt >= :rgt 
-            order by node.header_id desc
-            limit 1
+            SELECT node.*, h.* FROM iindex node 
+            JOIN blockIndex b ON (b.hash = node.header_id)
+            JOIN headerIndex h ON (h.id = b.id) 
+            WHERE node.lft <= :lft AND node.rgt >= :rgt 
+            ORDER BY node.header_id DESC
+            LIMIT 1
         ');
 
     }
@@ -319,13 +319,15 @@ class Db implements DbInterface
             'nBits' => $header->getBits()->getInt(),
             'nTimestamp' => $header->getTimestamp(),
             'nNonce' => $header->getNonce()
-        ))) {
+        ))
+        ) {
 
             if ($stmtIndex->execute([
                 'headerId' => $this->dbh->lastInsertId(),
                 'lft' => 1,
                 'rgt' => 2
-            ])) {
+            ])
+            ) {
                 return true;
             }
         }
@@ -402,22 +404,22 @@ class Db implements DbInterface
 
             for ($j = 0; $j < $nIn; $j++) {
                 $input = $tx->getInput($j);
-                $inBind[] = " ( :parentId$i , :nInput".$i."n".$j.", :hashPrevOut".$i."n".$j.", :nPrevOut".$i."n".$j.", :scriptSig".$i."n".$j.", :nSequence".$i."n".$j." ) ";
+                $inBind[] = " ( :parentId$i , :nInput" . $i . "n" . $j . ", :hashPrevOut" . $i . "n" . $j . ", :nPrevOut" . $i . "n" . $j . ", :scriptSig" . $i . "n" . $j . ", :nSequence" . $i . "n" . $j . " ) ";
                 $outpoint = $input->getOutPoint();
-                $inData["hashPrevOut" .$i  ."n"  .$j] = $outpoint->getTxId()->getBinary();
-                $inData["nPrevOut"    .$i  ."n"  .$j] = $outpoint->getVout();
-                $inData["scriptSig"   .$i  ."n"  .$j] = $input->getScript()->getBinary();
-                $inData["nSequence"   .$i  ."n"  .$j] = $input->getSequence();
-                $inData["nInput"      .$i  ."n"  .$j] = $j;
+                $inData["hashPrevOut" . $i . "n" . $j] = $outpoint->getTxId()->getBinary();
+                $inData["nPrevOut" . $i . "n" . $j] = $outpoint->getVout();
+                $inData["scriptSig" . $i . "n" . $j] = $input->getScript()->getBinary();
+                $inData["nSequence" . $i . "n" . $j] = $input->getSequence();
+                $inData["nInput" . $i . "n" . $j] = $j;
 
             }
 
             for ($k = 0; $k < $nOut; $k++) {
                 $output = $tx->getOutput($k);
-                $outBind[] = " ( :parentId$i , :nOutput".$i."n".$k.", :value".$i."n".$k.", :scriptPubKey".$i."n".$k." ) ";
-                $outData["value"        .$i  ."n"  .$k] = $output->getValue();
-                $outData["scriptPubKey" .$i  ."n"  .$k] = $output->getScript()->getBinary();
-                $outData["nOutput"      .$i  ."n"  .$k] = $k;
+                $outBind[] = " ( :parentId$i , :nOutput" . $i . "n" . $k . ", :value" . $i . "n" . $k . ", :scriptPubKey" . $i . "n" . $k . " ) ";
+                $outData["value" . $i . "n" . $k] = $output->getValue();
+                $outData["scriptPubKey" . $i . "n" . $k] = $output->getScript()->getBinary();
+                $outData["nOutput" . $i . "n" . $k] = $k;
 
             }
         }
@@ -728,10 +730,10 @@ class Db implements DbInterface
                 )
             );
 
-            $this->fetchChainStmt->execute(['id'=>$row['id']]);
+            $this->fetchChainStmt->execute(['id' => $row['id']]);
             $map = $this->fetchChainStmt->fetchAll(\PDO::FETCH_COLUMN);
 
-            $this->loadLastBlockStmt->execute(['id'=>$row['id']]);
+            $this->loadLastBlockStmt->execute(['id' => $row['id']]);
             $block = $this->loadLastBlockStmt->fetch(\PDO::FETCH_ASSOC);
 
             $lastBlock = new BlockIndex(
@@ -847,7 +849,7 @@ class Db implements DbInterface
             SELECT    node.hash
             FROM      headerIndex AS node,
                       headerIndex AS parent
-            WHERE     parent.hash = ? AND node.hash in (' . rtrim(str_repeat('?, ', count($hashes) - 1), ', ') . ')
+            WHERE     parent.hash = ? AND node.hash IN (' . rtrim(str_repeat('?, ', count($hashes) - 1), ', ') . ')
             ORDER BY  node.rgt LIMIT 1
         ');
 
@@ -907,13 +909,13 @@ class Db implements DbInterface
     {
         $tx = $this->dbh->prepare('
         SELECT t.id, t.hash, t.version, t.nLockTime
-FROM iindex as tip
-JOIN iindex as parent on (tip.lft between parent.lft AND parent.rgt)
-JOIN block_transactions bt on (bt.block_hash = parent.header_id)
-JOIN transactions t on (bt.transaction_hash = t.id)
+FROM iindex AS tip
+JOIN iindex AS parent ON (tip.lft BETWEEN parent.lft AND parent.rgt)
+JOIN block_transactions bt ON (bt.block_hash = parent.header_id)
+JOIN transactions t ON (bt.transaction_hash = t.id)
 WHERE tip.header_id = (
     SELECT id FROM headerIndex WHERE hash = :tipHash
-) AND tip.lft BETWEEN parent.lft and parent.rgt AND t.hash = :txHash
+) AND tip.lft BETWEEN parent.lft AND parent.rgt AND t.hash = :txHash
         ');
 
         $tx->execute([':tipHash' => $tipHash->getBinary(), ':txHash' => $txid->getBinary()]);
@@ -923,8 +925,8 @@ WHERE tip.header_id = (
         }
         $txInfo = $txResults[0];
 
-        $fetchInputs = $this->dbh->prepare('SELECT i.* from transactions t join transaction_input i on t.id = i.parent_tx WHERE t.id = :id ORDER BY i.nInput');
-        $fetchOutputs = $this->dbh->prepare('SELECT o.* from transactions t join transaction_output o on t.id = o.parent_tx WHERE t.id = :id ORDER BY o.nOutput');
+        $fetchInputs = $this->dbh->prepare('SELECT i.* FROM transactions t JOIN transaction_input i ON t.id = i.parent_tx WHERE t.id = :id ORDER BY i.nInput');
+        $fetchOutputs = $this->dbh->prepare('SELECT o.* FROM transactions t JOIN transaction_output o ON t.id = o.parent_tx WHERE t.id = :id ORDER BY o.nOutput');
 
         $fetchInputs->execute(['id' => $txInfo['id']]);
         $fetchOutputs->execute(['id' => $txInfo['id']]);
@@ -966,13 +968,13 @@ WHERE tip.header_id = (
     {
         $joinList = [];
         foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i ] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i ] = $outpoint->getVout();
+            $queryValues['hashParent' . $i] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i] = $outpoint->getVout();
 
             if (0 === $i) {
                 $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
             } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i ;
+                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i;
             }
         }
 
@@ -994,7 +996,7 @@ WHERE tip.header_id = (
         $queryValues = [];
         $innerJoin = $this->createOutpointsJoinSql($outpoints, $queryValues);
 
-        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN ('. $innerJoin . ') ou where ou.nOutput = u.nOutput AND ou.hashPrevOut = u.hashPrevOut');
+        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN (' . $innerJoin . ') ou WHERE ou.nOutput = u.nOutput AND ou.hashPrevOut = u.hashPrevOut');
         $fetchUtxoStmt->execute($queryValues);
         $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -1004,7 +1006,7 @@ WHERE tip.header_id = (
         }
 
         if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
         }
 
         return $outputSet;
@@ -1031,13 +1033,13 @@ WHERE tip.header_id = (
         $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
 
         $fetchUtxoStmt = $this->dbh->prepare('
-SELECT o.hashPrevOut as txid, o.nOutput as vout, ou.* FROM transactions t
-JOIN ('.$innerJoin.') o on (o.hashPrevOut = t.hash)
-JOIN transaction_output ou on (ou.parent_tx = t.id and ou.nOutput = o.nOutput)
-LEFT JOIN transaction_input ti on (ti.hashPrevOut = t.hash AND ti.nPrevOut = o.nOutput)
-JOIN block_transactions bt on (bt.transaction_hash = t.id)
-JOIN iindex i on (i.header_id = bt.block_hash)
-WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
+SELECT o.hashPrevOut AS txid, o.nOutput AS vout, ou.* FROM transactions t
+JOIN (' . $innerJoin . ') o ON (o.hashPrevOut = t.hash)
+JOIN transaction_output ou ON (ou.parent_tx = t.id AND ou.nOutput = o.nOutput)
+LEFT JOIN transaction_input ti ON (ti.hashPrevOut = t.hash AND ti.nPrevOut = o.nOutput)
+JOIN block_transactions bt ON (bt.transaction_hash = t.id)
+JOIN iindex i ON (i.header_id = bt.block_hash)
+WHERE i.lft <= :lft AND i.rgt >= :rgt AND ti.nPrevOut IS NULL
 ');
         $queryValues['rgt'] = $id['rgt'];
         $queryValues['lft'] = $id['lft'];
@@ -1051,7 +1053,7 @@ WHERE i.lft <= :lft and i.rgt >= :rgt AND ti.nPrevOut is NULL
         }
 
         if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than ('.count($outputSet).') required amount ('.$requiredCount.')returned');
+            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
         }
 
         return $outputSet;

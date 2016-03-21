@@ -51,7 +51,7 @@ class P2PService
      * @var DebugInterface
      */
     private $debug;
-    
+
     /**
      * @var NodeInterface
      */
@@ -133,7 +133,7 @@ class P2PService
         $this->messages = $this->factory->getMessages();
 
         $this->params = new ConnectionParams();
-        $this->params->requestTxRelay((bool) $this->config->getItem('config', 'tx_relay', false));
+        $this->params->requestTxRelay((bool)$this->config->getItem('config', 'tx_relay', false));
 
         $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns);
         $this->manager = new Manager($this->connector);
@@ -214,7 +214,7 @@ class P2PService
     {
         return $this->connector;
     }
-    
+
     /**
      * @param Peer $peer
      * @param Inv $inv
@@ -321,9 +321,9 @@ class P2PService
         $headerIdx = $node->headers();
         $blockIndex = $node->blocks();
 
-        $checkSignatures = (bool) $this->config->getItem('config', 'check_signatures', true);
-        $checkSize = (bool) $this->config->getItem('config', 'check_block_size', true);
-        $checkMerkleRoot = (bool) $this->config->getItem('config', 'check_merkle_root', true);
+        $checkSignatures = (bool)$this->config->getItem('config', 'check_signatures', true);
+        $checkSize = (bool)$this->config->getItem('config', 'check_block_size', true);
+        $checkMerkleRoot = (bool)$this->config->getItem('config', 'check_merkle_root', true);
 
         try {
             $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
