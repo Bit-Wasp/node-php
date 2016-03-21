@@ -1,10 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services;
+namespace BitWasp\Bitcoin\Node\Services\UserControl;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
-use BitWasp\Bitcoin\Node\Services\UserControl\UserControlService;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 

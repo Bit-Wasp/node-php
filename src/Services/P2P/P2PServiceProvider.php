@@ -1,9 +1,8 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Bitcoin\Node\Services\P2P\P2PService;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 
