@@ -84,5 +84,4 @@ class ChainCache implements ChainCacheInterface
         $this->hashByHeight[] = $binary;
         $this->heightByHash[$binary] = $index->getHeight();
     }
-
 }
