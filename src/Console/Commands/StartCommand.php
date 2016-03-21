@@ -7,9 +7,12 @@ use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
-use BitWasp\Bitcoin\Node\DebugDb;
+use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\NodeInterface;
+use BitWasp\Bitcoin\Node\Services\ConfigServiceProvider;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
+use BitWasp\Bitcoin\Node\Services\LoopServiceProvider;
 use BitWasp\Bitcoin\Node\Services\P2PServiceProvider;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
@@ -21,7 +24,9 @@ use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ShutdownCommand;
 use BitWasp\Bitcoin\Node\Services\UserControlServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocketServiceProvider;
 use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
+use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
+use React\EventLoop\LoopInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -66,6 +71,27 @@ class StartCommand extends AbstractCommand
         $db = Db::create($config);
         $node = new BitcoinNode($config, $params, $db);
 
+        $container = new Container();
+        $container['debug'] = function (Container $c) use ($node) {
+            $context = $c['zmq'];
+            return new ZmqDebug($node, $context);
+        };
+
+        $this->setupServices($container, $node, $loop, $config, $db);
+        $loop->run();
+
+        return 0;
+    }
+
+    /**
+     * @param Container $container
+     * @param NodeInterface $node
+     * @param LoopInterface $loop
+     * @param ConfigProviderInterface $config
+     * @param DbInterface $db
+     */
+    public function setupServices(Container $container, NodeInterface $node, LoopInterface $loop, ConfigProviderInterface $config, DbInterface $db)
+    {
         // Configure commands exposed by UserControl & WebSocket
         /** @var CommandInterface[] $basicCommands */
         $basicCommands = [
@@ -81,22 +107,22 @@ class StartCommand extends AbstractCommand
 
         // Create services
         $services = [
+            new LoopServiceProvider($loop),
+            new ConfigServiceProvider($config),
             new DbServiceProvider($db),
-            new ZmqServiceProvider($loop),
-            new UserControlServiceProvider($node, $consoleCommands),
-            new P2PServiceProvider($loop, $config, $node)
+            new ZmqServiceProvider(),
+            new UserControlServiceProvider($node, $consoleCommands)
         ];
+
+        $p2p = $config->getItem('config', 'p2p', true);
+        if ($p2p) {
+            $services[] = new P2PServiceProvider($node);
+        }
 
         $websocket = $config->getItem('config', 'websocket', false);
         if ($websocket) {
-            $services[] = new WebSocketServiceProvider($loop, $node, $basicCommands);
+            $services[] = new WebSocketServiceProvider($node, $basicCommands);
         }
-
-        $container = new Container();
-        $container['debug'] = function (Container $c) use ($node) {
-            $context = $c['zmq'];
-            return new ZmqDebug($node, $context);
-        };
 
         foreach ($services as $service) {
             $container->register($service);
@@ -105,12 +131,14 @@ class StartCommand extends AbstractCommand
         // Launch services
         $container['debug'];
         $container['userControl'];
+        $container['p2p'];
 
         if ($websocket) {
             $container['websocket'];
         }
-        $loop->run();
 
-        return 0;
+        if ($p2p) {
+            $container['p2p'];
+        }
     }
 }

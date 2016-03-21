@@ -27,6 +27,7 @@ class ForksServiceProvider implements ServiceProviderInterface
     /**
      * ForksServiceProvider constructor.
      * @param NodeInterface $node
+     * @param ParamsInterface $params
      */
     public function __construct(NodeInterface $node, ParamsInterface $params)
     {

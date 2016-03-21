@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
-use BitWasp\Bitcoin\Node\Services\UserControl\UserControl;
+use BitWasp\Bitcoin\Node\Services\UserControl\UserControlService;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 
@@ -37,7 +37,7 @@ class UserControlServiceProvider implements ServiceProviderInterface
     public function register(Container $container)
     {
         $container['userControl'] = function (Container $c) {
-            return new UserControl($c['zmq'], $this->node, $this->commands);
+            return new UserControlService($c['zmq'], $this->node, $this->commands);
         };
     }
 }

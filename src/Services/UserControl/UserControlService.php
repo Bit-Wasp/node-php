@@ -6,7 +6,7 @@ use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use React\ZMQ\Context;
 
-class UserControl
+class UserControlService
 {
     /**
      * @var \React\ZMQ\SocketWrapper
