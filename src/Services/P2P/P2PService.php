@@ -24,13 +24,13 @@ use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\NodeInterface;
+use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
-use Pimple\ServiceProviderInterface;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
 use React\Socket\Server;
@@ -48,7 +48,7 @@ class P2PService
     private $config;
 
     /**
-     * @var 
+     * @var DebugInterface
      */
     private $debug;
     
@@ -155,7 +155,7 @@ class P2PService
             $peer->on('close', [$this, 'onPeerClose']);
 
             $addr = $peer->getRemoteAddress();
-            $this->container['debug']->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $this->decodeServices($addr->getServices())]]);
+            $this->debug->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $this->decodeServices($addr->getServices())]]);
 
             $this->peersOutbound->add($peer);
 
@@ -177,7 +177,7 @@ class P2PService
             $peer->on(Message::PING, array($this, 'onPing'));
 
             $addr = $peer->getRemoteAddress();
-            $container['debug']->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+            $this->debug->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->peersInbound->add($peer);
         });
 
@@ -189,6 +189,30 @@ class P2PService
                     $this->connectNextPeer();
                 }
             });
+    }
+
+    /**
+     * @return Manager
+     */
+    public function manager()
+    {
+        return $this->manager;
+    }
+
+    /**
+     * @return Locator
+     */
+    public function locator()
+    {
+        return $this->locator;
+    }
+
+    /**
+     * @return Connector
+     */
+    public function connector()
+    {
+        return $this->connector;
     }
     
     /**
@@ -241,7 +265,7 @@ class P2PService
 
             $headers = $db->fetchNextHeaders($start);
             $peer->headers($headers);
-            $this->container['debug']->log('peer.sentheaders', ['count' => count($headers), 'start' => $start->getHex()]);
+            $this->debug->log('peer.sentheaders', ['count' => count($headers), 'start' => $start->getHex()]);
         }
     }
 
@@ -277,9 +301,9 @@ class P2PService
                 $this->blockDownload->start($batch->getTip(), $peer);
             }
 
-            $this->container['debug']->log('p2p.headers', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => $count]);
+            $this->debug->log('p2p.headers', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => $count]);
         } catch (\Exception $e) {
-            $this->container['debug']->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            $this->debug->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }
 
@@ -333,7 +357,7 @@ class P2PService
     public function onPeerClose(Peer $peer)
     {
         $addr = $peer->getRemoteAddress();
-        $this->container['debug']->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
+        $this->debug->log('p2p.disconnect', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
         $this->connectNextPeer();
     }
 
@@ -348,7 +372,7 @@ class P2PService
             $list[] = $ad->getIp();
         }
 
-        $this->container['debug']->log('p2p.addr', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => count($addr), 'list' => $list]);
+        $this->debug->log('p2p.addr', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => count($addr), 'list' => $list]);
     }
 
     /**
@@ -421,7 +445,7 @@ class P2PService
                             $goodPeer->resolve($peer);
                         }
 
-                    }, function ($e) use ($goodPeer) {
+                    }, function () use ($goodPeer) {
                         $goodPeer->reject();
                     });
 

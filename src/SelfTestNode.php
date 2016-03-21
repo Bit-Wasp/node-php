@@ -6,7 +6,6 @@ use BitWasp\Bitcoin\Address\AddressFactory;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Block\MerkleRoot;
-use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
@@ -15,9 +14,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Transaction\TransactionFactory;
 use BitWasp\Buffertools\Buffer;
-use Packaged\Config\ConfigProviderInterface;
 use React\EventLoop\LoopInterface;
-use React\ZMQ\Context;
 
 class SelfTestNode extends BitcoinNode
 {

@@ -3,8 +3,8 @@
 namespace BitWasp\Bitcoin\Node\Services\WebSocket;
 
 
-use Pimple\Container;
 use BitWasp\Bitcoin\Node\NodeInterface;
+use Pimple\Container;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use Ratchet\Wamp\WampServer;
