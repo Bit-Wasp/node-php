@@ -13,7 +13,12 @@ class DbCommand extends AbstractCommand
      * @var string
      */
     private $dbName;
+
+    /**
+     * @var string
+     */
     private $dbDesc;
+
     /**
      * DbCommand constructor.
      * @param string $name
@@ -43,7 +48,7 @@ class DbCommand extends AbstractCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        call_user_func([new Db((new ConfigLoader())->load()), $this->dbName]);
+        call_user_func([Db::create((new ConfigLoader())->load()), $this->dbName]);
         return 0;
     }
 }

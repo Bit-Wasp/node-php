@@ -196,7 +196,7 @@ class Forks
      */
     public function isNext(BlockIndexInterface $index)
     {
-        return $index->getHeader()->getPrevBlock()->equals($this->index->getHash());
+        return $this->index->isNext($index);
     }
 
     /**

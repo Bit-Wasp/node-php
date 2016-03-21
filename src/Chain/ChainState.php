@@ -19,6 +19,11 @@ class ChainState implements ChainStateInterface
     private $lastBlock;
 
     /**
+     * @var GuidedChainCache
+     */
+    private $lastBlockCache;
+
+    /**
      * ChainState constructor.
      * @param ChainInterface $chain
      * @param BlockIndexInterface $lastBlock
@@ -26,6 +31,7 @@ class ChainState implements ChainStateInterface
     public function __construct(ChainInterface $chain, BlockIndexInterface $lastBlock)
     {
         $this->chain = $chain;
+        $this->lastBlockCache = new GuidedChainCache($this->chain->getChainCache(), $lastBlock->getHeight());
         $this->lastBlock = $lastBlock;
     }
 
@@ -42,10 +48,7 @@ class ChainState implements ChainStateInterface
      */
     public function updateLastBlock(BlockIndexInterface $index)
     {
-        if (!$this->lastBlock->isNext($index)) {
-            throw new \RuntimeException('UpdateLastBlock: Block does not extend this chain');
-        }
-
+        $this->lastBlockCache->add($index);
         $this->lastBlock = $index;
     }
 
@@ -78,9 +81,7 @@ class ChainState implements ChainStateInterface
      */
     public function bestBlocksCache()
     {
-        return $this->chain
-            ->getChainCache()
-            ->subset($this->lastBlock->getHeight());
+        return $this->lastBlockCache;
     }
 
     /**

@@ -85,16 +85,4 @@ class ChainCache implements ChainCacheInterface
         $this->heightByHash[$binary] = $index->getHeight();
     }
 
-    /**
-     * @param int $endHeight
-     * @return ChainCacheInterface
-     */
-    public function subset($endHeight)
-    {
-        if ($endHeight > count($this->hashByHeight)) {
-            throw new \InvalidArgumentException('ChainCache::subset() - end height exceeds size of this cache');
-        }
-
-        return new self(array_slice($this->hashByHeight, 0, $endHeight));
-    }
 }

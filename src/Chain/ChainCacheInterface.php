@@ -29,10 +29,4 @@ interface ChainCacheInterface extends \Countable
      * @param BlockIndexInterface $index
      */
     public function add(BlockIndexInterface $index);
-
-    /**
-     * @param int $endHeight
-     * @return ChainCacheInterface
-     */
-    public function subset($endHeight);
 }

@@ -19,11 +19,12 @@ class GuidedChainCache implements ChainCacheInterface
     /**
      * GuidedChainCache constructor.
      * @param ChainCacheInterface $traceCache
+     * @param int $capHeight
      */
-    public function __construct(ChainCacheInterface $traceCache)
+    public function __construct(ChainCacheInterface $traceCache, $capHeight)
     {
         $this->traceCache = $traceCache;
-        $this->position = count($traceCache);
+        $this->position = $capHeight;
     }
 
     /**
@@ -96,18 +97,5 @@ class GuidedChainCache implements ChainCacheInterface
         }
 
         $this->position++;
-    }
-
-    /**
-     * @param int $endHeight
-     * @return ChainCacheInterface|mixed
-     */
-    public function subset($endHeight)
-    {
-        if ($endHeight > $this->position) {
-            throw new \InvalidArgumentException('GuidedChainCache::subset() - end height exceeds size of this cache');
-        }
-
-        return $this->subset($endHeight);
     }
 }

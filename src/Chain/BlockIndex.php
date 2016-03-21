@@ -83,7 +83,7 @@ class BlockIndex implements BlockIndexInterface
             return false;
         }
 
-        if (false === ($index->getHeight() === $this->height - 1)) {
+        if (false === ($index->getHeight() == ($this->height + 1))) {
             return false;
         }
 

@@ -767,7 +767,6 @@ class Db implements DbInterface
     public function fetchChainState(Headers $headers)
     {
         $loadTip = $this->loadTipStmt;
-
         $math = Bitcoin::getMath();
 
         if ($loadTip->execute()) {

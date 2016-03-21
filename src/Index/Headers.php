@@ -19,7 +19,6 @@ use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheckInterface;
-use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
@@ -130,7 +129,11 @@ class Headers extends EventEmitter
     public function prepareBatch(array $headers)
     {
         $countHeaders = count($headers);
-        $bestPrev = new Buffer();
+        if (0 === $countHeaders) {
+            return new HeadersBatch($this->chains->best(), []);
+        }
+
+        $bestPrev = null;
         $firstUnknown = null;
         $hashStorage = new HashStorage();
         foreach ($headers as $i => &$head) {
@@ -208,7 +211,7 @@ class Headers extends EventEmitter
 
         $tip = $batch->getTip();
         foreach ($batch->getIndices() as $index) {
-            $tip->getChain()->updateTip($index);
+            $tip->updateTip($index);
         }
 
         $this->emit('headers', [$batch]);
