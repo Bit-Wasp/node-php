@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Tests\Node\Chain;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Script\Script;

@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Tests\Node\Chain;
 
-
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\ChainCache;
