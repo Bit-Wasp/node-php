@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
@@ -169,11 +170,11 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param TransactionInterface $transaction
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface|CachingTransactionSerializer $txSerializer
      * @param bool|true $checkSize
      * @return $this
      */
-    public function checkTransaction(TransactionInterface $transaction, CachingTransactionSerializer $txSerializer, $checkSize = true)
+    public function checkTransaction(TransactionInterface $transaction, TransactionSerializerInterface $txSerializer, $checkSize = true)
     {
         // Must be at least one transaction input and output
         $params = $this->consensus->getParams();
@@ -214,11 +215,11 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param BlockInterface $block
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @return Buffer
      * @throws MerkleTreeEmpty
      */
-    public function calcMerkleRoot(BlockInterface $block, CachingTransactionSerializer $txSerializer)
+    public function calcMerkleRoot(BlockInterface $block, TransactionSerializerInterface $txSerializer)
     {
         $hashFxn = function ($value) {
             return hash('sha256', hash('sha256', $value, true), true);
@@ -261,14 +262,14 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param BlockInterface $block
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @param BlockSerializerInterface $blockSerializer
      * @param bool $checkSize
      * @param bool $checkMerkleRoot
      * @return $this
      * @throws MerkleTreeEmpty
      */
-    public function check(BlockInterface $block, CachingTransactionSerializer $txSerializer, BlockSerializerInterface $blockSerializer, $checkSize = true, $checkMerkleRoot = true)
+    public function check(BlockInterface $block, TransactionSerializerInterface $txSerializer, BlockSerializerInterface $blockSerializer, $checkSize = true, $checkMerkleRoot = true)
     {
         $params = $this->consensus->getParams();
         $header = $block->getHeader();

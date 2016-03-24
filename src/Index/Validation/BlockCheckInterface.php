@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 
 interface BlockCheckInterface
 {
@@ -42,19 +43,19 @@ interface BlockCheckInterface
 
     /**
      * @param TransactionInterface $transaction
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @param bool|true $checkSize
      * @return $this
      */
-    public function checkTransaction(TransactionInterface $transaction, CachingTransactionSerializer $txSerializer, $checkSize = true);
+    public function checkTransaction(TransactionInterface $transaction, TransactionSerializerInterface $txSerializer, $checkSize = true);
 
     /**
      * @param BlockInterface $block
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @param BlockSerializerInterface $blockSerializer
      * @return mixed
      */
-    public function check(BlockInterface $block, CachingTransactionSerializer $txSerializer, BlockSerializerInterface $blockSerializer);
+    public function check(BlockInterface $block, TransactionSerializerInterface $txSerializer, BlockSerializerInterface $blockSerializer);
 
     /**
      * @param UtxoView $view

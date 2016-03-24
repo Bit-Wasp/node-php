@@ -20,6 +20,7 @@ use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\BufferInterface;
@@ -115,10 +116,10 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @return BlockData
      */
-    public function parseUtxos(BlockInterface $block, CachingTransactionSerializer $txSerializer)
+    public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer)
     {
         $blockData = new BlockData();
         $unknown = [];
@@ -167,10 +168,10 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
-     * @param CachingTransactionSerializer $txSerializer
+     * @param TransactionSerializerInterface $txSerializer
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block, CachingTransactionSerializer $txSerializer)
+    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer)
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
 
