@@ -88,17 +88,23 @@ class UtxoView implements \Countable
     public function getValueIn(Math $math, TransactionInterface $tx)
     {
         $value = 0;
-
         foreach ($tx->getInputs() as $input) {
-            $value = $math->add(
-                $value,
-                $this
-                    ->fetchByInput($input)
-                    ->getOutput()
-                    ->getValue()
-            );
+            $value = $math->add($value, $this->fetchByInput($input)->getOutput()->getValue());
         }
 
         return $value;
+    }
+
+    /**
+     * @param Math $math
+     * @param TransactionInterface $tx
+     * @return int|string
+     */
+    public function getFeePaid(Math $math, TransactionInterface $tx)
+    {
+        $valueIn = $this->getValueIn($math, $tx);
+        $valueOut = $tx->getValueOut();
+
+        return $math->sub($valueIn, $valueOut);
     }
 }

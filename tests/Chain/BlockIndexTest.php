@@ -1,10 +1,12 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Tests\Chain;
+namespace BitWasp\Bitcoin\Tests\Node\Chain;
 
+use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Block\BlockHeaderFactory;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
-use BitWasp\Bitcoin\Node\Tests\BitcoinNodeTest;
+use BitWasp\Bitcoin\Tests\Node\BitcoinNodeTest;
+use BitWasp\Buffertools\Buffer;
 
 class BlockIndexTest extends BitcoinNodeTest
 {
@@ -23,5 +25,68 @@ class BlockIndexTest extends BitcoinNodeTest
         $this->assertEquals($work, $index->getWork());
         $this->assertSame($header, $index->getHeader());
 
+    }
+
+    public function testIsNext()
+    {
+        $first = new BlockIndex(
+            new Buffer('aa', 32),
+            0,
+            0,
+            new BlockHeader(
+                0,
+                new Buffer('', 32),
+                new Buffer('', 32),
+                0,
+                new Buffer(),
+                0
+            )
+        );
+
+        $nextGood = new BlockIndex(
+            new Buffer('bb'),
+            1, /* height + 1 */
+            0,
+            new BlockHeader(
+                0,
+                new Buffer('aa', 32), /* prevBlock matches */
+                new Buffer('', 32),
+                0,
+                new Buffer(),
+                0
+            )
+        );
+
+        $nextBadHeight = new BlockIndex(
+            Buffer::hex('bc', 32),
+            222, /* bad height */
+            0,
+            new BlockHeader(
+                0,
+                new Buffer('aa', 32), /* prevBlock matches */
+                new Buffer('', 32),
+                0,
+                new Buffer(),
+                0
+            )
+        );
+
+        $nextBadHash = new BlockIndex(
+            Buffer::hex('bd', 32),
+            1, /* height matches */
+            0,
+            new BlockHeader(
+                0,
+                new Buffer('22', 32), /* prevBlock doesn't match */
+                new Buffer('', 32),
+                0,
+                new Buffer(),
+                0
+            )
+        );
+
+        $this->assertFalse($first->isNext($nextBadHash));
+        $this->assertFalse($first->isNext($nextBadHeight));
+        $this->assertTrue($first->isNext($nextGood));
     }
 }

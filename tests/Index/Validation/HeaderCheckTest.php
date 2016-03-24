@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Tests\Index\Validation;
+namespace BitWasp\Bitcoin\Tests\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockHeader;
@@ -9,7 +9,7 @@ use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Index\Validation\HeaderCheck;
-use BitWasp\Bitcoin\Node\Tests\BitcoinNodeTest;
+use BitWasp\Bitcoin\Tests\Node\BitcoinNodeTest;
 
 class HeaderCheckTest extends BitcoinNodeTest
 {

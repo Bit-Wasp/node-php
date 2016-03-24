@@ -1,11 +1,11 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Tests\Chain;
+namespace BitWasp\Bitcoin\Tests\Node\Chain;
 
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\ChainCache;
-use BitWasp\Bitcoin\Node\Tests\BitcoinNodeTest;
+use BitWasp\Bitcoin\Tests\Node\BitcoinNodeTest;
 use BitWasp\Buffertools\Buffer;
 
 class ChainCacheTest extends BitcoinNodeTest

@@ -23,6 +23,14 @@ class GuidedChainCache implements ChainCacheInterface
      */
     public function __construct(ChainCacheInterface $traceCache, $capHeight)
     {
+        if (count($traceCache) === 0) {
+            throw new \RuntimeException('Parent cache must be initialized');
+        }
+
+        if ($capHeight > count($traceCache)) {
+            throw new \RuntimeException('Cap exceeds parent cache size');
+        }
+        
         $this->traceCache = $traceCache;
         $this->position = $capHeight;
     }
@@ -32,7 +40,7 @@ class GuidedChainCache implements ChainCacheInterface
      */
     public function count()
     {
-        return $this->position;
+        return $this->position + 1;
     }
 
     /**
