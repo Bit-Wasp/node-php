@@ -286,6 +286,8 @@ class Db implements DbInterface
         $stmt[] = $this->dbh->prepare('TRUNCATE transactions');
         $stmt[] = $this->dbh->prepare('TRUNCATE transaction_output');
         $stmt[] = $this->dbh->prepare('TRUNCATE transaction_input');
+        $stmt[] = $this->dbh->prepare('TRUNCATE utxo');
+
 
         foreach ($stmt as $st) {
             $st->execute();
@@ -983,6 +985,44 @@ WHERE tip.header_id = (
 
     /**
      * @param OutPointInterface[] $outpoints
+     * @param array $queryValues
+     * @return mixed
+     */
+    private function createInsertJoinSql(array $outpoints, array & $queryValues)
+    {
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues['hashParent' . $i] = $outpoint->getTxId()->getBinary();
+            $queryValues['noutparent' . $i] = $outpoint->getVout();
+
+            $joinList[] = ' (:hashParent' . $i . ', :noutparent' . $i . ")";
+        }
+
+        return "INSERT INTO outpoints (hashPrevOut, nOutput) VALUES " . implode(", ", $joinList);
+    }
+
+    /**
+     * @param OutPointInterface[] $outpoints
+     * @param array $queryValues
+     * @return mixed
+     */
+    private function createOutpointsRealSql(array $outpoints)
+    {
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+
+            if (0 === $i) {
+                $joinList[] = 'SELECT x"'.$outpoint->getTxid()->getHex().'" as hashPrevOut, '.$outpoint->getVout().' as nOutput';
+            } else {
+                $joinList[] = '  x"'.$outpoint->getTxid()->getHex().'" , '.$outpoint->getVout();
+            }
+        }
+
+        return implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
+    }
+
+    /**
+     * @param OutPointInterface[] $outpoints
      * @return Utxo[]
      * @throws \Exception
      */
@@ -993,24 +1033,36 @@ WHERE tip.header_id = (
             return [];
         }
 
-        $queryValues = [];
-        $innerJoin = $this->createOutpointsJoinSql($outpoints, $queryValues);
+        try {
 
-        $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN (' . $innerJoin . ') ou WHERE ou.nOutput = u.nOutput AND ou.hashPrevOut = u.hashPrevOut');
-        $fetchUtxoStmt->execute($queryValues);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $this->dbh->beginTransaction();
+            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19))");
+            $c->execute();
 
-        $outputSet = [];
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $iv = [];
+            $i = $this->dbh->prepare($this->createInsertJoinSql($outpoints, $iv));
+            $i->execute($iv);
+
+            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
+            $fetchUtxoStmt->execute();
+            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $this->dbh->exec('DROP TEMPORARY TABLE outpoints');
+            $outputSet = [];
+            foreach ($rows as $utxo) {
+                $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            }
+
+            if (count($outputSet) < $requiredCount) {
+                throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
+            }
+
+            return $outputSet;
+
+        } catch (\Exception $e) {
+            $this->dbh->rollBack();
+            throw $e;
         }
-
-        if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
-        }
-
-        return $outputSet;
-
     }
 
     /**
