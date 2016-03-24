@@ -135,7 +135,16 @@ class P2PService
         $this->params = new ConnectionParams();
         $this->params->requestTxRelay((bool)$this->config->getItem('config', 'tx_relay', false));
 
-        $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns);
+        if ((bool) $this->config->getItem('config', 'tor', true)) {
+            $socks = new \Clue\React\Socks\Client('127.0.0.1:9050', $this->loop);
+            $socks->setResolveLocal(false);
+
+            $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns, $socks->createConnector());
+        } else {
+            $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns);
+        }
+
+
         $this->manager = new Manager($this->connector);
         $this->locator = new Locator($dns);
 
