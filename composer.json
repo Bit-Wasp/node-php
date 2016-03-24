@@ -29,11 +29,11 @@
     "bitwasp/thread": "0.0.1",
     "symfony/console": "~2.7",
     "packaged/config": "~1.2",
-    "doctrine/orm": "2.4.*",
     "react/zmq": "0.3",
     "symfony/yaml": "2.*",
     "cboden/ratchet": "^0.3.4",
-    "pimple/pimple": "^3.0"
+    "pimple/pimple": "^3.0",
+    "doctrine/cache": "~1.6"
   },
   "require-dev": {
     "bitwasp/testing-php": "~0.0"
