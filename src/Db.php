@@ -1057,6 +1057,7 @@ WHERE tip.header_id = (
                 throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
             }
 
+            $this->dbh->commit();
             return $outputSet;
 
         } catch (\Exception $e) {
