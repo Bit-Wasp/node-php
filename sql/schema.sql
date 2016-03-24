@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Mar 19, 2016 at 11:18 PM
+-- Generation Time: Mar 24, 2016 at 11:03 PM
 -- Server version: 5.6.28-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.1
 
@@ -17,7 +17,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `coinevents`
+-- Database: `coin`
 --
 
 -- --------------------------------------------------------
@@ -108,6 +108,19 @@ CREATE TABLE IF NOT EXISTS `peers` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `retarget`
+--
+
+CREATE TABLE IF NOT EXISTS `retarget` (
+  `id` int(9) NOT NULL,
+  `hash` varbinary(32) NOT NULL,
+  `prevTime` int(12) NOT NULL,
+  `difference` decimal(10,8) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `transactions`
 --
 
@@ -175,66 +188,72 @@ CREATE TABLE IF NOT EXISTS `utxo` (
 -- Indexes for table `active_fork`
 --
 ALTER TABLE `active_fork`
-  ADD PRIMARY KEY (`id`);
+ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `hash` (`hash`);
+ADD PRIMARY KEY (`id`),
+ADD KEY `hash` (`hash`);
 
 --
 -- Indexes for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx` (`block_hash`,`transaction_hash`),
-  ADD KEY `txidx` (`transaction_hash`,`block_hash`);
+ADD PRIMARY KEY (`id`),
+ADD KEY `idx` (`block_hash`,`transaction_hash`),
+ADD KEY `txidx` (`transaction_hash`,`block_hash`);
 
 --
 -- Indexes for table `headerIndex`
 --
 ALTER TABLE `headerIndex`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `hash` (`hash`) USING HASH,
-  ADD KEY `prevBlock` (`prevBlock`);
+ADD PRIMARY KEY (`id`),
+ADD UNIQUE KEY `hash` (`hash`) USING HASH,
+ADD KEY `prevBlock` (`prevBlock`);
 
 --
 -- Indexes for table `iindex`
 --
 ALTER TABLE `iindex`
-  ADD UNIQUE KEY `header_id` (`header_id`),
-  ADD KEY `lft` (`lft`,`rgt`);
+ADD UNIQUE KEY `header_id` (`header_id`),
+ADD KEY `lft` (`lft`,`rgt`);
+
+--
+-- Indexes for table `retarget`
+--
+ALTER TABLE `retarget`
+ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `transactions`
 --
 ALTER TABLE `transactions`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `hash` (`hash`);
+ADD PRIMARY KEY (`id`),
+ADD KEY `hash` (`hash`);
 
 --
 -- Indexes for table `transaction_input`
 --
 ALTER TABLE `transaction_input`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `parent_tx` (`parent_tx`),
-  ADD KEY `prevout` (`hashPrevOut`,`nPrevOut`);
+ADD PRIMARY KEY (`id`),
+ADD KEY `parent_tx` (`parent_tx`),
+ADD KEY `prevout` (`hashPrevOut`,`nPrevOut`);
 
 --
 -- Indexes for table `transaction_output`
 --
 ALTER TABLE `transaction_output`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `parent_tx` (`parent_tx`);
+ADD PRIMARY KEY (`id`),
+ADD KEY `parent_tx` (`parent_tx`);
 
 --
 -- Indexes for table `utxo`
 --
 ALTER TABLE `utxo`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
+ADD PRIMARY KEY (`id`),
+ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -244,42 +263,47 @@ ALTER TABLE `utxo`
 -- AUTO_INCREMENT for table `active_fork`
 --
 ALTER TABLE `active_fork`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `blockIndex`
 --
 ALTER TABLE `blockIndex`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `block_transactions`
 --
 ALTER TABLE `block_transactions`
-  MODIFY `id` int(15) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(15) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `headerIndex`
 --
 ALTER TABLE `headerIndex`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `retarget`
+--
+ALTER TABLE `retarget`
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transaction_input`
 --
 ALTER TABLE `transaction_input`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `transaction_output`
 --
 ALTER TABLE `transaction_output`
-  MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 --
 -- AUTO_INCREMENT for table `utxo`
 --
 ALTER TABLE `utxo`
-  MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
