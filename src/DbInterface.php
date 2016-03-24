@@ -20,6 +20,11 @@ use BitWasp\Buffertools\BufferInterface;
 interface DbInterface
 {
     /**
+     * @return \PDO
+     */
+    public function getPdo();
+    
+    /**
      *
      */
     public function stop();

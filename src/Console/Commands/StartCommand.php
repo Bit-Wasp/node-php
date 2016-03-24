@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\LoopServiceProvider;
 use BitWasp\Bitcoin\Node\Services\P2P\P2PServiceProvider;
+use BitWasp\Bitcoin\Node\Services\Retarget\RetargetServiceProvider;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetBlockHashCommand;
@@ -111,7 +112,8 @@ class StartCommand extends AbstractCommand
             new ConfigServiceProvider($config),
             new DbServiceProvider($db),
             new ZmqServiceProvider(),
-            new UserControlServiceProvider($node, $consoleCommands)
+            new UserControlServiceProvider($node, $consoleCommands),
+            new RetargetServiceProvider($node)
         ];
 
         $p2p = $config->getItem('config', 'p2p', true);
@@ -131,6 +133,7 @@ class StartCommand extends AbstractCommand
         // Launch services
         $container['debug'];
         $container['userControl'];
+        //$container['retarget'];
         $container['p2p'];
 
         if ($websocket) {

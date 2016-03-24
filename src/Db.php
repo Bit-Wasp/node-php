@@ -218,7 +218,11 @@ class Db implements DbInterface
         ');
 
     }
-
+    
+    public function getPdo()
+    {
+        return $this->dbh;
+    }
     /**
      * @param ConfigProviderInterface $config
      * @return Db

@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Amount;
+use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
@@ -75,18 +76,8 @@ class Consensus implements ConsensusInterface
     {
         $header = $prevIndex->getHeader();
         $math = $this->math;
-        $timespan = $math->sub($header->getTimestamp(), $timeFirstBlock);
 
-        $lowest = $math->div($this->params->powTargetTimespan(), 4);
-        $highest = $math->mul($this->params->powTargetTimespan(), 4);
-
-        if ($math->cmp($timespan, $lowest) < 0) {
-            $timespan = $lowest;
-        }
-
-        if ($math->cmp($timespan, $highest) > 0) {
-            $timespan = $highest;
-        }
+        $timespan = $this->calculateWorkTimespan($timeFirstBlock, $header);
 
         $negative = false;
         $overflow = false;
@@ -118,5 +109,28 @@ class Consensus implements ConsensusInterface
         $heightLastRetarget = $math->sub($prevIndex->getHeight(), $math->sub($this->params->powRetargetInterval(), 1));
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
         return $this->calculateNextWorkRequired($prevIndex, $lastTime);
+    }
+
+    /**
+     * @param $timeFirstBlock
+     * @param BlockHeaderInterface $header
+     * @return mixed
+     */
+    public function calculateWorkTimespan($timeFirstBlock, BlockHeaderInterface $header)
+    {
+        $timespan = $this->math->sub($header->getTimestamp(), $timeFirstBlock);
+        
+        $lowest = $this->math->div($this->params->powTargetTimespan(), 4);
+        $highest = $this->math->mul($this->params->powTargetTimespan(), 4);
+
+        if ($this->math->cmp($timespan, $lowest) < 0) {
+            $timespan = $lowest;
+        }
+
+        if ($this->math->cmp($timespan, $highest) > 0) {
+            $timespan = $highest;
+        }
+        
+        return $timespan;
     }
 }
