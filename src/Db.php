@@ -1010,7 +1010,6 @@ WHERE tip.header_id = (
     {
         $joinList = [];
         foreach ($outpoints as $i => $outpoint) {
-
             if (0 === $i) {
                 $joinList[] = 'SELECT x"'.$outpoint->getTxid()->getHex().'" as hashPrevOut, '.$outpoint->getVout().' as nOutput';
             } else {
@@ -1036,7 +1035,8 @@ WHERE tip.header_id = (
         try {
 
             $this->dbh->beginTransaction();
-            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19))");
+
+            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
             $c->execute();
 
             $iv = [];
