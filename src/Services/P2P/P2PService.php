@@ -168,7 +168,7 @@ class P2PService extends EventEmitter
         $peer->on(Message::HEADERS, [$this, 'onHeaders']);
         $peer->on(Message::INV, [$this, 'onInv']);
         $peer->on(Message::MEMPOOL, [$this, 'onMemPool']);
-        $peer->on(Message::MERKLEBLOCK, [$this, 'onMerkleRoot']);
+        $peer->on(Message::MERKLEBLOCK, [$this, 'onMerkleBlock']);
         $peer->on(Message::NOTFOUND, [$this, 'onNotFound']);
         $peer->on(Message::PING, [$this, 'onPing']);
         $peer->on(Message::PONG, [$this, 'onPong']);
