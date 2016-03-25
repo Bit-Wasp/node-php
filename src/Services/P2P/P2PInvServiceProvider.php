@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\Inv;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 
 use Pimple\Container;

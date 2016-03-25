@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\GetHeaders;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Message;
@@ -9,7 +9,6 @@ use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
-use BitWasp\Bitcoin\Node\Services\P2P\MiniP2PService;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerState;
 use Evenement\EventEmitter;
 use Pimple\Container;
@@ -42,7 +41,7 @@ class P2PGetHeadersService extends EventEmitter
         $this->db = $container['db'];
         $this->debug = $container['debug'];
         
-        /** @var MiniP2PService $p2p */
+        /** @var P2PService $p2p */
         $p2p = $container['p2p'];
         $p2p->on(Message::GETHEADERS, [$this, 'onGetHeaders']);
     }

@@ -1,10 +1,8 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\Ping;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 
-use BitWasp\Bitcoin\Networking\Message;
-use BitWasp\Bitcoin\Node\Services\P2P\MiniP2PService;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 

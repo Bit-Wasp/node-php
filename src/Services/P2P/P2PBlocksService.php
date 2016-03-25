@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\Blocks;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 
 use BitWasp\Bitcoin\Networking\Message;
@@ -8,16 +8,13 @@ use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\Services\P2P\Headers\P2PHeadersService;
-use BitWasp\Bitcoin\Node\Services\P2P\Inv\P2PInvService;
-use BitWasp\Bitcoin\Node\Services\P2P\MiniP2PService;
+use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerState;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
-use BitWasp\Bitcoin\Node\NodeInterface;
 
 class P2PBlocksService extends EventEmitter
 {
@@ -47,7 +44,7 @@ class P2PBlocksService extends EventEmitter
         $this->config = $container['config'];
         $this->blockDownload = new BlockDownloader($this->node->chains(), $container['p2p.states'], $container['p2p.outbound']);
 
-        /** @var MiniP2PService $p2p */
+        /** @var P2PService $p2p */
         $p2p = $container['p2p'];
         $p2p->on(Message::BLOCK, [$this, 'onBlock']);
 

@@ -6,7 +6,6 @@ use BitWasp\Bitcoin\Node\Console\Commands\BlockVelocityCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\Config\ConfigDefault;
 use BitWasp\Bitcoin\Node\Console\Commands\ControlCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\DbCommand;
-use BitWasp\Bitcoin\Node\Console\Commands\Start2Command;
 use BitWasp\Bitcoin\Node\Console\Commands\StartCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\StopCommand;
 use BitWasp\Bitcoin\Node\Console\Commands\WatchCommand;
@@ -29,7 +28,6 @@ class Application extends ConsoleApplication
         $commands[] = new DbCommand('wipe', 'Deletes everything - INCLUDING the database');
 
         $commands[] = new StartCommand();
-        $commands[] = new Start2Command();
         $commands[] = new StopCommand();
         $commands[] = new WatchCommand();
         $commands[] = new WebSocketCommand();

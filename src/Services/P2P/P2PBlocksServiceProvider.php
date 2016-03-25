@@ -1,13 +1,13 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\GetHeaders;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 
 use BitWasp\Bitcoin\Node\NodeInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 
-class P2PGetHeadersServiceProvider implements ServiceProviderInterface
+class P2PBlocksServiceProvider implements ServiceProviderInterface
 {
     /**
      * @var NodeInterface
@@ -28,9 +28,10 @@ class P2PGetHeadersServiceProvider implements ServiceProviderInterface
      */
     public function register(Container $container)
     {
-        $container['p2p.getheaders'] = function (Container $container) {
-            return new P2PGetHeadersService($this->node, $container);
+        $container['p2p.blocks'] = function (Container $container) {
+            return new P2PBlocksService($this->node, $container);
         };
-        $container['p2p.getheaders'];
+        
+        $container['p2p.blocks'];
     }
 }

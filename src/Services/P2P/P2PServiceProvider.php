@@ -1,11 +1,12 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\Core;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 use BitWasp\Bitcoin\Networking\Peer\ConnectionParams;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
+use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 
@@ -42,12 +43,16 @@ class P2PServiceProvider implements ServiceProviderInterface
             return new Peers();
         };
 
-        $container['p2p.params'] = function () {
-            return new ConnectionParams();
+        $container['p2p.params'] = function (Container $container) {
+            /** @var ConfigProviderInterface $config */
+            $config = $container['config'];
+            $params =  new ConnectionParams();
+            $params->requestTxRelay((bool)$config->getItem('config', 'tx_relay', false));
+            return $params;
         };
-        
+
         $container['p2p'] = function (Container $container) {
-            return new P2PService($this->node, $container);
+            return new P2PService($container);
         };
     }
 }

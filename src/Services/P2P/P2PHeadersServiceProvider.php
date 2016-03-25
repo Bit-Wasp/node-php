@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P\Headers;
+namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 
 use BitWasp\Bitcoin\Node\NodeInterface;
