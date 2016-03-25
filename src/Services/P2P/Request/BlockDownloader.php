@@ -76,11 +76,6 @@ class BlockDownloader
             $peer->getheaders($chain->getHeadersLocator($lastUnknown));
             $this->peerState->fetch($peer)->updateBlockAvailability($chain, $lastUnknown);
         }
-
-        if (count($fetch) > 0) {
-            $peer->getdata($fetch);
-        }
-
     }
 
     /**

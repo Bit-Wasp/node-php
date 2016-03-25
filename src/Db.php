@@ -1040,14 +1040,14 @@ WHERE tip.header_id = (
 
             $this->dbh->beginTransaction();
 
-            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
+            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (nOutput INT(19), hashPrevOut VARBINARY(32), INDEX(nOutput, hashPrevOut)) ");
             $c->execute();
 
             $iv = [];
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpoints, $iv));
             $i->execute($iv);
 
-            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
+            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut)');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 

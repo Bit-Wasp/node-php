@@ -115,7 +115,7 @@ class MiniP2PService extends EventEmitter
         $dns = $this->factory->getDns();
         $this->messages = $this->factory->getMessages();
 
-        if ((bool) $this->config->getItem('config', 'tor', true)) {
+        if ((bool) $this->config->getItem('config', 'tor', false)) {
             $socks = new \Clue\React\Socks\Client('127.0.0.1:9050', $this->loop);
             $socks->setResolveLocal(false);
 
