@@ -13,8 +13,11 @@ use BitWasp\Bitcoin\Node\Services\ConfigServiceProvider;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\LoopServiceProvider;
-use BitWasp\Bitcoin\Node\Services\P2P\Core\P2PServiceProvider;
-use BitWasp\Bitcoin\Node\Services\Retarget\RetargetServiceProvider;
+use BitWasp\Bitcoin\Node\Services\P2P\MiniP2PServiceProvider;
+use BitWasp\Bitcoin\Node\Services\P2P\Blocks\P2PBlocksServiceProvider;
+use BitWasp\Bitcoin\Node\Services\P2P\Ping\P2PPingServiceProvider;
+use BitWasp\Bitcoin\Node\Services\P2P\Headers\P2PHeadersServiceProvider;
+use BitWasp\Bitcoin\Node\Services\P2P\Inv\P2PInvServiceProvider;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetBlockHashCommand;
@@ -23,6 +26,7 @@ use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\InfoCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ShutdownCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\UserControlServiceProvider;
+use BitWasp\Bitcoin\Node\Services\Utxos\UtxoServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocket\WebSocketServiceProvider;
 use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use Packaged\Config\ConfigProviderInterface;
@@ -31,7 +35,7 @@ use React\EventLoop\LoopInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class StartCommand extends AbstractCommand
+class Start2Command extends AbstractCommand
 {
 
     /**
@@ -40,7 +44,7 @@ class StartCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setName('start')
+            ->setName('start2')
             ->setDescription('Start the bitcoin node');
     }
 
@@ -113,12 +117,20 @@ class StartCommand extends AbstractCommand
             new DbServiceProvider($db),
             new ZmqServiceProvider(),
             new UserControlServiceProvider($node, $consoleCommands),
-            new RetargetServiceProvider($node)
         ];
+
+        $utxos = (bool) $config->getItem('config', 'index_utxos', true);
+        if ($utxos) {
+            $services[] = new UtxoServiceProvider($node);
+        }
 
         $p2p = $config->getItem('config', 'p2p', true);
         if ($p2p) {
-            $services[] = new P2PServiceProvider($node);
+            $services[] = new MiniP2PServiceProvider($node);
+            $services[] = new P2PInvServiceProvider();
+            $services[] = new P2PHeadersServiceProvider($node);
+            $services[] = new P2PBlocksServiceProvider($node);
+            $services[] = new P2PPingServiceProvider();
         }
 
         $websocket = $config->getItem('config', 'websocket', false);
@@ -133,15 +145,13 @@ class StartCommand extends AbstractCommand
         // Launch services
         $container['debug'];
         $container['userControl'];
-        //$container['retarget'];
-        $container['p2p'];
 
         if ($websocket) {
             $container['websocket'];
         }
 
         if ($p2p) {
-            $container['p2p'];
+            $container['p2p']->run();
         }
     }
 }

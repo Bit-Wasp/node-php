@@ -1047,7 +1047,7 @@ WHERE tip.header_id = (
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpoints, $iv));
             $i->execute($iv);
 
-            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
+            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Services\P2P;
+namespace BitWasp\Bitcoin\Node\Services\P2P\Core;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockInterface;
@@ -124,9 +124,9 @@ class P2PService
         $this->loop = $container['loop'];
         $this->config = $container['config'];
         $this->node = $node;
-        $this->peerStates = new PeerStateCollection();
-        $this->peersInbound = new Peers();
-        $this->peersOutbound = new Peers();
+        $this->peerStates = $container['p2p.states'];
+        $this->peersInbound = $container['p2p.inbound'];
+        $this->peersOutbound = $container['p2p.outbound'];
         $this->blockDownload = new BlockDownloader($this->node->chains(), $this->peerStates, $this->peersOutbound);
         $this->factory = new \BitWasp\Bitcoin\Networking\Factory($this->loop, Bitcoin::getNetwork());
         $dns = $this->factory->getDns();
@@ -143,7 +143,6 @@ class P2PService
         } else {
             $this->connector = new Connector($this->messages, $this->params, $this->loop, $dns);
         }
-
 
         $this->manager = new Manager($this->connector);
         $this->locator = new Locator($dns);
