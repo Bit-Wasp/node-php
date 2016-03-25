@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Retarget;
 
-
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
 class RetargetDb
@@ -36,6 +35,4 @@ class RetargetDb
         $index = $state->getIndex();
         $this->insertRecordStmt->execute(['hash' => $index->getHash()->getBinary(), 'prevTime' => $prevTime, 'difference' => $diffAdjust]);
     }
-
-
 }

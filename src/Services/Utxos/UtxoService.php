@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Utxos;
 
-
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;

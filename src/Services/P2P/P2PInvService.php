@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\P2P;
 
-
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\Inv;
 use BitWasp\Bitcoin\Networking\Peer\Peer;

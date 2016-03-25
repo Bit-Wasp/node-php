@@ -80,7 +80,6 @@ class Blocks extends EventEmitter
         ChainsInterface $chains,
         Consensus $consensus
     ) {
-    
 
         $this->db = $db;
         $this->config = $config;

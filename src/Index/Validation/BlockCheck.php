@@ -17,7 +17,6 @@ use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\Buffer;
-use BitWasp\Buffertools\BufferInterface;
 use Pleo\Merkle\FixedSizeTree;
 
 class BlockCheck implements BlockCheckInterface
@@ -189,7 +188,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         if ($checkSize && $txSerializer->serialize($transaction)->getSize() > $params->maxBlockSizeBytes()) {
-            throw new \RuntimeException('CheckTransaction: tx size exceeds max block size');
+            throw new \RuntimeException('CheckTransaction: transaction size exceeds maximum block size');
         }
 
         $this
@@ -235,7 +234,6 @@ class BlockCheck implements BlockCheckInterface
         if ($txCount === 1) {
             $transaction = $block->getTransaction(0);
             $serialized = $txSerializer->serialize($transaction);
-            /** @var BufferInterface $serialized */
             $binary = $hashFxn($serialized->getBinary());
 
         } else {
@@ -272,38 +270,35 @@ class BlockCheck implements BlockCheckInterface
     public function check(BlockInterface $block, TransactionSerializerInterface $txSerializer, BlockSerializerInterface $blockSerializer, $checkSize = true, $checkMerkleRoot = true)
     {
         $params = $this->consensus->getParams();
-        $header = $block->getHeader();
 
-        if ($checkMerkleRoot && $this->calcMerkleRoot($block, $txSerializer)->equals($header->getMerkleRoot()) === false) {
-            throw new \RuntimeException('Blocks::check(): failed to verify merkle root');
+        if ($checkMerkleRoot && $this->calcMerkleRoot($block, $txSerializer)->equals($block->getHeader()->getMerkleRoot()) === false) {
+            throw new \RuntimeException('BlockCheck: failed to verify merkle root');
         }
 
-        $transactions = $block->getTransactions();
-        $txCount = count($transactions);
-
+        $txCount = count($block->getTransactions());
         if ($checkSize && (0 === $txCount || $blockSerializer->serialize($block)->getSize() > $params->maxBlockSizeBytes())) {
-            throw new \RuntimeException('Blocks::check(): Zero transactions, or block exceeds max size');
+            throw new \RuntimeException('BlockCheck: Zero transactions, or block exceeds max size');
         }
 
         // The first transaction is coinbase, and only the first transaction is coinbase.
-        if (!$transactions[0]->isCoinbase()) {
-            throw new \RuntimeException('Blocks::check(): First transaction was not coinbase');
+        if (!$block->getTransaction(0)->isCoinbase()) {
+            throw new \RuntimeException('BlockCheck: First transaction was not coinbase');
         }
 
         for ($i = 1; $i < $txCount; $i++) {
-            if ($transactions[$i]->isCoinbase()) {
-                throw new \RuntimeException('Blocks::check(): more than one coinbase');
+            if ($block->getTransaction($i)->isCoinbase()) {
+                throw new \RuntimeException('BlockCheck: more than one coinbase');
             }
         }
 
         $nSigOps = 0;
-        foreach ($transactions as $transaction) {
+        foreach ($block->getTransactions() as $transaction) {
             $this->checkTransaction($transaction, $txSerializer, $checkSize);
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 
         if ($this->math->cmp($nSigOps, $params->getMaxBlockSigOps()) > 0) {
-            throw new \RuntimeException('Blocks::check(): out-of-bounds sigop count');
+            throw new \RuntimeException('BlockCheck: sigops exceeds maximum allowed');
         }
 
         return $this;
@@ -312,16 +307,14 @@ class BlockCheck implements BlockCheckInterface
     /**
      * @param UtxoView $view
      * @param TransactionInterface $tx
-     * @param $spendHeight
+     * @param int $spendHeight
      * @return $this
      */
     public function checkContextualInputs(UtxoView $view, TransactionInterface $tx, $spendHeight)
     {
         $valueIn = 0;
-        $nInputs = count($tx->getInputs());
 
-        for ($i = 0; $i < $nInputs; $i++) {
-            $utxo = $view->fetchByInput($tx->getInput($i));
+        for ($i = 0, $nInputs = count($tx->getInputs()); $i < $nInputs; $i++) {
             /*if ($out->isCoinbase()) {
                 // todo: cb / height
                 if ($spendHeight - $out->getHeight() < $this->params->coinbaseMaturityAge()) {
@@ -329,7 +322,7 @@ class BlockCheck implements BlockCheckInterface
                 }
             }*/
 
-            $valueIn = $this->math->add($valueIn, $utxo->getOutput()->getValue());
+            $valueIn = $this->math->add($valueIn, $view->fetchByInput($tx->getInput($i))->getOutput()->getValue());
             $this->consensus->checkAmount($valueIn);
         }
 
@@ -340,7 +333,7 @@ class BlockCheck implements BlockCheckInterface
         }
 
         if ($this->math->cmp($valueIn, $valueOut) < 0) {
-            throw new \RuntimeException('Value-in ' . $valueIn . ' is less than value out ' . $valueOut);
+            throw new \RuntimeException('Value-in is less than value-out');
         }
 
         $fee = $this->math->sub($valueIn, $valueOut);

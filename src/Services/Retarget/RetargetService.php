@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Retarget;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\Params;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;

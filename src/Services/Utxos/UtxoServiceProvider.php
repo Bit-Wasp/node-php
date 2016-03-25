@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Utxos;
 
-
 use BitWasp\Bitcoin\Node\NodeInterface;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
