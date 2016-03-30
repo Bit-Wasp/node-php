@@ -55,6 +55,11 @@ class Headers extends EventEmitter
     private $proofOfWork;
 
     /**
+     * @var Forks
+     */
+    private $forks;
+
+    /**
      * Headers constructor.
      * @param DbInterface $db
      * @param EcAdapterInterface $ecAdapter
@@ -69,8 +74,7 @@ class Headers extends EventEmitter
         Consensus $consensus,
         ProofOfWork $proofOfWork
     ) {
-    
-
+        
         $this->db = $db;
         $this->math = $ecAdapter->getMath();
         $this->chains = $chains;

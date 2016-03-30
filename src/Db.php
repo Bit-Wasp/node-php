@@ -473,17 +473,14 @@ class Db implements DbInterface
         try {
 
             $this->dbh->beginTransaction();
-
+            $t1 = microtime(true);
             if (count($deleteOutPoints) > 0) {
-                $d = microtime(true);
                 foreach ($deleteOutPoints as $o) {
                     $this->deleteUtxoStmt->execute(['hash' => $o->getTxId()->getBinary(), 'n' => $o->getVout()]);
                 }
-                echo "U[delete] ".(microtime(true) - $d) . " seconds\n";
             }
 
             if (count($newUtxos) > 0) {
-                $i = microtime(true);
                 $utxoQuery = [];
                 $utxoValues = [];
                 foreach ($newUtxos as $c => $utxo) {
@@ -496,10 +493,10 @@ class Db implements DbInterface
 
                 $insertUtxos = $this->dbh->prepare('INSERT INTO utxo  (hashPrevOut, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
                 $insertUtxos->execute($utxoValues);
-                echo "U[insert] ".(microtime(true) - $i) . " seconds\n";
             }
 
             $this->dbh->commit();
+            echo "Res: UpdateUtxoSet: " . (microtime(true) - $t1) . " seconds\n";
         } catch (\Exception $e) {
             $this->dbh->rollBack();
         }
@@ -1050,8 +1047,9 @@ WHERE tip.header_id = (
         try {
 
             $this->dbh->beginTransaction();
-$t1 = microtime(true);
+            $t1 = microtime(true);
             $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
+            //$c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (nOutput INT(19), hashPrevOut VARBINARY(32), INDEX(nOutput, hashPrevOut)) ");
             $c->execute();
 
             $iv = [];
@@ -1059,6 +1057,7 @@ $t1 = microtime(true);
             $i->execute($iv);
 
             $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
+            ///$fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -1071,8 +1070,9 @@ $t1 = microtime(true);
             if (count($outputSet) < $requiredCount) {
                 throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
             }
-            echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
+
             $this->dbh->commit();
+            echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
             return $outputSet;
 
         } catch (\Exception $e) {
