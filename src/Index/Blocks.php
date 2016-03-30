@@ -202,12 +202,14 @@ class Blocks extends EventEmitter
         $txSerializer = new CachingTransactionSerializer();
         $blockSerializer = new BlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
+        $blockData = $this->prepareBatch($block, $txSerializer);
+
+        $v = microtime(true);
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
             ->checkContextual($block, $state->getLastBlock());
 
-        $blockData = $this->prepareBatch($block, $txSerializer);
         $view = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
@@ -250,6 +252,7 @@ class Blocks extends EventEmitter
         }
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
+        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
 
         $this->db->transaction(function () use ($hash, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);

@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Node\BitcoinNode;
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
 use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\DebugDb;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\ConfigServiceProvider;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
@@ -73,7 +74,7 @@ class StartCommand extends AbstractCommand
         $params = new Params($math);
         $loop = \React\EventLoop\Factory::create();
 
-        $db = Db::create($config);
+        $db = new DebugDb(Db::create($config));
         $node = new BitcoinNode($config, $params, $db);
 
         $container = new Container();

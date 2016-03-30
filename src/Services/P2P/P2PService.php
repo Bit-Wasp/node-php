@@ -25,6 +25,7 @@ use BitWasp\Bitcoin\Networking\Messages\Pong;
 use BitWasp\Bitcoin\Networking\Messages\Reject;
 use BitWasp\Bitcoin\Networking\Messages\SendHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Tx;
+use BitWasp\Bitcoin\Networking\Peer\ConnectionParams;
 use BitWasp\Bitcoin\Networking\Peer\Connector;
 use BitWasp\Bitcoin\Networking\Peer\Listener;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
@@ -57,21 +58,6 @@ class P2PService extends EventEmitter
     private $config;
 
     /**
-     * @var DebugInterface
-     */
-    private $debug;
-
-    /**
-     * @var Peers
-     */
-    private $peersInbound;
-
-    /**
-     * @var Peers
-     */
-    private $peersOutbound;
-
-    /**
      * @var PeerStateCollection
      */
     private $peerStates;
@@ -97,15 +83,12 @@ class P2PService extends EventEmitter
      */
     public function __construct(Container $container)
     {
-        $this->debug = $container['debug'];
         $this->loop = $container['loop'];
         $this->config = $container['config'];
         $this->peerStates = $container['p2p.states'];
-        $this->peersInbound = $container['p2p.inbound'];
-        $this->peersOutbound = $container['p2p.outbound'];
 
+        /** @var ConnectionParams $params */
         $params = $container['p2p.params'];
-
         $factory = new Factory($this->loop, Bitcoin::getNetwork());
         $dns = $factory->getDns();
         $messages = $factory->getMessages();
@@ -113,7 +96,6 @@ class P2PService extends EventEmitter
         if ((bool)$this->config->getItem('config', 'tor', false)) {
             $socks = new Client('127.0.0.1:9050', $this->loop);
             $socks->setResolveLocal(false);
-
             $this->connector = new Connector($messages, $params, $this->loop, $dns, $socks->createConnector());
         } else {
             $this->connector = new Connector($messages, $params, $this->loop, $dns);
@@ -128,21 +110,30 @@ class P2PService extends EventEmitter
             $this->manager->registerListener($listener);
         }
 
-        $this->manager->on('outbound', function (Peer $peer) {
-            $this->setupPeer($peer);
-            $peer->on('close', [$this, 'onPeerClose']);
+        /**
+         * @var Peers $peersInbound
+         * @var Peers $peersOutbound
+         * @var DebugInterface $debug
+         */
+        $debug = $container['debug'];
+        $peersInbound = $container['p2p.inbound'];
+        $peersOutbound = $container['p2p.outbound'];
 
+        $this->manager->on('outbound', function (Peer $peer) use ($peersOutbound, $debug) {
             $addr = $peer->getRemoteAddress();
-            $this->debug->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $this->decodeServices($addr->getServices())]]);
-            $this->peersOutbound->add($peer);
+            $debug->log('p2p.outbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort(), 'services' => $this->decodeServices($addr->getServices())]]);
+            $this->setupPeer($peer);
+
+            $peersOutbound->add($peer);
+            $peer->on('close', [$this, 'onPeerClose']);
         });
 
-        $this->manager->on('inbound', function (Peer $peer) {
+        $this->manager->on('inbound', function (Peer $peer) use ($peersInbound, $debug) {
+            $addr = $peer->getRemoteAddress();
+            $debug->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
             $this->setupPeer($peer);
 
-            $addr = $peer->getRemoteAddress();
-            $this->debug->log('p2p.inbound', ['peer' => ['ip' => $addr->getIp(), 'port' => $addr->getPort()]]);
-            $this->peersInbound->add($peer);
+            $peersInbound->add($peer);
         });
 
         $this->manager->on('outbound', [$this, 'onOutBoundPeer']);
@@ -175,24 +166,6 @@ class P2PService extends EventEmitter
         $peer->on(Message::REJECT, [$this, 'onReject']);
         $peer->on(Message::SENDHEADERS, [$this, 'onSendHeaders']);
         $peer->on('close', [$this, 'onPeerClose']);
-    }
-
-    /**
-     * @param Peer $peer
-     */
-    public function onInboundPeer(Peer $peer)
-    {
-        $state = $this->peerStates->fetch($peer);
-        $this->emit('inbound', [$state, $peer]);
-    }
-
-    /**
-     * @param Peer $peer
-     */
-    public function onOutBoundPeer(Peer $peer)
-    {
-        $state = $this->peerStates->fetch($peer);
-        $this->emit('outbound', [$state, $peer]);
     }
 
     /**
@@ -316,6 +289,24 @@ class P2PService extends EventEmitter
     public function connector()
     {
         return $this->connector;
+    }
+
+    /**
+     * @param Peer $peer
+     */
+    public function onInboundPeer(Peer $peer)
+    {
+        $state = $this->peerStates->fetch($peer);
+        $this->emit('inbound', [$state, $peer]);
+    }
+
+    /**
+     * @param Peer $peer
+     */
+    public function onOutBoundPeer(Peer $peer)
+    {
+        $state = $this->peerStates->fetch($peer);
+        $this->emit('outbound', [$state, $peer]);
     }
 
     /**

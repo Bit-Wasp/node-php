@@ -87,6 +87,7 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
+        $t1 = microtime(true);
         $node = $this->node;
         $best = $node->chain();
         $block = $blockMsg->getBlock();
@@ -110,6 +111,7 @@ class P2PBlocksService extends EventEmitter
                 return $r + count($v->getInputs());
             }, 0);
             $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'nTx' => $txcount, 'nSig' => $nSig]]);
+            echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
         } catch (\Exception $e) {
             $header = $block->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
