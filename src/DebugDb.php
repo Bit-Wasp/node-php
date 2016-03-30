@@ -27,6 +27,12 @@ class DebugDb implements DbInterface
         $this->db = $db;
     }
 
+    public function getPdo()
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->getPdo();
+    }
+
     public function stop()
     {
         echo __FUNCTION__ . PHP_EOL;
