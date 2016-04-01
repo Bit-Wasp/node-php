@@ -366,8 +366,10 @@ class Db implements DbInterface
      */
     public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
     {
+        $t = microtime(true);
         // Insert the block header ID
         $this->insertBlockStmt->execute(['hash' => $blockHash->getBinary(), 'block' => $blockSerializer->serialize($block)->getBinary()]);
+        echo "db|insertBlock: " . (microtime(true) - $t) . " seconds\n";
         return $this->dbh->lastInsertId();
     }
 
@@ -1054,16 +1056,16 @@ WHERE tip.header_id = (
 
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
-            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
-            //$c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (nOutput INT(19), hashPrevOut VARBINARY(32), INDEX(nOutput, hashPrevOut)) ");
+            //$c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
+            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (nOutput INT(19), hashPrevOut VARBINARY(32), INDEX(nOutput, hashPrevOut)) ");
             $c->execute();
 
             $iv = [];
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpoints, $iv));
             $i->execute($iv);
 
-            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
-            ///$fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
+            //$fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
+            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
