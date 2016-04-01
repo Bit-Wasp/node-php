@@ -6,6 +6,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\DbInterface;
 
 class UtxoDb
@@ -38,6 +39,13 @@ class UtxoDb
      */
     public function update(ChainStateInterface $chainState, BlockInterface $block, BlockData $blockData)
     {
-        $this->db->updateUtxoSet($blockData->requiredOutpoints, $blockData->remainingNew);
+        $deleteList = [];
+        /** @var DbUtxo $dbUtxo */
+        foreach ($blockData->requiredOutpoints as $outpoint) {
+            $dbUtxo = $blockData->utxoView->fetch($outpoint);
+            $deleteList[] = $dbUtxo->getId();
+        }
+
+        $this->db->updateUtxoSet($deleteList, $blockData->remainingNew);
     }
 }

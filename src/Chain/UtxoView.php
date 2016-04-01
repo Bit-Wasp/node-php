@@ -38,11 +38,13 @@ class UtxoView implements \Countable
      */
     private function addUtxo(Utxo $utxo)
     {
-        $outpoint = $utxo->getOutPoint();
-        if (!isset($this->utxo[$outpoint->getTxId()->getBinary()])) {
-            $this->utxo[$outpoint->getTxId()->getBinary()] = [$outpoint->getVout() => $utxo];
+        $hash = $utxo->getOutPoint()->getTxId()->getBinary();
+        $vout = $utxo->getOutPoint()->getVout();
+
+        if (!isset($this->utxo[$hash])) {
+            $this->utxo[$hash] = [$vout => $utxo];
         } else {
-            $this->utxo[$outpoint->getTxId()->getBinary()][$outpoint->getVout()] = $utxo;
+            $this->utxo[$hash][$vout] = $utxo;
         }
     }
 

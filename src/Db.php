@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
@@ -98,7 +99,10 @@ class Db implements DbInterface
      * @var \PDOStatement
      */
     private $deleteUtxoStmt;
-
+    /**
+     * @var \PDOStatement
+     */
+    private $deleteUtxoByIdStmt;
     /**
      * @var \PDOStatement
      */
@@ -160,6 +164,8 @@ class Db implements DbInterface
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
+        $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
+
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
         $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
         $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash , block ) SELECT h.id, :block FROM headerIndex h WHERE h.hash = :hash');
@@ -476,7 +482,7 @@ class Db implements DbInterface
             $t1 = microtime(true);
             if (count($deleteOutPoints) > 0) {
                 foreach ($deleteOutPoints as $o) {
-                    $this->deleteUtxoStmt->execute(['hash' => $o->getTxId()->getBinary(), 'n' => $o->getVout()]);
+                    $this->deleteUtxoByIdStmt->execute(['id' => $o]);
                 }
             }
 
@@ -1064,7 +1070,7 @@ WHERE tip.header_id = (
             $this->dbh->exec('DROP TEMPORARY TABLE outpoints');
             $outputSet = [];
             foreach ($rows as $utxo) {
-                $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+                $outputSet[] = new DbUtxo($utxo['id'], new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
             if (count($outputSet) < $requiredCount) {
