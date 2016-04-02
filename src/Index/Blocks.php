@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
+use BitWasp\Bitcoin\Node\Serializer\Block\CachingBlockSerializer;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
@@ -200,7 +201,7 @@ class Blocks extends EventEmitter
         $index = $headers->accept($hash, $block->getHeader());
 
         $txSerializer = new CachingTransactionSerializer();
-        $blockSerializer = new BlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
+        $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
         $blockData = $this->prepareBatch($block, $txSerializer);
 

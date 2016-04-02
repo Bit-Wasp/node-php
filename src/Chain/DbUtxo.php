@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutputInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;
