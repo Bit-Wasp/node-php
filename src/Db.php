@@ -103,6 +103,10 @@ class Db implements DbInterface
     /**
      * @var \PDOStatement
      */
+    private $deleteUtxosInView;
+    /**
+     * @var \PDOStatement
+     */
     private $deleteUtxoByIdStmt;
     /**
      * @var \PDOStatement
@@ -1051,13 +1055,14 @@ WHERE tip.header_id = (
         }
 
         $outpointSerializer = new OutPointSerializer();
+        $outputSet = [];
 
         try {
 
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
 
-            $this->dbh->exec('DROP TEMPORARY TABLE IF EXISTS outpoints');
+            $d = $this->dbh->exec("DROP TEMPORARY TABLE IF EXISTS outpoints");
             $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashKey VARBINARY(36), INDEX(hashKey)) ");
             $c->execute();
 
@@ -1073,24 +1078,26 @@ WHERE tip.header_id = (
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $outputSet = [];
             foreach ($rows as $utxo) {
                 $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
                 $outputSet[] = new DbUtxo($utxo['hashKey'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
+            $this->dbh->commit();
+
             if (count($outputSet) < $requiredCount) {
                 throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
             }
 
-            $this->dbh->commit();
             echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
             return $outputSet;
 
         } catch (\Exception $e) {
             echo "WEIR FAILED TO SELECT TRANSACTIONS\n";
-            $this->dbh->rollBack();
             echo $e->getMessage().PHP_EOL;
+            echo $e->getTraceAsString();
+            $this->dbh->rollBack();
+            die();
             throw $e;
         }
     }
