@@ -21,6 +21,7 @@ use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
+use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
@@ -478,12 +479,13 @@ class Db implements DbInterface
      */
     public function updateUtxoSet(array $deleteOutPoints, array $newUtxos)
     {
+        $outpointSerializer = new OutPointSerializer();
+
         try {
 
             $this->dbh->beginTransaction();
-            $t1 = microtime(true);
-            if (count($deleteOutPoints) > 0) {
 
+            if (count($deleteOutPoints) > 0) {
                 foreach ($deleteOutPoints as $o) {
                     $this->deleteUtxoByIdStmt->execute(['id' => $o]);
                 }
@@ -493,23 +495,22 @@ class Db implements DbInterface
                 $utxoQuery = [];
                 $utxoValues = [];
                 foreach ($newUtxos as $c => $utxo) {
-                    $utxoQuery[] = "(:hash$c, :n$c, :v$c, :s$c)";
-                    $utxoValues['hash' . $c] = $utxo->getOutPoint()->getTxId()->getBinary();
-                    $utxoValues['n' . $c] = $utxo->getOutPoint()->getVout();
-                    $utxoValues['v' . $c] = $utxo->getOutput()->getValue();
-                    $utxoValues['s' . $c] = $utxo->getOutput()->getScript()->getBinary();
+                    $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+                    $utxoValues["hash$c"] = $outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
+                    $utxoValues["v$c"] = $utxo->getOutput()->getValue();
+                    $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
                 }
 
-                $insertUtxos = $this->dbh->prepare('INSERT INTO utxo  (hashPrevOut, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+                $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
                 $insertUtxos->execute($utxoValues);
             }
 
             $this->dbh->commit();
-            echo "Deletes: " . count($deleteOutPoints) . " \n";
-            echo "Inserts: " . count($newUtxos) . " \n";
-            echo "Res: UpdateUtxoSet: " . (microtime(true) - $t1) . " seconds\n";
         } catch (\Exception $e) {
+            echo "Fail inserting\n";
             $this->dbh->rollBack();
+            echo $e->getMessage().PHP_EOL;
+            die();
         }
     }
 
@@ -1011,17 +1012,15 @@ WHERE tip.header_id = (
      * @param array $queryValues
      * @return mixed
      */
-    private function createInsertJoinSql(array $outpoints, array & $queryValues)
+    private function createInsertJoinSql(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
     {
         $joinList = [];
         foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i] = $outpoint->getVout();
-
-            $joinList[] = ' (:hashParent' . $i . ', :noutparent' . $i . ")";
+            $queryValues['hashParent' . $i] = $serializer->serialize($outpoint)->getBinary();
+            $joinList[] = "(:hashParent$i)";
         }
 
-        return "INSERT INTO outpoints (hashPrevOut, nOutput) VALUES " . implode(", ", $joinList);
+        return "INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList);
     }
 
     /**
@@ -1055,27 +1054,33 @@ WHERE tip.header_id = (
             return [];
         }
 
+        $outpointSerializer = new OutPointSerializer();
+
         try {
 
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
-            //$c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashPrevOut VARBINARY(32), nOutput INT(19), INDEX(hashPrevOut, nOutput)) ");
-            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (nOutput INT(19), hashPrevOut VARBINARY(32), INDEX(nOutput, hashPrevOut)) ");
+            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashKey VARBINARY(36), INDEX(hashKey)) ");
             $c->execute();
 
             $iv = [];
-            $i = $this->dbh->prepare($this->createInsertJoinSql($outpoints, $iv));
-            $i->execute($iv);
+            $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
+            $result = $i->execute($iv);
+            var_dump($result);
+            if ($result == false) {
+                die('Query exited unsuccessfully');
+            }
 
             //$fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
-            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.nOutput = u.nOutput AND o.hashPrevOut = u.hashPrevOut )');
+            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON o.hashKey = u.hashKey');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $this->dbh->exec('DROP TEMPORARY TABLE outpoints');
             $outputSet = [];
             foreach ($rows as $utxo) {
-                $outputSet[] = new DbUtxo($utxo['id'], new OutPoint(new Buffer($utxo['hashPrevOut'], 32), $utxo['nOutput']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+                $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
+                $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
             if (count($outputSet) < $requiredCount) {
@@ -1087,7 +1092,10 @@ WHERE tip.header_id = (
             return $outputSet;
 
         } catch (\Exception $e) {
+            echo "WEIR FAILED TO SELECT TRANSACTIONS\n";
             $this->dbh->rollBack();
+            echo $e->getMessage().PHP_EOL;
+            die();
             throw $e;
         }
     }

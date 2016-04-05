@@ -174,8 +174,7 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 
 CREATE TABLE IF NOT EXISTS `utxo` (
   `id` int(19) NOT NULL,
-  `hashPrevOut` varbinary(32) NOT NULL,
-  `nOutput` int(19) NOT NULL,
+  `hashKey` varbinary(36) NOT NULL,
   `value` bigint(32) NOT NULL,
   `scriptPubKey` blob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
