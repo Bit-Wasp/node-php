@@ -166,6 +166,7 @@ class Db implements DbInterface
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
         $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
+        $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM utxo u JOIN outpoints o on (o.hashKey = u.hashKey)');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
         $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
@@ -482,13 +483,9 @@ class Db implements DbInterface
         $outpointSerializer = new OutPointSerializer();
 
         try {
-
             $this->dbh->beginTransaction();
-
             if (count($deleteOutPoints) > 0) {
-                foreach ($deleteOutPoints as $o) {
-                    $this->deleteUtxoByIdStmt->execute(['id' => $o]);
-                }
+                $this->deleteUtxosInView->execute();
             }
 
             if (count($newUtxos) > 0) {
@@ -510,7 +507,6 @@ class Db implements DbInterface
             echo "Fail inserting\n";
             $this->dbh->rollBack();
             echo $e->getMessage().PHP_EOL;
-            die();
         }
     }
 
@@ -1060,13 +1056,14 @@ WHERE tip.header_id = (
 
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
+
+            $this->dbh->exec('DROP TEMPORARY TABLE IF EXISTS outpoints');
             $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashKey VARBINARY(36), INDEX(hashKey)) ");
             $c->execute();
 
             $iv = [];
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
             $result = $i->execute($iv);
-            var_dump($result);
             if ($result == false) {
                 die('Query exited unsuccessfully');
             }
@@ -1076,11 +1073,10 @@ WHERE tip.header_id = (
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $this->dbh->exec('DROP TEMPORARY TABLE outpoints');
             $outputSet = [];
             foreach ($rows as $utxo) {
                 $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-                $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+                $outputSet[] = new DbUtxo($utxo['hashKey'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
             if (count($outputSet) < $requiredCount) {
@@ -1095,7 +1091,6 @@ WHERE tip.header_id = (
             echo "WEIR FAILED TO SELECT TRANSACTIONS\n";
             $this->dbh->rollBack();
             echo $e->getMessage().PHP_EOL;
-            die();
             throw $e;
         }
     }

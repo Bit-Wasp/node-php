@@ -173,7 +173,6 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 --
 
 CREATE TABLE IF NOT EXISTS `utxo` (
-  `id` int(19) NOT NULL,
   `hashKey` varbinary(36) NOT NULL,
   `value` bigint(32) NOT NULL,
   `scriptPubKey` blob NOT NULL
@@ -250,9 +249,9 @@ ADD KEY `parent_tx` (`parent_tx`);
 --
 -- Indexes for table `utxo`
 --
+
 ALTER TABLE `utxo`
-ADD PRIMARY KEY (`id`),
-ADD KEY `outpoint` (`nOutput`,`hashPrevOut`) USING BTREE;
+ADD PRIMARY KEY `hkidx` (`hashKey`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -298,11 +297,6 @@ MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
 --
 ALTER TABLE `transaction_output`
 MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
---
--- AUTO_INCREMENT for table `utxo`
---
-ALTER TABLE `utxo`
-MODIFY `id` int(19) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
