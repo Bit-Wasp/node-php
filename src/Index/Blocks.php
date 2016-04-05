@@ -194,6 +194,7 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
+        echo "Block hash: ".$block->getHeader()->getHash()->getHex().PHP_EOL;
         $state = $this->chains->best();
 
         $hash = $block->getHeader()->getHash();

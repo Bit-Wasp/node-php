@@ -169,7 +169,7 @@ class Db implements DbInterface
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
-        $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
+        $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = :id');
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM utxo u JOIN outpoints o on (o.hashKey = u.hashKey)');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
@@ -489,7 +489,9 @@ class Db implements DbInterface
         try {
             $this->dbh->beginTransaction();
             if (count($deleteOutPoints) > 0) {
-                $this->deleteUtxosInView->execute();
+                foreach ($deleteOutPoints as $id) {
+                    $this->deleteUtxoByIdStmt->execute(['id' => $id]);
+                }
             }
 
             if (count($newUtxos) > 0) {
@@ -511,6 +513,8 @@ class Db implements DbInterface
             echo "Fail inserting\n";
             $this->dbh->rollBack();
             echo $e->getMessage().PHP_EOL;
+            echo $e->getTraceAsString().PHP_EOL;
+            die();
         }
     }
 
@@ -1008,9 +1012,10 @@ WHERE tip.header_id = (
     }
 
     /**
-     * @param OutPointInterface[] $outpoints
+     * @param OutPointSerializer $serializer
+     * @param array $outpoints
      * @param array $queryValues
-     * @return mixed
+     * @return string
      */
     private function createInsertJoinSql(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
     {
@@ -1021,25 +1026,6 @@ WHERE tip.header_id = (
         }
 
         return "INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList);
-    }
-
-    /**
-     * @param OutPointInterface[] $outpoints
-     * @param array $queryValues
-     * @return mixed
-     */
-    private function createOutpointsRealSql(array $outpoints)
-    {
-        $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            if (0 === $i) {
-                $joinList[] = 'SELECT x"'.$outpoint->getTxid()->getHex().'" as hashPrevOut, '.$outpoint->getVout().' as nOutput';
-            } else {
-                $joinList[] = '  x"'.$outpoint->getTxid()->getHex().'" , '.$outpoint->getVout();
-            }
-        }
-
-        return implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
     }
 
     /**
@@ -1092,13 +1078,22 @@ WHERE tip.header_id = (
             echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
             return $outputSet;
 
-        } catch (\Exception $e) {
-            echo "WEIR FAILED TO SELECT TRANSACTIONS\n";
+        } catch (\PDOException $e) {
+            echo "PDO Exception\n";
             echo $e->getMessage().PHP_EOL;
             echo $e->getTraceAsString();
             $this->dbh->rollBack();
             die();
             throw $e;
+        } catch (\Exception $e) {
+            echo "Failed to find UTXO\n";
+            foreach ($outpoints as $out) {
+                echo $out->getTxId()->getHex() . " - " . $out->getVout().PHP_EOL;
+                echo $out->getHex().PHP_EOL;
+            }
+            echo $e->getMessage().PHP_EOL;
+            echo $e->getTraceAsString();
+            die();
         }
     }
 
