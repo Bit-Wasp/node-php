@@ -169,7 +169,7 @@ class Db implements DbInterface
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
-        $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = :id');
+        $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM utxo u JOIN outpoints o on (o.hashKey = u.hashKey)');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
@@ -489,9 +489,10 @@ class Db implements DbInterface
         try {
             $this->dbh->beginTransaction();
             if (count($deleteOutPoints) > 0) {
-                foreach ($deleteOutPoints as $id) {
+                $this->deleteUtxosInView->execute();
+                /**foreach ($deleteOutPoints as $id) {
                     $this->deleteUtxoByIdStmt->execute(['id' => $id]);
-                }
+                }/**/
             }
 
             if (count($newUtxos) > 0) {
@@ -1048,25 +1049,21 @@ WHERE tip.header_id = (
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
 
-            $d = $this->dbh->exec("DROP TEMPORARY TABLE IF EXISTS outpoints");
+            $this->dbh->exec("DROP TEMPORARY TABLE IF EXISTS outpoints");
             $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashKey VARBINARY(36), INDEX(hashKey)) ");
             $c->execute();
 
             $iv = [];
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
-            $result = $i->execute($iv);
-            if ($result == false) {
-                die('Query exited unsuccessfully');
-            }
+            $i->execute($iv);
 
-            //$fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON (o.hashPrevOut = u.hashPrevOut AND o.nOutput = u.nOutput)');
             $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON o.hashKey = u.hashKey');
             $fetchUtxoStmt->execute();
             $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
 
             foreach ($rows as $utxo) {
                 $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-                $outputSet[] = new DbUtxo($utxo['hashKey'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+                $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
             $this->dbh->commit();
