@@ -49,7 +49,7 @@ class DebugDb implements DbInterface
     public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
     {
         echo __FUNCTION__ . PHP_EOL;
-        $this->db->insertBlock($hash, $block, $blockSerializer);
+        return $this->db->insertBlock($hash, $block, $blockSerializer);
     }
 
     /**

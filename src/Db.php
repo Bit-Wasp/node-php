@@ -362,7 +362,7 @@ class Db implements DbInterface
      * @param BufferInterface $blockHash
      * @param BlockInterface $block
      * @param BlockSerializerInterface $blockSerializer
-     * @return string
+     * @return int
      */
     public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
     {
@@ -483,6 +483,7 @@ class Db implements DbInterface
             $this->dbh->beginTransaction();
             $t1 = microtime(true);
             if (count($deleteOutPoints) > 0) {
+
                 foreach ($deleteOutPoints as $o) {
                     $this->deleteUtxoByIdStmt->execute(['id' => $o]);
                 }
@@ -492,11 +493,11 @@ class Db implements DbInterface
                 $utxoQuery = [];
                 $utxoValues = [];
                 foreach ($newUtxos as $c => $utxo) {
-                    $utxoQuery[] = "(:hashPrevOut$c, :nOutput$c, :value$c, :scriptPubKey$c)";
-                    $utxoValues['hashPrevOut' . $c] = $utxo->getOutPoint()->getTxId()->getBinary();
-                    $utxoValues['nOutput' . $c] = $utxo->getOutPoint()->getVout();
-                    $utxoValues['value' . $c] = $utxo->getOutput()->getValue();
-                    $utxoValues['scriptPubKey' . $c] = $utxo->getOutput()->getScript()->getBinary();
+                    $utxoQuery[] = "(:hash$c, :n$c, :v$c, :s$c)";
+                    $utxoValues['hash' . $c] = $utxo->getOutPoint()->getTxId()->getBinary();
+                    $utxoValues['n' . $c] = $utxo->getOutPoint()->getVout();
+                    $utxoValues['v' . $c] = $utxo->getOutput()->getValue();
+                    $utxoValues['s' . $c] = $utxo->getOutput()->getScript()->getBinary();
                 }
 
                 $insertUtxos = $this->dbh->prepare('INSERT INTO utxo  (hashPrevOut, nOutput, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
@@ -504,6 +505,8 @@ class Db implements DbInterface
             }
 
             $this->dbh->commit();
+            echo "Deletes: " . count($deleteOutPoints) . " \n";
+            echo "Inserts: " . count($newUtxos) . " \n";
             echo "Res: UpdateUtxoSet: " . (microtime(true) - $t1) . " seconds\n";
         } catch (\Exception $e) {
             $this->dbh->rollBack();
