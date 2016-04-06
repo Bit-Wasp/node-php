@@ -144,6 +144,15 @@ class Db implements DbInterface
     private $loadLastBlockByCoord;
 
     /**
+     * @var \PDOStatement
+     */
+    private $truncateOutpointsStmt;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $selectUtxosByOutpointsStmt;
+    /**
      * Db constructor.
      * @param ConfigProviderInterface $config
      */
@@ -159,6 +168,8 @@ class Db implements DbInterface
         $this->dbh = new \PDO("$driver:host=$host;dbname=$database", $username, $password);
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
+        $this->truncateOutpointsStmt = $this->dbh->prepare('TRUNCATE outpoints');
+        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM utxo u join outpoints o on (o.hashKey = u.hashKey)");
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
         $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt FROM headerIndex h, iindex i WHERE h.hash = :hash AND i.header_id = h.id');
@@ -1032,29 +1043,26 @@ WHERE tip.header_id = (
         $outpointSerializer = new OutPointSerializer();
         $outputSet = [];
 
+        $this->truncateOutpointsStmt->execute();
+
         try {
 
-            $this->dbh->beginTransaction();
+            //$this->dbh->beginTransaction();
             $t1 = microtime(true);
-
-            $this->dbh->exec("DROP TEMPORARY TABLE IF EXISTS outpoints");
-            $c = $this->dbh->prepare("CREATE TEMPORARY TABLE outpoints (hashKey VARBINARY(36), INDEX(hashKey)) ");
-            $c->execute();
 
             $iv = [];
             $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
             $i->execute($iv);
 
-            $fetchUtxoStmt = $this->dbh->prepare('SELECT u.* FROM utxo u JOIN outpoints o ON o.hashKey = u.hashKey');
-            $fetchUtxoStmt->execute();
-            $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $this->selectUtxosByOutpointsStmt->execute();
+            $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
 
             foreach ($rows as $utxo) {
                 $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
                 $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
             }
 
-            $this->dbh->commit();
+            //$this->dbh->commit();
 
             if (count($outputSet) < $requiredCount) {
                 throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
@@ -1067,7 +1075,7 @@ WHERE tip.header_id = (
             echo "PDO Exception\n";
             echo $e->getMessage().PHP_EOL;
             echo $e->getTraceAsString();
-            $this->dbh->rollBack();
+            //$this->dbh->rollBack();
             die();
             throw $e;
         } catch (\Exception $e) {

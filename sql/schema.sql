@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS `active_fork` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE IF NOT EXISTS `outpoints` (
+  `hashKey` varbinary(36) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+ALTER TABLE `outpoints`
+ADD KEY `hkidx` (`hashKey`);
 --
 -- Table structure for table `blockIndex`
 --
