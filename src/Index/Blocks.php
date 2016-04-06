@@ -194,7 +194,6 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
-        echo "Block hash: ".$block->getHeader()->getHash()->getHex().PHP_EOL;
         $state = $this->chains->best();
 
         $hash = $block->getHeader()->getHash();
@@ -255,17 +254,22 @@ class Blocks extends EventEmitter
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
         echo "Validation: " . (microtime(true) - $v) . " seconds\n";
 
-        $this->db->transaction(function () use ($hash, $block, $blockData, $blockSerializer) {
+        $m = microtime(true);
+        $this->db->transaction(function () use ($hash, $state, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
+
+            if ($this->config->getItem('config', 'index_utxos', true)) {
+                $this->emit('block', [$state, $block, $blockData]);
+            }
 
             if ($this->config->getItem('config', 'index_transactions', true)) {
                 $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }
         });
+        echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
 
         $state->updateLastBlock($index);
         $this->forks->next($index);
-        $this->emit('block', [$state, $block, $blockData]);
 
         return $index;
     }

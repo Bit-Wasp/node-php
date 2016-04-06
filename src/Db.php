@@ -372,10 +372,8 @@ class Db implements DbInterface
      */
     public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
     {
-        $t = microtime(true);
         // Insert the block header ID
         $this->insertBlockStmt->execute(['hash' => $blockHash->getBinary(), 'block' => $blockSerializer->serialize($block)->getBinary()]);
-        echo "db|insertBlock: " . (microtime(true) - $t) . " seconds\n";
         return $this->dbh->lastInsertId();
     }
 
@@ -486,37 +484,27 @@ class Db implements DbInterface
     {
         $outpointSerializer = new OutPointSerializer();
 
-        try {
-            $this->dbh->beginTransaction();
-            if (count($deleteOutPoints) > 0) {
-                $this->deleteUtxosInView->execute();
-                /**foreach ($deleteOutPoints as $id) {
-                    $this->deleteUtxoByIdStmt->execute(['id' => $id]);
-                }/**/
-            }
-
-            if (count($newUtxos) > 0) {
-                $utxoQuery = [];
-                $utxoValues = [];
-                foreach ($newUtxos as $c => $utxo) {
-                    $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
-                    $utxoValues["hash$c"] = $outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
-                    $utxoValues["v$c"] = $utxo->getOutput()->getValue();
-                    $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
-                }
-
-                $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
-                $insertUtxos->execute($utxoValues);
-            }
-
-            $this->dbh->commit();
-        } catch (\Exception $e) {
-            echo "Fail inserting\n";
-            $this->dbh->rollBack();
-            echo $e->getMessage().PHP_EOL;
-            echo $e->getTraceAsString().PHP_EOL;
-            die();
+        if (count($deleteOutPoints) > 0) {
+            $this->deleteUtxosInView->execute();
+            /**foreach ($deleteOutPoints as $id) {
+                $this->deleteUtxoByIdStmt->execute(['id' => $id]);
+            }/**/
         }
+
+        if (count($newUtxos) > 0) {
+            $utxoQuery = [];
+            $utxoValues = [];
+            foreach ($newUtxos as $c => $utxo) {
+                $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+                $utxoValues["hash$c"] = $outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
+                $utxoValues["v$c"] = $utxo->getOutput()->getValue();
+                $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
+            }
+
+            $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+            $insertUtxos->execute($utxoValues);
+        }
+
     }
 
     /**
