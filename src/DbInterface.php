@@ -132,7 +132,7 @@ interface DbInterface
      * @param OutPointInterface[] $deleteOutPoints
      * @param Utxo[] $newUtxos
      */
-    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos);
+    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos, array $specificDeletes = []);
 
     /**
      * @param HeadersBatch $batch

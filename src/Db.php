@@ -180,7 +180,7 @@ class Db implements DbInterface
                 UPDATE iindex  SET rgt = rgt + :nTimes2 WHERE rgt > :myLeft ;
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
-        $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashPrevOut = :hash AND nOutput = :n');
+        $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = ?');
         $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM utxo u JOIN outpoints o on (o.hashKey = u.hashKey)');
 
@@ -488,17 +488,26 @@ class Db implements DbInterface
     }
 
     /**
-     * @param OutPointInterface[] $deleteOutPoints
-     * @param Utxo[] $newUtxos
-     * @throws \Exception
+     * @param array $deleteOutPoints
+     * @param array $newUtxos
+     * @param string[] $specificDeletes
      */
-    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos)
+    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
     {
         $outpointSerializer = new OutPointSerializer();
 
         if (count($deleteOutPoints) > 0) {
             $this->deleteUtxosInView->execute();
             echo "Deleted rows: " . $this->deleteUtxosInView->rowCount(). PHP_EOL;
+        }
+
+        if (count($specificDeletes) > 0) {
+            echo "SPECIFIC DELETES***\n";
+            echo "SPECIFIC DELETES***\n";
+            echo "SPECIFIC DELETES***\n";
+            foreach ($specificDeletes as $delete) {
+                $this->deleteUtxoStmt->execute([$delete]);
+            }
         }
 
         if (count($newUtxos) > 0) {

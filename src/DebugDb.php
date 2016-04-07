@@ -153,7 +153,7 @@ class DebugDb implements DbInterface
         return $this->db->insertBlockTransactions($blockId, $block, $hashStorage);
     }
 
-    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos)
+    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);

@@ -32,7 +32,8 @@ class UtxoSet implements \Countable
     public function __construct(\PDOStatement $statement)
     {
         foreach ($statement->fetchAll() as $values) {
-            $this->set[$values['hashKey']] = [$values['value'], $values['scriptPubKey']];
+            list ($key, $value, $script) = $values;
+            $this->set[$key] = [$value, $script];
         }
         $this->outpointSerializer = new OutPointSerializer();
     }

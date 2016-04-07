@@ -7,6 +7,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
+use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
@@ -69,7 +70,7 @@ class Blocks extends EventEmitter
     private $consensus;
 
     /**
-     * @var UtxoSet
+     * @var CachingUtxoSet
      */
     private $utxoSet;
 
@@ -179,7 +180,7 @@ class Blocks extends EventEmitter
     private function fetchUtxoSet()
     {
         if (null === $this->utxoSet) {
-            $this->utxoSet = $this->db->fetchUtxoSet();
+            $this->utxoSet = new CachingUtxoSet($this->db);
         } 
         
         return $this->utxoSet;
@@ -220,17 +221,7 @@ class Blocks extends EventEmitter
      */
     public function updateUtxoSet(ChainStateInterface $chainState, BlockInterface $block, BlockData $blockData)
     {
-        echo "Blocks::updateUtxoSet\n";
-        $deleteList = [];
-        ///** @var DbUtxo $dbUtxo */
-        //foreach ($blockData->requiredOutpoints as $outpoint) {
-//            $dbUtxo = $blockData->utxoView->fetch($outpoint);
-//            $deleteList[] = $dbUtxo->getId();
-//        }
-
-        $this->db->updateUtxoSet($deleteList, $blockData->remainingNew);
         $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-
         echo "UTXOS DONE\n";
     }
 
