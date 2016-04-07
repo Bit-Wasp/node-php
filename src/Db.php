@@ -1096,12 +1096,11 @@ WHERE tip.header_id = (
      */
     public function fetchUtxoSet()
     {
-        $prepared = $this->dbh->prepare("SELECT * FROM utxo");
+        $prepared = $this->dbh->prepare("SELECT hashKey, value, scriptPubKey FROM utxo");
         $prepared->execute();
 
-        return new UtxoSet($prepared->fetchAll(\PDO::FETCH_ASSOC));
+        return new UtxoSet($prepared);
     }
-
 
     /**
      * @param BufferInterface $tipHash

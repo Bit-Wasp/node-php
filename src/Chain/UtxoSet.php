@@ -27,16 +27,13 @@ class UtxoSet implements \Countable
 
     /**
      * UtxoSet constructor.
-     * @param array $set
+     * @param \PDOStatement $statement
      */
-    public function __construct(array $set)
+    public function __construct(\PDOStatement $statement)
     {
-        //$this->set = $set;
-        foreach ($set as $values) {
+        foreach ($statement->fetchAll() as $values) {
             $this->set[$values['hashKey']] = [$values['value'], $values['scriptPubKey']];
         }
-
-        echo "Initialized utxo set: ".count($set).PHP_EOL;
         $this->outpointSerializer = new OutPointSerializer();
     }
 
