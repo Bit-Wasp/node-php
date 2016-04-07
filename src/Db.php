@@ -170,7 +170,7 @@ class Db implements DbInterface
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->truncateOutpointsStmt = $this->dbh->prepare('TRUNCATE outpoints');
-        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM utxo u join outpoints o on (o.hashKey = u.hashKey)");
+        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM outpoints o join utxo u on (o.hashKey = u.hashKey)");
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
         $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt FROM headerIndex h, iindex i WHERE h.hash = :hash AND i.header_id = h.id');
@@ -182,7 +182,7 @@ class Db implements DbInterface
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = ?');
         $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
-        $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM utxo u JOIN outpoints o on (o.hashKey = u.hashKey)');
+        $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM outpoints o join utxo u on (o.hashKey = u.hashKey)');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
         $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
