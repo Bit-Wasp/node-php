@@ -27,7 +27,6 @@ use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\InfoCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ShutdownCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\UserControlServiceProvider;
-use BitWasp\Bitcoin\Node\Services\Utxos\UtxoServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocket\WebSocketServiceProvider;
 use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use Packaged\Config\ConfigProviderInterface;
@@ -119,11 +118,6 @@ class StartCommand extends AbstractCommand
             new ZmqServiceProvider(),
             new UserControlServiceProvider($node, $consoleCommands),
         ];
-
-        $utxos = (bool) $config->getItem('config', 'index_utxos', true);
-        if ($utxos) {
-            $services[] = new UtxoServiceProvider($node);
-        }
 
         $p2p = $config->getItem('config', 'p2p', true);
         if ($p2p) {

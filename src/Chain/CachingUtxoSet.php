@@ -62,7 +62,7 @@ class CachingUtxoSet
 //                $this->db->appendUtxoViewKeys($this->cacheHits);
 //            }
 
-            $this->db->updateUtxoSet($deleteOutPoints, $newUtxos, $this->cacheHits);
+            $this->db->updateUtxoSet($this->outpointSerializer, $deleteOutPoints, $newUtxos, $this->cacheHits);
 
         });
 
@@ -108,9 +108,8 @@ class CachingUtxoSet
                 }
             }
 
-            echo "A: $a B: $b\n";
             if (empty($required) === false) {
-                $utxos = array_merge($utxos, $this->db->fetchUtxoDbList($required));
+                $utxos = array_merge($utxos, $this->db->fetchUtxoDbList($this->outpointSerializer, $required));
             }
 
             $this->cacheHits = $cacheHits;

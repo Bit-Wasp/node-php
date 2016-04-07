@@ -4,7 +4,6 @@ namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Index\UtxoDb;
 use Evenement\EventEmitterInterface;
 
 interface NodeInterface extends EventEmitterInterface
@@ -36,8 +35,4 @@ interface NodeInterface extends EventEmitterInterface
      */
     public function chains();
 
-    /**
-     * @return UtxoDb
-     */
-    public function utxos();
 }

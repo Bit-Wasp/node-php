@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
+use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Buffertools\BufferInterface;
 
 class DebugDb implements DbInterface
@@ -122,10 +123,10 @@ class DebugDb implements DbInterface
         return $this->db->fetchUtxoList($tipHash, $outpoints);
     }
 
-    public function fetchUtxoDbList(array $outpoints)
+    public function fetchUtxoDbList(OutPointSerializer $outpointSerializer, array $outpoints)
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->fetchUtxoDbList($outpoints);
+        return $this->db->fetchUtxoDbList($outpointSerializer, $outpoints);
     }
 
     public function fetchHistoricChain(Headers $headers, BufferInterface $hash)
@@ -152,10 +153,10 @@ class DebugDb implements DbInterface
         return $this->db->insertBlockTransactions($blockId, $block, $hashStorage);
     }
 
-    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);
+        $this->db->updateUtxoSet($serializer, $deleteOutPoints, $newUtxos, $specificDeletes);
     }
 
     public function findFork(ChainStateInterface $activeChain, BlockLocator $locator)

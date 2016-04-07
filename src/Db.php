@@ -505,16 +505,15 @@ class Db implements DbInterface
     }
 
     /**
+     * @param OutPointSerializer $serializer
      * @param array $deleteOutPoints
      * @param array $newUtxos
-     * @param string[] $specificDeletes
+     * @param array $specificDeletes
      */
-    public function updateUtxoSet(array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
     {
-        $outpointSerializer = new OutPointSerializer();
-
         $deleteUtxos = false;
-        $useAppendList = true;
+        $useAppendList = false;
         if (true === $useAppendList) {
             if (false === empty($specificDeletes)) {
                 $deleteUtxos = true;
@@ -543,7 +542,7 @@ class Db implements DbInterface
             $utxoValues = [];
             foreach ($newUtxos as $c => $utxo) {
                 $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
-                $utxoValues["hash$c"] = $outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
+                $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
                 $utxoValues["v$c"] = $utxo->getOutput()->getValue();
                 $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
             }
@@ -1064,19 +1063,16 @@ WHERE tip.header_id = (
     }
 
     /**
+     * @param OutPointSerializer $outpointSerializer
      * @param OutPointInterface[] $outpoints
-     * @return Utxo[]
-     * @throws \Exception
+     * @return \BitWasp\Bitcoin\Utxo\Utxo[]
      */
-    public function fetchUtxoDbList(array $outpoints)
+    public function fetchUtxoDbList(OutPointSerializer $outpointSerializer, array $outpoints)
     {
         $requiredCount = count($outpoints);
         if (0 === count($outpoints)) {
             return [];
         }
-
-        $outpointSerializer = new OutPointSerializer();
-        $outputSet = [];
 
         $this->truncateOutpointsStmt->execute();
 
@@ -1089,6 +1085,7 @@ WHERE tip.header_id = (
         $this->selectUtxosByOutpointsStmt->execute();
         $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
 
+        $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
             $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
