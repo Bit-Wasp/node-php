@@ -513,13 +513,28 @@ class Db implements DbInterface
     {
         $outpointSerializer = new OutPointSerializer();
 
-        if (count($deleteOutPoints) > 0) {
+        $deleteUtxos = false;
+        $useAppendList = true;
+        if (true === $useAppendList) {
+            if (false === empty($specificDeletes)) {
+                $deleteUtxos = true;
+                $this->appendUtxoViewKeys($specificDeletes);
+            }
+        }
+
+        if (!$deleteUtxos && count($deleteOutPoints) > 0) {
+            $deleteUtxos = true;
+        }
+
+        if (true === $deleteUtxos) {
             $this->deleteUtxosInView->execute();
         }
 
-        if (count($specificDeletes) > 0) {
-            foreach ($specificDeletes as $delete) {
-                $this->deleteUtxoStmt->execute([$delete]);
+        if (false === $useAppendList) {
+            if (count($specificDeletes) > 0) {
+                foreach ($specificDeletes as $delete) {
+                    $this->deleteUtxoStmt->execute([$delete]);
+                }
             }
         }
 
@@ -1078,8 +1093,6 @@ WHERE tip.header_id = (
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
             $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
-
-        //$this->dbh->commit();
 
         if (count($outputSet) < $requiredCount) {
             throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
