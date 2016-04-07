@@ -18,7 +18,6 @@ use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -153,6 +152,7 @@ class Db implements DbInterface
      * @var \PDOStatement
      */
     private $selectUtxosByOutpointsStmt;
+
     /**
      * Db constructor.
      * @param ConfigProviderInterface $config
@@ -487,6 +487,19 @@ class Db implements DbInterface
 
     }
 
+    public function appendUtxoViewKeys(array $cacheHits)
+    {
+        $joinList = [];
+        $queryValues = [];
+        foreach ($cacheHits as $i => $key) {
+            $queryValues[] = $key;
+            $joinList[] = "(?)";
+        }
+
+        $append = $this->dbh->prepare("INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList));
+        $append->execute($queryValues);
+    }
+
     /**
      * @param array $deleteOutPoints
      * @param array $newUtxos
@@ -498,12 +511,6 @@ class Db implements DbInterface
 
         if (count($deleteOutPoints) > 0) {
             $this->deleteUtxosInView->execute();
-        }
-
-        if (count($specificDeletes) > 0) {
-            foreach ($specificDeletes as $delete) {
-                $this->deleteUtxoStmt->execute([$delete]);
-            }
         }
 
         if (count($newUtxos) > 0) {
@@ -1091,19 +1098,6 @@ WHERE tip.header_id = (
             echo $e->getTraceAsString();
             die();
         }
-    }
-
-
-    /**
-     * @return Utxo[]
-     * @throws \Exception
-     */
-    public function fetchUtxoSet()
-    {
-        $prepared = $this->dbh->prepare("SELECT hashKey, value, scriptPubKey FROM utxo");
-        $prepared->execute();
-
-        return new UtxoSet($prepared);
     }
 
     /**

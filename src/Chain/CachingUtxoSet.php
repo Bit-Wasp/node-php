@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
@@ -58,7 +57,11 @@ class CachingUtxoSet
      */
     public function applyBlock(array $deleteOutPoints, array $newUtxos)
     {
-        $this->db->updateUtxoSet($deleteOutPoints, $newUtxos, $this->cacheHits);
+        if (!empty($this->cacheHits)) {
+            $this->db->appendUtxoViewKeys($this->cacheHits);
+        }
+        
+        $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);
 
         foreach ($this->cacheHits as $key) {
             $this->set->delete($key);
@@ -109,5 +112,4 @@ class CachingUtxoSet
             throw new \RuntimeException('Failed to find UTXOS in set');
         }
     }
-
 }
