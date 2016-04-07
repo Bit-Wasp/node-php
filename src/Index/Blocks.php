@@ -215,17 +215,6 @@ class Blocks extends EventEmitter
     }
 
     /**
-     * @param ChainStateInterface $chainState
-     * @param BlockInterface $block
-     * @param BlockData $blockData
-     */
-    public function updateUtxoSet(ChainStateInterface $chainState, BlockInterface $block, BlockData $blockData)
-    {
-        $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-        echo "UTXOS DONE\n";
-    }
-
-    /**
      * @param BlockInterface $block
      * @param Headers $headers
      * @param bool $checkSignatures
@@ -306,7 +295,7 @@ class Blocks extends EventEmitter
         echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
-            $this->updateUtxoSet($state, $block, $blockData);
+            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
         }
 
         $state->updateLastBlock($index);

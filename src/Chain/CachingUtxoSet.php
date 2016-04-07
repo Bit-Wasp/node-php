@@ -10,6 +10,8 @@ use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
 use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
+use Doctrine\Common\Cache\ArrayCache;
+use Doctrine\Common\Cache\RedisCache;
 
 class CachingUtxoSet
 {
@@ -18,7 +20,11 @@ class CachingUtxoSet
      */
     private $db;
 
-    private $set = [];
+    /**
+     * @var RedisCache
+     */
+    private $set;
+
     private $cacheHits = [];
 
     /**
@@ -33,6 +39,16 @@ class CachingUtxoSet
     public function __construct(DbInterface $db)
     {
         $this->db = $db;
+
+        if (class_exists('Redis')) {
+            $redis = new \Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $this->set = new RedisCache();
+            $this->set->setRedis($redis);
+        } else {
+            $this->set = new ArrayCache();
+        }
+
         $this->outpointSerializer = new OutPointSerializer();
     }
 
@@ -45,18 +61,18 @@ class CachingUtxoSet
         $this->db->updateUtxoSet($deleteOutPoints, $newUtxos, $this->cacheHits);
 
         foreach ($this->cacheHits as $key) {
-            unset($this->set[$key]);
+            $this->set->delete($key);
         }
 
         foreach ($newUtxos as $c => $utxo) {
             $new = $this->outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
-            $this->set[$new] = [
+            $this->set->save($new, [
                 $newUtxos[$c]->getOutput()-> getValue(),
                 $newUtxos[$c]->getOutput()->getScript()->getBinary(),
-            ];
+            ], 500000);
         }
 
-        echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheGits: " . count($this->cacheHits) . " Total size: " . count($this->set).PHP_EOL;
+        echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
 
         $this->cacheHits = [];
     }
@@ -73,9 +89,9 @@ class CachingUtxoSet
             $cacheHits = [];
             foreach ($requiredOutpoints as $c => $outpoint) {
                 $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
-                if (array_key_exists($key, $this->set)) {
-                    list ($value, $scriptPubKey) = $this->set[$key];
-                    $cacheHit[] = $key;
+                if ($this->set->contains($key)) {
+                    list ($value, $scriptPubKey) = $this->set->fetch($key);
+                    $cacheHits[] = $key;
                     $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
                 } else {
                     $required[] = $outpoint;

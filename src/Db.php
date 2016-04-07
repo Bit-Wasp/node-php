@@ -498,13 +498,9 @@ class Db implements DbInterface
 
         if (count($deleteOutPoints) > 0) {
             $this->deleteUtxosInView->execute();
-            echo "Deleted rows: " . $this->deleteUtxosInView->rowCount(). PHP_EOL;
         }
 
         if (count($specificDeletes) > 0) {
-            echo "SPECIFIC DELETES***\n";
-            echo "SPECIFIC DELETES***\n";
-            echo "SPECIFIC DELETES***\n";
             foreach ($specificDeletes as $delete) {
                 $this->deleteUtxoStmt->execute([$delete]);
             }
@@ -523,7 +519,6 @@ class Db implements DbInterface
             $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
             $insertUtxos->execute($utxoValues);
         }
-
     }
 
     /**

@@ -34,7 +34,7 @@
     "cboden/ratchet": "^0.3.4",
     "dunglas/php-torcontrol": "~v1.0.0",
     "pimple/pimple": "^3.0",
-    "doctrine/cache": "~1.6"
+    "doctrine/cache": "^1.6"
   },
   "require-dev": {
     "bitwasp/testing-php": "~0.0"
