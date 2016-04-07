@@ -18,6 +18,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
+use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -241,7 +242,7 @@ class Db implements DbInterface
         ');
 
     }
-    
+
     public function getPdo()
     {
         return $this->dbh;
@@ -497,9 +498,7 @@ class Db implements DbInterface
 
         if (count($deleteOutPoints) > 0) {
             $this->deleteUtxosInView->execute();
-            /**foreach ($deleteOutPoints as $id) {
-                $this->deleteUtxoByIdStmt->execute(['id' => $id]);
-            }/**/
+            echo "Deleted rows: " . $this->deleteUtxosInView->rowCount(). PHP_EOL;
         }
 
         if (count($newUtxos) > 0) {
@@ -1089,6 +1088,20 @@ WHERE tip.header_id = (
             die();
         }
     }
+
+
+    /**
+     * @return Utxo[]
+     * @throws \Exception
+     */
+    public function fetchUtxoSet()
+    {
+        $prepared = $this->dbh->prepare("SELECT * FROM utxo");
+        $prepared->execute();
+
+        return new UtxoSet($prepared->fetchAll(\PDO::FETCH_ASSOC));
+    }
+
 
     /**
      * @param BufferInterface $tipHash

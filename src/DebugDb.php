@@ -33,6 +33,12 @@ class DebugDb implements DbInterface
         return $this->db->getPdo();
     }
 
+    public function fetchUtxoSet()
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->fetchUtxoSet();
+    }
+
     public function stop()
     {
         echo __FUNCTION__ . PHP_EOL;

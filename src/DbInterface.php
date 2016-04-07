@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
+use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Index\Headers;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
@@ -113,6 +114,11 @@ interface DbInterface
      * @return int
      */
     public function insertToBlockIndex(BufferInterface $index);
+
+    /**
+     * @return UtxoSet
+     */
+    public function fetchUtxoSet();
 
     /**
      * @param int $blockId
