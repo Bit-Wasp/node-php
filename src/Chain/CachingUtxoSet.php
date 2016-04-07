@@ -57,11 +57,14 @@ class CachingUtxoSet
      */
     public function applyBlock(array $deleteOutPoints, array $newUtxos)
     {
-        if (!empty($this->cacheHits)) {
-            $this->db->appendUtxoViewKeys($this->cacheHits);
-        }
-        
-        $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);
+        $this->db->transaction(function () use ($deleteOutPoints, $newUtxos) {
+            if (!empty($this->cacheHits)) {
+                $this->db->appendUtxoViewKeys($this->cacheHits);
+            }
+
+            $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);
+
+        });
 
         foreach ($this->cacheHits as $key) {
             $this->set->delete($key);
