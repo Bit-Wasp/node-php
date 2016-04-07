@@ -58,11 +58,11 @@ class CachingUtxoSet
     public function applyBlock(array $deleteOutPoints, array $newUtxos)
     {
         $this->db->transaction(function () use ($deleteOutPoints, $newUtxos) {
-            if (!empty($this->cacheHits)) {
-                $this->db->appendUtxoViewKeys($this->cacheHits);
-            }
+            //if (!empty($this->cacheHits)) {
+//                $this->db->appendUtxoViewKeys($this->cacheHits);
+//            }
 
-            $this->db->updateUtxoSet($deleteOutPoints, $newUtxos);
+            $this->db->updateUtxoSet($deleteOutPoints, $newUtxos, $this->cacheHits);
 
         });
 
@@ -93,17 +93,22 @@ class CachingUtxoSet
             $utxos = [];
             $required = [];
             $cacheHits = [];
+            $a = 0;
+            $b = 0;
             foreach ($requiredOutpoints as $c => $outpoint) {
                 $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
                 if ($this->set->contains($key)) {
                     list ($value, $scriptPubKey) = $this->set->fetch($key);
                     $cacheHits[] = $key;
                     $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
+                    $a++;
                 } else {
                     $required[] = $outpoint;
+                    $b++;
                 }
             }
 
+            echo "A: $a B: $b\n";
             if (empty($required) === false) {
                 $utxos = array_merge($utxos, $this->db->fetchUtxoDbList($required));
             }

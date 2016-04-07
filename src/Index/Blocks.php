@@ -194,6 +194,7 @@ class Blocks extends EventEmitter
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
             try {
+                echo "Utxoset - fetch view\n";
                 $utxoSet = $this->fetchUtxoSet();
                 $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
             } catch (\Exception $e) {
@@ -201,7 +202,6 @@ class Blocks extends EventEmitter
                 echo $e->getTraceAsString().PHP_EOL;
                 die();
             }
-            //$remaining = $this->db->fetchUtxoDbList($blockData->requiredOutpoints);
 
         } else {
             $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);

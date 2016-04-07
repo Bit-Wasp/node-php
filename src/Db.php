@@ -413,9 +413,11 @@ class Db implements DbInterface
         $txBind = [];
         $txData = [];
 
+        /** @var BufferInterface $txHash */
         $transactions = $block->getTransactions();
         foreach ($transactions as $i => $tx) {
-            $hash = $hashStorage[$tx]->getBinary();
+            $txHash = $hashStorage[$tx];
+            $hash = $txHash->getBinary();
             $temp[$i] = $hash;
             $valueOut = $tx->getValueOut();
             $nOut = count($tx->getOutputs());
@@ -441,7 +443,6 @@ class Db implements DbInterface
                 $inData["scriptSig" . $i . "n" . $j] = $input->getScript()->getBinary();
                 $inData["nSequence" . $i . "n" . $j] = $input->getSequence();
                 $inData["nInput" . $i . "n" . $j] = $j;
-
             }
 
             for ($k = 0; $k < $nOut; $k++) {
@@ -487,6 +488,9 @@ class Db implements DbInterface
 
     }
 
+    /**
+     * @param array $cacheHits
+     */
     public function appendUtxoViewKeys(array $cacheHits)
     {
         $joinList = [];
@@ -511,6 +515,12 @@ class Db implements DbInterface
 
         if (count($deleteOutPoints) > 0) {
             $this->deleteUtxosInView->execute();
+        }
+
+        if (count($specificDeletes) > 0) {
+            foreach ($specificDeletes as $delete) {
+                $this->deleteUtxoStmt->execute([$delete]);
+            }
         }
 
         if (count($newUtxos) > 0) {
@@ -1055,49 +1065,28 @@ WHERE tip.header_id = (
 
         $this->truncateOutpointsStmt->execute();
 
-        try {
+        $t1 = microtime(true);
 
-            //$this->dbh->beginTransaction();
-            $t1 = microtime(true);
+        $iv = [];
+        $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
+        $i->execute($iv);
 
-            $iv = [];
-            $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
-            $i->execute($iv);
+        $this->selectUtxosByOutpointsStmt->execute();
+        $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $this->selectUtxosByOutpointsStmt->execute();
-            $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            foreach ($rows as $utxo) {
-                $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-                $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-            }
-
-            //$this->dbh->commit();
-
-            if (count($outputSet) < $requiredCount) {
-                throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
-            }
-
-            echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
-            return $outputSet;
-
-        } catch (\PDOException $e) {
-            echo "PDO Exception\n";
-            echo $e->getMessage().PHP_EOL;
-            echo $e->getTraceAsString();
-            //$this->dbh->rollBack();
-            die();
-            throw $e;
-        } catch (\Exception $e) {
-            echo "Failed to find UTXO\n";
-            foreach ($outpoints as $out) {
-                echo $out->getTxId()->getHex() . " - " . $out->getVout().PHP_EOL;
-                echo $out->getHex().PHP_EOL;
-            }
-            echo $e->getMessage().PHP_EOL;
-            echo $e->getTraceAsString();
-            die();
+        foreach ($rows as $utxo) {
+            $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
+            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
+
+        //$this->dbh->commit();
+
+        if (count($outputSet) < $requiredCount) {
+            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
+        }
+
+        echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
+        return $outputSet;
     }
 
     /**
