@@ -96,8 +96,7 @@ class CachingUtxoSet
             $utxos = [];
             $required = [];
             $cacheHits = [];
-            $a = 0;
-            $b = 0;
+
             foreach ($requiredOutpoints as $c => $outpoint) {
                 if ($this->useCaching) {
                     $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
@@ -105,7 +104,7 @@ class CachingUtxoSet
                         list ($value, $scriptPubKey) = $this->set->fetch($key);
                         $cacheHits[] = $key;
                         $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
-                        $a++;
+            
                         continue;
                     }
                 }

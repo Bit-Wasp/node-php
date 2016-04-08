@@ -1119,7 +1119,7 @@ WHERE tip.header_id = (
         }
         $this->deleteUtxoView();
 
-        $sql = "create view utxo_view as select * from utxo where hashKey in (".implode(",", $joinList).")";
+        $sql = "create view utxo_view as select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
         $prepared = $this->dbh->prepare($sql);
         $prepared->execute($queryValues);
 
@@ -1129,7 +1129,7 @@ WHERE tip.header_id = (
         $outputSet = [];
         foreach ($select->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[] = new Utxo($outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) < $requiredCount) {
