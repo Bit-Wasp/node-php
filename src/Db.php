@@ -59,6 +59,11 @@ class Db implements DbInterface
     /**
      * @var \PDOStatement
      */
+    private $preloadUtxosStmt;
+
+    /**
+     * @var \PDOStatement
+     */
     private $loadTipStmt;
 
     /**
@@ -181,6 +186,7 @@ class Db implements DbInterface
                 UPDATE iindex  SET lft = lft + :nTimes2 WHERE lft > :myLeft ;
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = ?');
+        $this->preloadUtxosStmt = $this->dbh->prepare("SELECT u.* from utxo");
         $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM outpoints o join utxo u on (o.hashKey = u.hashKey)');
 
@@ -504,6 +510,17 @@ class Db implements DbInterface
         $append->execute($queryValues);
     }
 
+    private function deleteUtxoBatchSql(array $outpoints, &$queryValues = [])
+    {
+        $queryList = [];
+        foreach ($outpoints as $outpoint) {
+            $queryList[] = "?";
+            $queryValues[] = $outpoint;
+        }
+
+        return "DELETE FROM utxo WHERE hashKey IN (" . implode(",", $queryList) . ")";
+    }
+
     /**
      * @param OutPointSerializer $serializer
      * @param array $deleteOutPoints
@@ -531,9 +548,12 @@ class Db implements DbInterface
 
         if (false === $useAppendList) {
             if (count($specificDeletes) > 0) {
-                foreach ($specificDeletes as $delete) {
+                $deleteValues = [];
+                $delete = $this->dbh->prepare($this->deleteUtxoBatchSql($specificDeletes, $deleteValues));
+                $delete->execute($deleteValues);
+                /*foreach ($specificDeletes as $delete) {
                     $this->deleteUtxoStmt->execute([$delete]);
-                }
+                }*/
             }
         }
 
@@ -1063,6 +1083,23 @@ WHERE tip.header_id = (
     }
 
     /**
+     * @param OutPointSerializer $serializer
+     * @param array $outpoints
+     * @param array $queryValues
+     * @return string
+     */
+    private function createUtxoSelectSql(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
+    {
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues[] = $serializer->serialize($outpoint)->getBinary();
+            $joinList[] = ":?";
+        }
+
+        return "SELECT * FROM utxo WHERE hashKey IN (" . implode(", ", $joinList) . ")";
+    }
+
+    /**
      * @param OutPointSerializer $outpointSerializer
      * @param OutPointInterface[] $outpoints
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]
@@ -1077,14 +1114,21 @@ WHERE tip.header_id = (
         $this->truncateOutpointsStmt->execute();
 
         $t1 = microtime(true);
+        $queryValues = [];
+        $prepare = $this->dbh->prepare($this->createUtxoSelectSql($outpointSerializer, $outpoints, $queryValues));
+        $prepare->execute();
 
+        $rows = $prepare->fetchAll(\PDO::FETCH_ASSOC);
+
+        /*
+        $this->preloadUtxosStmt->execute();
         $iv = [];
         $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
         $i->execute($iv);
 
         $this->selectUtxosByOutpointsStmt->execute();
         $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
-
+*/
         $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
