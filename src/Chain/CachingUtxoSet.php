@@ -53,7 +53,7 @@ class CachingUtxoSet
 
     /**
      * @param OutPointInterface[] $deleteOutPoints
-     * @param Utxo[] $newUtxos
+     * @param ChainUtxo[] $newUtxos
      */
     public function applyBlock(array $deleteOutPoints, array $newUtxos)
     {
@@ -73,9 +73,10 @@ class CachingUtxoSet
         foreach ($newUtxos as $c => $utxo) {
             $new = $this->outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
             $this->set->save($new, [
+                $newUtxos[$c]->getHeight(),
                 $newUtxos[$c]->getOutput()-> getValue(),
                 $newUtxos[$c]->getOutput()->getScript()->getBinary(),
-            ], 500000);
+            ], 3600);
         }
 
         echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
@@ -98,9 +99,9 @@ class CachingUtxoSet
             foreach ($requiredOutpoints as $c => $outpoint) {
                 $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
                 if ($this->set->contains($key)) {
-                    list ($value, $scriptPubKey) = $this->set->fetch($key);
+                    list ($height, $value, $scriptPubKey) = $this->set->fetch($key);
                     $cacheHits[] = $key;
-                    $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
+                    $utxos[] = new ChainUtxo($height, $outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
                     $a++;
                 } else {
                     $required[] = $outpoint;

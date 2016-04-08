@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainUtxo;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\DbInterface;
@@ -23,7 +24,6 @@ use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
-use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
@@ -120,11 +120,12 @@ class Blocks extends EventEmitter
     }
 
     /**
+     * @param int $height
      * @param BlockInterface $block
      * @param TransactionSerializerInterface $txSerializer
      * @return BlockData
      */
-    public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer)
+    public function parseUtxos($height, BlockInterface $block, TransactionSerializerInterface $txSerializer)
     {
         $blockData = new BlockData();
         $unknown = [];
@@ -153,11 +154,11 @@ class Blocks extends EventEmitter
                 if (isset($unknown[$lookup])) {
                     // Remove unknown outpoints which consume this output
                     $outpoint = $unknown[$lookup];
-                    $utxo = new Utxo($outpoint, $out);
+                    $utxo = new ChainUtxo($height, $outpoint, $out);
                     unset($unknown[$lookup]);
                 } else {
                     // Record new utxos which are not consumed in the same block
-                    $utxo = new Utxo(new OutPoint($hash, $i), $out);
+                    $utxo = new ChainUtxo($height, new OutPoint($hash, $i), $out);
                     $blockData->remainingNew[] = $utxo;
                 }
 
@@ -188,9 +189,9 @@ class Blocks extends EventEmitter
      * @param TransactionSerializerInterface $txSerializer
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer)
+    public function prepareBatch($height, BlockInterface $block, TransactionSerializerInterface $txSerializer)
     {
-        $blockData = $this->parseUtxos($block, $txSerializer);
+        $blockData = $this->parseUtxos($height, $block, $txSerializer);
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
             try {
@@ -229,7 +230,7 @@ class Blocks extends EventEmitter
         $txSerializer = new CachingTransactionSerializer();
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
-        $blockData = $this->prepareBatch($block, $txSerializer);
+        $blockData = $this->prepareBatch($index->getHeight(), $block, $txSerializer);
 
         $v = microtime(true);
         $this

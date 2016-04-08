@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS `utxo` (
   `id` int(11) NOT NULL,
   `hashKey` varbinary(36) NOT NULL,
   `value` bigint(32) NOT NULL,
+  `height` INT(9) NOT NULL,
   `scriptPubKey` blob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

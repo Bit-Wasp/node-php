@@ -14,12 +14,12 @@ class BlockData
     public $requiredOutpoints = [];
 
     /**
-     * @var Utxo[]
+     * @var ChainUtxo[]
      */
     public $parsedUtxos = [];
 
     /**
-     * @var Utxo[]
+     * @var ChainUtxo[]
      */
     public $remainingNew = [];
 

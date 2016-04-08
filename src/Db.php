@@ -16,6 +16,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainState;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainUtxo;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
@@ -524,7 +525,7 @@ class Db implements DbInterface
     /**
      * @param OutPointSerializer $serializer
      * @param array $deleteOutPoints
-     * @param array $newUtxos
+     * @param ChainUtxo[] $newUtxos
      * @param array $specificDeletes
      */
     public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
@@ -561,13 +562,14 @@ class Db implements DbInterface
             $utxoQuery = [];
             $utxoValues = [];
             foreach ($newUtxos as $c => $utxo) {
-                $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+                $utxoQuery[] = "(:hash$c, :h$c, :v$c, :s$c)";
                 $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
+                $utxoValues["h$c"] = $utxo->getHeight();
                 $utxoValues["v$c"] = $utxo->getOutput()->getValue();
                 $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
             }
 
-            $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+            $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, height, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
             $insertUtxos->execute($utxoValues);
         }
     }
