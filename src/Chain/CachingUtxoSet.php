@@ -76,7 +76,7 @@ class CachingUtxoSet
                 $newUtxos[$c]->getHeight(),
                 $newUtxos[$c]->getOutput()-> getValue(),
                 $newUtxos[$c]->getOutput()->getScript()->getBinary(),
-            ], 3600);
+            ], 1 * 60 * 30);
         }
 
         echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
