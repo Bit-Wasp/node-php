@@ -1063,6 +1063,82 @@ WHERE tip.header_id = (
     }
 
     /**
+     * @param OutPointSerializer $serializer
+     * @param array $deleteOutPoints
+     * @param array $newUtxos
+     * @param array $specificDeletes
+     */
+    public function updateUtxoView(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    {
+        $deleteUtxos = false;
+        if (!$deleteUtxos && count($deleteOutPoints) > 0) {
+            $deleteUtxos = true;
+        }
+
+        //if (true === $deleteUtxos) {
+        //}
+
+        if (count($newUtxos) > 0) {
+            $utxoQuery = [];
+            $utxoValues = [];
+            foreach ($newUtxos as $c => $utxo) {
+                $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+                $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
+                $utxoValues["v$c"] = $utxo->getOutput()->getValue();
+                $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
+            }
+
+            $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+            $insertUtxos->execute($utxoValues);
+        }
+    }
+
+    public function deleteUtxoView()
+    {
+        $delete = $this->dbh->prepare("DROP VIEW  IF EXISTS utxo_view ");
+        $delete->execute();
+    }
+
+    /**
+     * @param OutPointSerializer $outpointSerializer
+     * @param OutPointInterface[] $outpoints
+     * @return \BitWasp\Bitcoin\Utxo\Utxo[]
+     */
+    public function createMiniUtxoView(OutPointSerializer $outpointSerializer, array $outpoints)
+    {
+        $requiredCount = count($outpoints);
+        $t1 = microtime(true);
+
+        $joinList = [];
+        $queryValues = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues[] = $outpointSerializer->serialize($outpoint)->getBinary();
+            $joinList[] = "?";
+        }
+        $this->deleteUtxoView();
+
+        $sql = "create view utxo_view as select * from utxo where hashKey in (".implode(",", $joinList).")";
+        $prepared = $this->dbh->prepare($sql);
+        $prepared->execute($queryValues);
+
+        $select = $this->dbh->prepare("SELECT * FROM utxo_view");
+        $select->execute();
+
+        $outputSet = [];
+        foreach ($select->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
+            $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
+            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+        }
+
+        if (count($outputSet) < $requiredCount) {
+            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
+        }
+
+        echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
+        return $outputSet;
+    }
+
+    /**
      * @param OutPointSerializer $outpointSerializer
      * @param OutPointInterface[] $outpoints
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]

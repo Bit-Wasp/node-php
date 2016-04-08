@@ -297,7 +297,8 @@ class Blocks extends EventEmitter
 
         $state->updateLastBlock($index);
         $this->forks->next($index);
-
+        echo "Finished block\n";
+        
         return $index;
     }
 }

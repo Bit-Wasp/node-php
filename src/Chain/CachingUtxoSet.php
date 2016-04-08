@@ -30,7 +30,7 @@ class CachingUtxoSet
      * @var OutPointSerializer
      */
     private $outpointSerializer;
-
+    private $useCaching = false;
     /**
      * UtxoSet constructor.
      * @param DbInterface $db
@@ -61,21 +61,24 @@ class CachingUtxoSet
             //if (!empty($this->cacheHits)) {
 //                $this->db->appendUtxoViewKeys($this->cacheHits);
 //            }
-
-            $this->db->updateUtxoSet($this->outpointSerializer, $deleteOutPoints, $newUtxos, $this->cacheHits);
+            
+            $this->db->updateUtxoView($this->outpointSerializer, $deleteOutPoints, $newUtxos, []);
+            //$this->db->updateUtxoSet($this->outpointSerializer, $deleteOutPoints, $newUtxos, $this->cacheHits);
 
         });
 
-        foreach ($this->cacheHits as $key) {
-            $this->set->delete($key);
-        }
+        if ($this->useCaching) {
+            foreach ($this->cacheHits as $key) {
+                $this->set->delete($key);
+            }
 
-        foreach ($newUtxos as $c => $utxo) {
-            $new = $this->outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
-            $this->set->save($new, [
-                $newUtxos[$c]->getOutput()-> getValue(),
-                $newUtxos[$c]->getOutput()->getScript()->getBinary(),
-            ], 500000);
+            foreach ($newUtxos as $c => $utxo) {
+                $new = $this->outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
+                $this->set->save($new, [
+                    $newUtxos[$c]->getOutput()-> getValue(),
+                    $newUtxos[$c]->getOutput()->getScript()->getBinary(),
+                ], 500000);
+            }
         }
 
         echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
@@ -96,26 +99,29 @@ class CachingUtxoSet
             $a = 0;
             $b = 0;
             foreach ($requiredOutpoints as $c => $outpoint) {
-                $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
-                if ($this->set->contains($key)) {
-                    list ($value, $scriptPubKey) = $this->set->fetch($key);
-                    $cacheHits[] = $key;
-                    $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
-                    $a++;
-                } else {
-                    $required[] = $outpoint;
-                    $b++;
+                if ($this->useCaching) {
+                    $key = $this->outpointSerializer->serialize($outpoint)->getBinary();
+                    if ($this->set->contains($key)) {
+                        list ($value, $scriptPubKey) = $this->set->fetch($key);
+                        $cacheHits[] = $key;
+                        $utxos[] = new Utxo($outpoint, new TransactionOutput($value, new Script(new Buffer($scriptPubKey))));
+                        $a++;
+                        continue;
+                    }
                 }
+
+                $required[] = $outpoint;
             }
 
             if (empty($required) === false) {
-                $utxos = array_merge($utxos, $this->db->fetchUtxoDbList($this->outpointSerializer, $required));
+                $utxos = array_merge($utxos, $this->db->createMiniUtxoView($this->outpointSerializer, $required));
             }
 
             $this->cacheHits = $cacheHits;
 
             return $utxos;
         } catch (\Exception $e) {
+            echo $e->getMessage() . PHP_EOL . $e->getTraceAsString().PHP_EOL;
             throw new \RuntimeException('Failed to find UTXOS in set');
         }
     }
