@@ -1070,6 +1070,7 @@ WHERE tip.header_id = (
      */
     public function updateUtxoView(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
     {
+        $m1 = microtime(true);
         $deleteUtxos = false;
         if (!$deleteUtxos && count($deleteOutPoints) > 0) {
             $deleteUtxos = true;
@@ -1091,6 +1092,7 @@ WHERE tip.header_id = (
             $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
             $insertUtxos->execute($utxoValues);
         }
+        echo "UpdateUtxoView: " . (microtime(true) - $m1) . " seconds\n";
     }
 
     public function deleteUtxoView()
