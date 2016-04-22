@@ -1127,7 +1127,13 @@ WHERE tip.header_id = (
         //$this->deleteUtxoView();
 
         //$sql = "create view utxo_view as select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
-        $sql = "SELECT * FROM utxo WHERE id in (SELECT id from utxo where hashKey in (". implode(",", $joinList) . "))";
+        $sql = "
+SELECT u.* FROM utxo u WHERE u.id in (
+  SELECT idx.id from utxo idx where idx.hashKey in (". implode(",", $joinList) . ")
+)
+";
+
+        $sql = "SELECT u.* from utxo u JOIN utxo idx on (u.id = idx.id) where idx.hashKey in (".implode(",", $joinList).");";
         //$sql = "select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
         $prepared = $this->dbh->prepare($sql);
         $prepared->execute($queryValues);
