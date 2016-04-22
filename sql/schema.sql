@@ -3,9 +3,9 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Apr 05, 2016 at 09:43 PM
--- Server version: 5.6.28-0ubuntu0.15.10.1
--- PHP Version: 5.6.11-1ubuntu3.1
+-- Generation Time: Apr 22, 2016 at 04:34 PM
+-- Server version: 5.6.30-0ubuntu0.15.10.1
+-- PHP Version: 5.6.11-1ubuntu3.2
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
@@ -39,12 +39,6 @@ CREATE TABLE IF NOT EXISTS `active_fork` (
 
 -- --------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS `outpoints` (
-  `hashKey` varbinary(36) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
-ALTER TABLE `outpoints`
-ADD KEY `hkidx` (`hashKey`);
 --
 -- Table structure for table `blockIndex`
 --
@@ -97,6 +91,16 @@ CREATE TABLE IF NOT EXISTS `iindex` (
   `header_id` int(11) NOT NULL,
   `lft` int(11) NOT NULL,
   `rgt` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `outpoints`
+--
+
+CREATE TABLE IF NOT EXISTS `outpoints` (
+  `hashKey` varbinary(36) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -179,10 +183,16 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 --
 
 CREATE TABLE IF NOT EXISTS `utxo` (
+  `id` int(9) NOT NULL,
   `hashKey` varbinary(36) NOT NULL,
+  `height` int(9) NOT NULL,
   `value` bigint(32) NOT NULL,
   `scriptPubKey` blob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+-- --------------------------------------------------------
 
 --
 -- Indexes for dumped tables
@@ -225,6 +235,12 @@ ADD UNIQUE KEY `header_id` (`header_id`),
 ADD KEY `lft` (`lft`,`rgt`);
 
 --
+-- Indexes for table `outpoints`
+--
+ALTER TABLE `outpoints`
+ADD KEY `o` (`hashKey`);
+
+--
 -- Indexes for table `retarget`
 --
 ALTER TABLE `retarget`
@@ -256,6 +272,7 @@ ADD KEY `parent_tx` (`parent_tx`);
 -- Indexes for table `utxo`
 --
 ALTER TABLE `utxo`
+ADD PRIMARY KEY (`id`),
 ADD KEY `hashKeyIdx` (`hashKey`);
 
 --
@@ -301,6 +318,11 @@ MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
 -- AUTO_INCREMENT for table `transaction_output`
 --
 ALTER TABLE `transaction_output`
+MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
+--
+-- AUTO_INCREMENT for table `utxo`
+--
+ALTER TABLE `utxo`
 MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

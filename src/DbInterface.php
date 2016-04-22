@@ -26,7 +26,7 @@ interface DbInterface
     public function getPdo();
 
     public function createMiniUtxoView(OutPointSerializer $outpointSerializer, array $outpoints);
-    public function updateUtxoView(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = []);
+    public function updateUtxoView(OutPointSerializer $serializer, array $deleteUtxos, array $newUtxos, array $specificDeletes = []);
     public function deleteUtxoView();
     /**
      *

@@ -292,7 +292,7 @@ class Blocks extends EventEmitter
         echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
 
         if ($this->config->getItem('config', 'index_utxos', true)) {
-            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+            $this->utxoSet->applyBlock($blockData->utxoView, $blockData->requiredOutpoints, $blockData->remainingNew);
         }
 
         $state->updateLastBlock($index);

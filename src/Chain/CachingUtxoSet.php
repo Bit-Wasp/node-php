@@ -52,17 +52,23 @@ class CachingUtxoSet
     }
 
     /**
-     * @param OutPointInterface[] $deleteOutPoints
-     * @param Utxo[] $newUtxos
+     * @param UtxoView $view
+     * @param array $deleteOutPoints
+     * @param array $newUtxos
      */
-    public function applyBlock(array $deleteOutPoints, array $newUtxos)
+    public function applyBlock(UtxoView $view, array $deleteOutPoints, array $newUtxos)
     {
-        $this->db->transaction(function () use ($deleteOutPoints, $newUtxos) {
+        $this->db->transaction(function () use ($view, $deleteOutPoints, $newUtxos) {
             //if (!empty($this->cacheHits)) {
 //                $this->db->appendUtxoViewKeys($this->cacheHits);
 //            }
-            
-            $this->db->updateUtxoView($this->outpointSerializer, $deleteOutPoints, $newUtxos, []);
+
+            $deleteUtxos = [];
+            foreach ($deleteOutPoints as $outpoint) {
+                $deleteUtxos[] = $view->fetch($outpoint);
+            }
+
+            $this->db->updateUtxoView($this->outpointSerializer, $deleteUtxos, $newUtxos, []);
             //$this->db->updateUtxoSet($this->outpointSerializer, $deleteOutPoints, $newUtxos, $this->cacheHits);
 
         });

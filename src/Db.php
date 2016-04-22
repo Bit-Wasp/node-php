@@ -1064,20 +1064,27 @@ WHERE tip.header_id = (
 
     /**
      * @param OutPointSerializer $serializer
-     * @param array $deleteOutPoints
+     * @param DbUtxo[] $deleteUtxos
      * @param array $newUtxos
      * @param array $specificDeletes
      */
-    public function updateUtxoView(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoView(OutPointSerializer $serializer, array $deleteUtxos, array $newUtxos, array $specificDeletes = [])
     {
         $m1 = microtime(true);
-        $deleteUtxos = false;
-        if (!$deleteUtxos && count($deleteOutPoints) > 0) {
-            $deleteUtxos = true;
+        $doDelete = false;
+        if (!$doDelete && count($deleteUtxos) > 0) {
+            $doDelete = true;
         }
 
-        //if (true === $deleteUtxos) {
-        //}
+        if (true === $doDelete) {
+            $deleteValues = [];
+            foreach ($deleteUtxos as $utxo) {
+                $deleteValues[] = $utxo->getId();
+            }
+
+            $deleteQuery = $this->dbh->prepare('DELETE FROM utxo WHERE id IN (' . implode(', ', $deleteValues) . ')');
+            $deleteQuery->execute($deleteValues);
+        }
 
         if (count($newUtxos) > 0) {
             $utxoQuery = [];
@@ -1097,7 +1104,7 @@ WHERE tip.header_id = (
 
     public function deleteUtxoView()
     {
-        $delete = $this->dbh->prepare("DROP VIEW  IF EXISTS utxo_view ");
+        $delete = $this->dbh->prepare("DROP VIEW IF EXISTS utxo_view ");
         $delete->execute();
     }
 
@@ -1117,19 +1124,20 @@ WHERE tip.header_id = (
             $queryValues[] = $outpointSerializer->serialize($outpoint)->getBinary();
             $joinList[] = "?";
         }
-        $this->deleteUtxoView();
+        //$this->deleteUtxoView();
 
-        $sql = "create view utxo_view as select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
+        //$sql = "create view utxo_view as select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
+        $sql = "select * from utxo where hashKey in (" . implode(",", $joinList) . ")";
         $prepared = $this->dbh->prepare($sql);
         $prepared->execute($queryValues);
 
-        $select = $this->dbh->prepare("SELECT * FROM utxo_view");
-        $select->execute();
+        //$select = $this->dbh->prepare("SELECT * FROM utxo_view");
+        //$select->execute();
 
         $outputSet = [];
-        foreach ($select->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
+        foreach ($prepared->fetchAll(\PDO::FETCH_ASSOC) as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-            $outputSet[] = new Utxo($outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) < $requiredCount) {

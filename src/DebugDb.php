@@ -38,10 +38,10 @@ class DebugDb implements DbInterface
         return $this->db->deleteUtxoView();
         // TODO: Implement deleteUtxoView() method.
     }
-    public function updateUtxoView(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoView(OutPointSerializer $serializer, array $deleteUtxos, array $newUtxos, array $specificDeletes = [])
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->updateUtxoView($serializer, $deleteOutPoints, $newUtxos, $specificDeletes);
+        return $this->db->updateUtxoView($serializer, $deleteUtxos, $newUtxos, $specificDeletes);
     }
 
     public function getPdo()
