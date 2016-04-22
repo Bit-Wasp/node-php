@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Apr 22, 2016 at 04:34 PM
+-- Generation Time: Apr 22, 2016 at 05:12 PM
 -- Server version: 5.6.30-0ubuntu0.15.10.1
 -- PHP Version: 5.6.11-1ubuntu3.2
 
@@ -192,7 +192,19 @@ CREATE TABLE IF NOT EXISTS `utxo` (
 
 -- --------------------------------------------------------
 
+--
+-- Stand-in structure for view `utxo_view`
+--
+CREATE TABLE IF NOT EXISTS `utxo_view` (
+   `id` int(9)
+  ,`hashKey` varbinary(36)
+  ,`height` int(9)
+  ,`value` bigint(32)
+  ,`scriptPubKey` blob
+);
+
 -- --------------------------------------------------------
+
 
 --
 -- Indexes for dumped tables
@@ -273,7 +285,7 @@ ADD KEY `parent_tx` (`parent_tx`);
 --
 ALTER TABLE `utxo`
 ADD PRIMARY KEY (`id`),
-ADD KEY `hashKeyIdx` (`hashKey`);
+ADD KEY `hashKeyIdx` (`hashKey`,`id`) USING BTREE;
 
 --
 -- AUTO_INCREMENT for dumped tables
