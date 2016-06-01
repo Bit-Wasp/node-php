@@ -25,7 +25,7 @@
     "php": ">=5.4.0",
     "ext-gmp": "*",
     "ext-json": "*",
-    "bitwasp/bitcoin-p2p": "~0.0.13",
+    "bitwasp/bitcoin-p2p": "~0.0.15",
     "bitwasp/thread": "0.0.1",
     "symfony/console": "~2.7",
     "packaged/config": "~1.2",
