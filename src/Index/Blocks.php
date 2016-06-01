@@ -2,6 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
+use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
@@ -21,6 +22,8 @@ use BitWasp\Bitcoin\Node\Serializer\Block\CachingBlockSerializer;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
+use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
 use BitWasp\Bitcoin\Utxo\Utxo;
@@ -106,7 +109,9 @@ class Blocks extends EventEmitter
         try {
             $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
-            $this->db->insertToBlockIndex($index->getHash());
+            $math = Bitcoin::getMath();
+            $bs = new BlockSerializer($math, new BlockHeaderSerializer(), new TransactionSerializer());
+            $this->db->insertBlock($index->getHash(), $genesisBlock, $bs);
         }
     }
 
