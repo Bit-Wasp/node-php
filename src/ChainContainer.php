@@ -100,7 +100,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     private function processSegment(DbInterface $db, ChainSegment $segment)
     {
         $id = $segment->getId();
-        if (isset($this->segmentBlock[$id])) {
+        if (isset($this->segmentBlock[$segment])) {
             throw new \Exception('Already processed this segment');
         }
 
