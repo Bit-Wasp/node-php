@@ -64,8 +64,23 @@ class Db implements DbInterface
     /**
      * @var \PDOStatement
      */
-    private $loadLastBlockStmt;
+    public $newLoadTipStmt;
 
+    /**
+     * @var \PDOStatement
+     */
+    public $loadSegmentHashList;
+
+    /**
+     * @var \PDOStatement
+     */
+    public $loadSegmentAncestor;
+
+    /**
+     * @var \PDOStatement
+     */
+    private $loadLastBlockStmt;
+    private $loadSegmentBestBlockStmt;
     /**
      * @var \PDOStatement
      */
@@ -204,7 +219,6 @@ class Db implements DbInterface
                 FROM transaction_input  txIn
                 JOIN block_transactions  bt ON bt.transaction_hash = txIn.parent_tx
                 WHERE bt.block_hash = :id
-                GROUP BY txIn.parent_tx
                 ORDER BY txIn.nInput
             ');
 
@@ -213,10 +227,13 @@ class Db implements DbInterface
               FROM      transaction_output  txOut
               JOIN      block_transactions  bt ON bt.transaction_hash = txOut.parent_tx
               WHERE     bt.block_hash = :id
-              GROUP BY  txOut.parent_tx
               ORDER BY  txOut.nOutput
             ');
         $this->loadTipStmt = $this->dbh->prepare('SELECT * FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE i.rgt = i.lft + 1 ');
+        $this->newLoadTipStmt = $this->dbh->prepare('SELECT segment, max(id) as id, max(height) as maxh, min(height) as minh from headerIndex group by segment order by segment');
+        $this->loadSegmentHashList = $this->dbh->prepare("SELECT hash, height from headerIndex where segment = :segment");
+        $this->loadSegmentAncestor = $this->dbh->prepare("SELECT c1.segment from headerIndex c1 join headerIndex c2 on (c2.prevBlock = c1.hash) where c2.segment = :thisSegment and c2.height = :thisMin");
+
         $this->loadChainByCoord = $this->dbh->prepare("SELECT h.hash FROM iindex i JOIN headerIndex h ON (h.id = i.header_id) WHERE i.lft <= :lft AND i.rgt >= :rgt");
         $this->fetchChainStmt = $this->dbh->prepare('
                SELECT h.hash
@@ -242,6 +259,34 @@ class Db implements DbInterface
         ');
 
     }
+
+    /**
+     * @param int $segmentId
+     * @return array
+     */
+    public function loadHashesForSegment($segmentId)
+    {
+        $this->loadSegmentHashList->execute(['segment' => $segmentId]);
+        $hashes = $this->loadSegmentHashList->fetchAll(\PDO::FETCH_ASSOC);
+        return $hashes;
+    }
+
+    /**
+     * @param int $segmentId
+     * @param int $segmentStart
+     * @return int
+     */
+    public function loadSegmentAncestor($segmentId, $segmentStart)
+    {
+        $this->loadSegmentAncestor->execute(['thisSegment' => $segmentId, 'thisMin' => $segmentStart]);
+        $ancestorRow = $this->loadSegmentAncestor->fetch(\PDO::FETCH_ASSOC);
+        if ($ancestorRow === false) {
+            throw new \RuntimeException('Ancestor not found');
+        }
+
+        return $ancestorRow['segment'];
+    }
+
 
     public function getPdo()
     {
@@ -331,16 +376,17 @@ class Db implements DbInterface
      */
     public function createIndexGenesis(BlockHeaderInterface $header)
     {
-        $stmtIndex = $this->dbh->prepare('INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
+        //$stmtIndex = $this->dbh->prepare('INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
         $stmtHeader = $this->dbh->prepare('INSERT INTO headerIndex (
-            hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
+            hash, segment, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
           ) VALUES (
-            :hash, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce
+            :hash, :segment, :height, :work, :version, :prevBlock, :merkleRoot, :nBits, :nTimestamp, :nNonce
           )
         ');
 
         if ($stmtHeader->execute(array(
             'hash' => $header->getHash()->getBinary(),
+            'segment' => 0,
             'height' => 0,
             'work' => 0,
             'version' => $header->getVersion(),
@@ -352,28 +398,17 @@ class Db implements DbInterface
         ))
         ) {
 
-            if ($stmtIndex->execute([
-                'headerId' => $this->dbh->lastInsertId(),
-                'lft' => 1,
-                'rgt' => 2
-            ])
-            ) {
+            //if ($stmtIndex->execute([
+            //    'headerId' => $this->dbh->lastInsertId(),
+            //    'lft' => 1,
+             //   'rgt' => 2
+            //])
+            //) {
                 return true;
-            }
+            //}
         }
 
         throw new \RuntimeException('Failed to update insert Genesis block index!');
-    }
-
-    /**
-     * @param BufferInterface $blockHash
-     * @return string
-     */
-    public function insertToBlockIndex(BufferInterface $blockHash)
-    {
-        // Insert the block header ID
-        $this->insertToBlockIndexStmt->execute(['refHash' => $blockHash->getBinary()]);
-        return $this->dbh->lastInsertId();
     }
 
     /**
@@ -431,7 +466,7 @@ class Db implements DbInterface
             $txData["nValueOut$i"] = $valueOut;
             $txData["nFee$i"] = '0';
             $txData["nLockTime$i"] = $tx->getLockTime();
-            $txData["isCoinbase$i"] = $tx->isCoinbase();
+            $txData["isCoinbase$i"] = (int) $tx->isCoinbase();
             $txData["version$i"] = $tx->getVersion();
 
             for ($j = 0; $j < $nIn; $j++) {
@@ -439,7 +474,7 @@ class Db implements DbInterface
                 $inBind[] = " ( :parentId$i , :nInput" . $i . "n" . $j . ", :hashPrevOut" . $i . "n" . $j . ", :nPrevOut" . $i . "n" . $j . ", :scriptSig" . $i . "n" . $j . ", :nSequence" . $i . "n" . $j . " ) ";
                 $outpoint = $input->getOutPoint();
                 $inData["hashPrevOut" . $i . "n" . $j] = $outpoint->getTxId()->getBinary();
-                $inData["nPrevOut" . $i . "n" . $j] = $outpoint->getVout();
+                $inData["nPrevOut" . $i . "n" . $j] = (int) $outpoint->getVout();
                 $inData["scriptSig" . $i . "n" . $j] = $input->getScript()->getBinary();
                 $inData["nSequence" . $i . "n" . $j] = $input->getSequence();
                 $inData["nInput" . $i . "n" . $j] = $j;
@@ -456,6 +491,7 @@ class Db implements DbInterface
         }
 
         $insertTx = $this->dbh->prepare('INSERT INTO transactions  (hash, version, nLockTime, nOut, valueOut, valueFee, isCoinbase ) VALUES ' . implode(', ', $txBind));
+
         $insertTx->execute($txData);
         unset($txBind);
 
@@ -553,51 +589,91 @@ class Db implements DbInterface
     }
 
     /**
+     * @param ChainSegment $history
+     * @return BlockIndexInterface
+     */
+    public function findSegmentBestBlock(array $history)
+    {
+        $queryValues = [];
+        $queryBind = [];
+        foreach ($history as $c => $segment) {
+            $queryValues[] = "h.segment = :seg$c";
+            $queryBind['seg' . $c] = $segment->getId();
+        }
+
+        $tail = implode(" OR ", $queryValues);
+//        $query = "SELECT MAX(b.id) as maxid, h.* FROM blockIndex b JOIN headerIndex h on (b.hash = h.id) WHERE " . $tail . " GROUP BY b.id";
+        $query = "SELECT * from headerIndex where id = (SELECT MAX(b.hash) FROM blockIndex b JOIN headerIndex h on (b.hash = h.id) WHERE " . $tail . " LIMIT 1)";
+        echo "Generated: $query\n";
+        $sql = $this->dbh->prepare($query);
+        $sql->execute($queryBind);
+        $result = $sql->fetch(\PDO::FETCH_ASSOC);
+
+        $index = new BlockIndex(
+            new Buffer($result['hash'], 32),
+            $result['height'],
+            $result['work'],
+            new BlockHeader(
+                $result['version'],
+                new Buffer($result['prevBlock'], 32),
+                new Buffer($result['merkleRoot'], 32),
+                $result['nTimestamp'],
+                Buffer::int($result['nBits'], 4),
+                $result['nNonce']
+            )
+        );
+
+        return $index;
+    }
+
+    /**
      * @param HeadersBatch $batch
      * @return bool
      * @throws \Exception
      */
     public function insertHeaderBatch(HeadersBatch $batch)
     {
-        $fetchParent = $this->fetchLftStmt;
-        $resizeIndex = $this->updateIndicesStmt;
+        //$fetchParent = $this->fetchLftStmt;
+        //$resizeIndex = $this->updateIndicesStmt;
 
-        $fetchParent->bindValue(':prevBlock', $batch->getTip()->getIndex()->getHash()->getBinary());
-        if ($fetchParent->execute()) {
-            foreach ($fetchParent->fetchAll() as $record) {
-                $myLeft = $record['lft'];
-            }
-        }
+        //$fetchParent->bindValue(':prevBlock', $batch->getTip()->getIndex()->getHash()->getBinary());
+        //if ($fetchParent->execute()) {
+//            foreach ($fetchParent->fetchAll() as $record) {
+//                $myLeft = $record['lft'];
+//            }
+//        }
 
-        $fetchParent->closeCursor();
-        if (!isset($myLeft)) {
-            throw new \RuntimeException('Failed to extract header position');
-        }
+//        $fetchParent->closeCursor();
+//        if (!isset($myLeft)) {
+//            throw new \RuntimeException('Failed to extract header position');
+//        }
 
         $index = $batch->getIndices();
-        $totalN = count($index);
-        $nTimesTwo = 2 * $totalN;
-        $leftOffset = $myLeft;
-        $rightOffset = $myLeft + $nTimesTwo;
+        $segment = $batch->getTip()->getSegment()->getId();
+        //$totalN = count($index);
+        //$nTimesTwo = 2 * $totalN;
+        //$leftOffset = $myLeft;
+        //$rightOffset = $myLeft + $nTimesTwo;
 
-        $this->transaction(function () use ($resizeIndex, $nTimesTwo, $myLeft, $index, $leftOffset, $rightOffset) {
-            $resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft]);
-            $resizeIndex->closeCursor();
+        $this->transaction(function () use ($index, $segment) {
+            //$resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft]);
+            //$resizeIndex->closeCursor();
 
             $headerValues = [];
             $headerQuery = [];
 
-            $indexValues = [];
-            $indexQuery = [];
+            //$indexValues = [];
+            //$indexQuery = [];
 
             $c = 0;
             foreach ($index as $i) {
-                $headerQuery[] = "(:hash$c , :height$c , :work$c ,
+                $headerQuery[] = "(:hash$c , :segment$c , :height$c , :work$c ,
                 :version$c , :prevBlock$c , :merkleRoot$c ,
                 :nBits$c , :nTimestamp$c , :nNonce$c  )";
 
                 $headerValues['hash' . $c] = $i->getHash()->getBinary();
                 $headerValues['height' . $c] = $i->getHeight();
+                $headerValues['segment' . $c] = $segment;
                 $headerValues['work' . $c] = $i->getWork();
 
                 $header = $i->getHeader();
@@ -607,15 +683,12 @@ class Db implements DbInterface
                 $headerValues['nBits' . $c] = $header->getBits()->getInt();
                 $headerValues['nTimestamp' . $c] = $header->getTimestamp();
                 $headerValues['nNonce' . $c] = $header->getNonce();
-
-                $indexQuery[] = "(:header_id$c, :lft$c, :rgt$c )";
-                $indexValues['lft' . $c] = $leftOffset + 1 + $c;
-                $indexValues['rgt' . $c] = $rightOffset - $c;
+                
                 $c++;
             }
 
             $insertHeaders = $this->dbh->prepare('
-              INSERT INTO headerIndex  (hash, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+              INSERT INTO headerIndex  (hash, segment, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
               VALUES ' . implode(', ', $headerQuery));
             $insertHeaders->execute($headerValues);
 
@@ -626,11 +699,10 @@ class Db implements DbInterface
                 $indexValues['header_id' . $i] = $rowId;
             }
 
-            $insertIndices = $this->dbh->prepare('INSERT INTO iindex  (header_id, lft, rgt) VALUES ' . implode(', ', $indexQuery));
-            $insertIndices->execute($indexValues);
-
             return true;
         });
+
+        echo "done\n";
     }
 
     /**
@@ -827,35 +899,51 @@ class Db implements DbInterface
         throw new \RuntimeException('Failed to load historic chain?');
     }
 
+    public function buildChain()
+    {
+        $loadTip = $this->newLoadTipStmt;
+        if ($loadTip->execute()) {
+            $states = [];
+            foreach ($loadTip->fetchAll(\PDO::FETCH_ASSOC) as $entry) {
+                $bestHeader = $this->fetchIndexById($entry['id']);
+                $segment = new ChainSegment($entry['segment'], $entry['minh'], $bestHeader);
+
+            }
+        }
+    }
+
+    /**
+     * @return array
+     */
+    public function fetchChainSegments()
+    {
+        $this->newLoadTipStmt->execute();
+        $entries = $this->newLoadTipStmt->fetchAll(\PDO::FETCH_ASSOC);
+        $segments = [];
+
+        foreach ($entries as $entry) {
+            $index = $this->fetchIndexById($entry['id']);
+            $segments[] = new ChainSegment($entry['segment'], $entry['minh'], $index);
+        }
+
+        return $segments;
+    }
+
     /**
      * @param Headers $headers
      * @return ChainStateInterface[]
      */
     public function fetchChainState(Headers $headers)
     {
-        $loadTip = $this->loadTipStmt;
+        //$loadTip = $this->loadTipStmt;
+        $loadTip = $this->newLoadTipStmt;
         $math = Bitcoin::getMath();
 
         if ($loadTip->execute()) {
             $states = [];
             foreach ($loadTip->fetchAll(\PDO::FETCH_ASSOC) as $index) {
-                $bestHeader = new BlockIndex(
-                    new Buffer($index['hash'], 32),
-                    $index['height'],
-                    $index['work'],
-                    new BlockHeader(
-                        $index['version'],
-                        new Buffer($index['prevBlock'], 32),
-                        new Buffer($index['merkleRoot'], 32),
-                        $index['nTimestamp'],
-                        Buffer::int($index['nBits'], 4, $math),
-                        $index['nNonce']
-                    )
-                );
-
-                $this->loadChainByCoord->execute(['lft' => $index['lft'], 'rgt' => $index['rgt']]);
-                $map = $this->loadChainByCoord->fetchAll(\PDO::FETCH_COLUMN);
-
+                $bestHeader = $this->fetchIndexById($index['id']);
+                
                 $this->loadLastBlockByCoord->execute(['lft' => $index['lft'], 'rgt' => $index['rgt']]);
                 $block = $this->loadLastBlockByCoord->fetchAll(\PDO::FETCH_ASSOC);
 

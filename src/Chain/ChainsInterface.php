@@ -2,37 +2,38 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
+use BitWasp\Bitcoin\Math\Math;
+use BitWasp\Bitcoin\Node\ChainSegment;
+use BitWasp\Bitcoin\Node\ChainView;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitterInterface;
 
 interface ChainsInterface extends \Countable, EventEmitterInterface
 {
-    /**
-     * @return ChainStateInterface[]
-     */
-    public function getStates();
 
     /**
-     * @param ChainStateInterface $a
-     * @param ChainStateInterface $b
-     * @return int
+     * @param Math $math
+     * @return ChainView
      */
-    public function compareChainStateWork(ChainStateInterface $a, ChainStateInterface $b);
+    public function best(Math $math);
 
     /**
-     * @return void
+     * @param ChainSegment $segment
+     * @return ChainViewInterface
      */
-    public function checkTips();
+    public function view(ChainSegment $segment);
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainViewInterface $view
+     * @return ChainAccessInterface
      */
-    public function trackState(ChainStateInterface $state);
+    public function access(ChainViewInterface $view);
 
     /**
-     * @return ChainStateInterface
+     * @param ChainSegment $segment
+     * @return GuidedChainView
      */
-    public function best();
+    public function blocks(ChainSegment $segment);
 
     /**
      * @param BufferInterface $hash

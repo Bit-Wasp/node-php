@@ -2,10 +2,13 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
+use BitWasp\Bitcoin\Node\ChainSegment;
+use BitWasp\Bitcoin\Node\ChainView;
+
 class HeadersBatch
 {
     /**
-     * @var ChainStateInterface
+     * @var ChainView
      */
     private $chainState;
 
@@ -16,17 +19,17 @@ class HeadersBatch
 
     /**
      * HeadersBatch constructor.
-     * @param ChainStateInterface $chainState
+     * @param ChainView $chainState
      * @param BlockIndexInterface[] $indices
      */
-    public function __construct(ChainStateInterface $chainState, array $indices)
+    public function __construct(ChainView $chainState, array $indices)
     {
         $this->chainState = $chainState;
         $this->indices = $indices;
     }
 
     /**
-     * @return ChainStateInterface
+     * @return ChainView
      */
     public function getTip()
     {

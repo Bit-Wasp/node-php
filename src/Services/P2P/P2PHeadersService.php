@@ -59,25 +59,28 @@ class P2PHeadersService extends EventEmitter
      */
     public function onHeaders(PeerState $state, Peer $peer, Headers $headersMsg)
     {
-        $chains = $this->node->chains();
         $headers = $this->node->headers();
 
         try {
             $vHeaders = $headersMsg->getHeaders();
+            echo "Processing " . count($vHeaders) . " headers\n";
+            $p1 = microtime(true);
             $batch = $headers->prepareBatch($vHeaders);
+            echo "Preparation: ".(microtime(true) - $p1) . " seconds\n";
             $count = count($batch->getIndices());
 
             if ($count > 0) {
+                $p1 = microtime(true);
                 $headers->applyBatch($batch);
-                $chains->checkTips();
-                $chainState = $batch->getTip();
+                $view = $batch->getTip();
                 $indices = $batch->getIndices();
                 $indexLast = end($indices);
 
-                $state->updateBlockAvailability($chainState, $indexLast->getHash());
-
+                $state->updateBlockAvailability($view, $indexLast->getHash());
+                echo "Application: ".(microtime(true) - $p1) . " seconds\n";
                 if ($count >= 1999) {
-                    $peer->getheaders($chainState->getHeadersLocator());
+                    $peer->getheaders($view->getHeadersLocator());
+                    echo "Send getheaders\n";
                 }
             }
 
@@ -85,6 +88,7 @@ class P2PHeadersService extends EventEmitter
 
             $this->debug->log('p2p.headers', ['ip' => $peer->getRemoteAddress()->getIp(), 'count' => $count]);
         } catch (\Exception $e) {
+            echo "onHeaders: exception\n";
             $this->debug->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }

@@ -4,7 +4,7 @@ namespace BitWasp\Bitcoin\Node\Services\P2P\Request;
 
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Buffertools\BufferInterface;
 
 class BlockRequest
@@ -23,25 +23,25 @@ class BlockRequest
     private $lastRequested;
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainViewInterface $headerChain
      * @param BufferInterface $startHash
      * @throws \RuntimeException
      * @throws \Exception
      * @return Inventory[]
      */
-    private function relativeNextInventory(ChainStateInterface $state, BufferInterface $startHash)
+    private function relativeNextInventory(ChainViewInterface $headerChain, BufferInterface $startHash)
     {
-        if (!$state->containsHash($startHash)) {
+        if (!$headerChain->containsHash($startHash)) {
             throw new \RuntimeException('Hash not found in this chain');
         }
 
-        $startHeight = $state->getHeightFromHash($startHash) + 1;
-        $stopHeight = min($startHeight + self::DOWNLOAD_AMOUNT, $state->getIndex()->getHeight());
+        $startHeight = $headerChain->getHeightFromHash($startHash) + 1;
+        $stopHeight = min($startHeight + self::DOWNLOAD_AMOUNT, $headerChain->getIndex()->getHeight());
         $nInFlight = count($this->inFlight);
 
         $request = [];
         for ($i = $startHeight; $i < $stopHeight && $nInFlight < self::MAX_IN_FLIGHT; $i++) {
-            $request[] = Inventory::block($state->getHashFromHeight($i));
+            $request[] = Inventory::block($headerChain->getHashFromHeight($i));
             $nInFlight++;
         }
 
@@ -49,28 +49,26 @@ class BlockRequest
     }
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainViewInterface $state
      * @return Inventory[]
      * @throws \RuntimeException
      * @throws \Exception
      */
-    public function nextInventory(ChainStateInterface $state)
+    public function nextInventory(ChainViewInterface $state)
     {
         return $this->relativeNextInventory($state, $state->getLastBlock()->getHash());
     }
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainViewInterface $headerChain
      * @param Peer $peer
-     * @throws \RuntimeException
-     * @throws \Exception
      */
-    public function requestNextBlocks(ChainStateInterface $state, Peer $peer)
+    public function requestNextBlocks(ChainViewInterface $headerChain, Peer $peer)
     {
         if (null === $this->lastRequested) {
-            $nextData = $this->nextInventory($state);
+            $nextData = $this->nextInventory($headerChain);
         } else {
-            $nextData = $this->relativeNextInventory($state, $this->lastRequested);
+            $nextData = $this->relativeNextInventory($headerChain, $this->lastRequested);
         }
 
         if (count($nextData) > 0) {

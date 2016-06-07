@@ -10,10 +10,9 @@ use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
+use BitWasp\Bitcoin\Node\ChainContainer;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Node\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
@@ -30,12 +29,12 @@ class Headers extends EventEmitter
     private $consensus;
 
     /**
-     * @var Db
+     * @var DbInterface
      */
     private $db;
 
     /**
-     * @var ChainsInterface
+     * @var ChainContainer
      */
     private $chains;
 
@@ -135,7 +134,7 @@ class Headers extends EventEmitter
     {
         $countHeaders = count($headers);
         if (0 === $countHeaders) {
-            return new HeadersBatch($this->chains->best(), []);
+            return new HeadersBatch($this->chains->best($this->math), []);
         }
 
         $bestPrev = null;
@@ -157,14 +156,15 @@ class Headers extends EventEmitter
             throw new \RuntimeException('Headers::accept(): Unknown start header');
         }
 
-        $chainState = $this->chains->isTip($bestPrev);
-        if ($chainState === false) {
-            $chainState = $this->db->fetchHistoricChain($this, $bestPrev);
-            $this->chains->trackState($chainState);
+        $view = $this->chains->isTip($bestPrev);
+        if ($view === false) {
+            // TODO: forks
+            //$segment = $this->db->fetchHistoricChain($this, $bestPrev);
+            //$this->chains->trackState($segment);
         }
 
-        /* @var ChainStateInterface $chainState */
-        $prevIndex = $chainState->getIndex();
+        $prevIndex = $view->getIndex();
+        $access = $this->chains->access($view);
 
         $batch = [];
         if ($firstUnknown !== null) {
@@ -189,14 +189,14 @@ class Headers extends EventEmitter
                 );
 
                 $forks->next($index);
-                $this->headerCheck->checkContextual($chainState, $index, $prevIndex, $forks);
+                $this->headerCheck->checkContextual($access, $index, $prevIndex, $forks);
 
                 $batch[] = $index;
                 $prevIndex = $index;
             }
         }
 
-        return new HeadersBatch($chainState, $batch);
+        return new HeadersBatch($view, $batch);
     }
 
     /**

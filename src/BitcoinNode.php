@@ -49,7 +49,8 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $math = Bitcoin::getMath();
         $adapter = Bitcoin::getEcAdapter($math);
 
-        $this->chains = new Chains($adapter, $params);
+
+        $this->chains = new ChainContainer($params);
         $consensus = new Consensus($math, $params);
 
         $pow = new ProofOfWork($math, $params);
@@ -62,12 +63,12 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $this->blocks->init($genesis);
 
         $this->db = $db;
-        $states = $this->db->fetchChainState($this->headers);
-        foreach ($states as $state) {
-            $this->chains->trackState($state);
+        $segments = $this->db->fetchChainSegments();
+        foreach ($segments as $segment) {
+            $this->chains->addSegment($segment);
         }
 
-        $this->chains->checkTips();
+        $this->chains->initialize($this->db);
     }
 
     /**
@@ -103,11 +104,11 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     }
 
     /**
-     * @return ChainStateInterface
+     * @return ChainView
      */
     public function chain()
     {
-        return $this->chains->best();
+        return $this->chains->best(Bitcoin::getMath());
     }
 
     /**
@@ -117,5 +118,4 @@ class BitcoinNode extends EventEmitter implements NodeInterface
     {
         return $this->chains;
     }
-
 }

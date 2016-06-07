@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS `block_transactions` (
 
 CREATE TABLE IF NOT EXISTS `headerIndex` (
   `id` int(9) NOT NULL,
+  `segment` int(9) NOT NULL,
   `hash` varbinary(32) NOT NULL,
   `height` bigint(20) NOT NULL,
   `work` varchar(64) NOT NULL,
@@ -132,13 +133,12 @@ CREATE TABLE IF NOT EXISTS `retarget` (
 CREATE TABLE IF NOT EXISTS `transactions` (
   `id` int(9) NOT NULL,
   `hash` varbinary(32) NOT NULL,
-  `transaction` text NOT NULL,
   `nOut` int(9) NOT NULL,
   `valueOut` bigint(32) NOT NULL,
   `valueFee` bigint(32) NOT NULL,
   `version` int(11) NOT NULL,
   `nLockTime` int(11) NOT NULL,
-  `isCoinbase` tinyint(1) NOT NULL DEFAULT '0'
+  `isCoinbase` boolean DEFAULT false
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `transactions` (
 CREATE TABLE IF NOT EXISTS `transaction_input` (
   `id` bigint(20) NOT NULL,
   `hashPrevOut` varbinary(32) NOT NULL,
-  `nPrevOut` int(32) NOT NULL,
+  `nPrevOut` bigint(32) NOT NULL,
   `scriptSig` blob NOT NULL,
   `nSequence` bigint(19) NOT NULL,
   `parent_tx` int(15) NOT NULL,

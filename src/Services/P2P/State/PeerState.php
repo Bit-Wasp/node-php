@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Services\P2P\State;
 
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Buffertools\BufferInterface;
 
 class PeerState extends AbstractState
@@ -95,12 +95,12 @@ class PeerState extends AbstractState
     }
 
     /**
-     * @param ChainStateInterface $state
+     * @param ChainViewInterface $view
      * @param BufferInterface $hash
      */
-    public function updateBlockAvailability(ChainStateInterface $state, BufferInterface $hash)
+    public function updateBlockAvailability(ChainViewInterface $view, BufferInterface $hash)
     {
-        if ($state->containsHash($hash)) {
+        if ($view->containsHash($hash)) {
             $this->save(self::INDEXBESTKNOWNBLOCK, $hash);
         } else {
             $this->save(self::HASHLASTUNKNOWNBLOCK, $hash);

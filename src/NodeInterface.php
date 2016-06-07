@@ -26,7 +26,7 @@ interface NodeInterface extends EventEmitterInterface
     public function transactions();
 
     /**
-     * @return ChainStateInterface
+     * @return ChainView
      */
     public function chain();
 

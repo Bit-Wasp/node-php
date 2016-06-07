@@ -109,9 +109,8 @@ class Blocks extends EventEmitter
         try {
             $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
-            $math = Bitcoin::getMath();
-            $bs = new BlockSerializer($math, new BlockHeaderSerializer(), new TransactionSerializer());
-            $this->db->insertBlock($index->getHash(), $genesisBlock, $bs);
+            echo $e->getMessage().PHP_EOL;
+            $this->db->insertBlock($index->getHash(), $genesisBlock, new BlockSerializer(Bitcoin::getMath(), new BlockHeaderSerializer(), new TransactionSerializer()));
         }
     }
 
@@ -226,8 +225,9 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
-        $state = $this->chains->best();
-
+        $chainView = $this->chains->best($this->math);
+        $blocksView = $this->chains->blocks($chainView->getSegment());
+        echo "Try to fill ".$blocksView->getIndex()->getHeight().PHP_EOL;
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader());
 
@@ -240,15 +240,15 @@ class Blocks extends EventEmitter
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
-            ->checkContextual($block, $state->getLastBlock());
+            ->checkContextual($block, $chainView->getLastBlock());
 
-        $view = $blockData->utxoView;
+        $utxoView = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
             $forks = $this->forks;
         } else {
             $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
-            $forks = $this->forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+            $forks = $this->forks = new Forks($this->consensus->getParams(), $chainView->getLastBlock(), $versionInfo);
         }
 
         $flags = $forks->getFlags();
@@ -266,16 +266,16 @@ class Blocks extends EventEmitter
 
             if (!$tx->isCoinbase()) {
                 if ($flags & InterpreterInterface::VERIFY_P2SH) {
-                    $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
+                    $nSigOps = $this->blockCheck->getP2shSigOps($utxoView, $tx);
                     if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');
                     }
                 }
 
-                $fee = $this->math->sub($view->getValueIn($this->math, $tx), $tx->getValueOut());
+                $fee = $this->math->sub($utxoView->getValueIn($this->math, $tx), $tx->getValueOut());
                 $nFees = $this->math->add($nFees, $fee);
 
-                $this->blockCheck->checkInputs($view, $tx, $index->getHeight(), $flags, $scriptCheckState);
+                $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);
             }
         }
 
@@ -287,7 +287,7 @@ class Blocks extends EventEmitter
         echo "Validation: " . (microtime(true) - $v) . " seconds\n";
 
         $m = microtime(true);
-        $this->db->transaction(function () use ($hash, $state, $block, $blockData, $blockSerializer) {
+        $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
 
             if ($this->config->getItem('config', 'index_transactions', true)) {
@@ -300,7 +300,7 @@ class Blocks extends EventEmitter
             $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
         }
 
-        $state->updateLastBlock($index);
+        $blocksView->updateTip($index);
         $this->forks->next($index);
 
         return $index;

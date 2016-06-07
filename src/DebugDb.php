@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Chain\BlockLocator;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
 use BitWasp\Bitcoin\Node\Index\Headers;
@@ -32,6 +33,16 @@ class DebugDb implements DbInterface
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->getPdo();
+    }
+
+    /**
+     * @param ChainSegment $history
+     * @return BlockIndexInterface
+     */
+    public function findSegmentBestBlock(array $history)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->findSegmentBestBlock($history);
     }
 
     public function appendUtxoViewKeys(array $cacheHits)
@@ -79,6 +90,24 @@ class DebugDb implements DbInterface
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->reset();
+    }
+
+    public function fetchChainSegments()
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->fetchChainSegments();
+    }
+
+    public function loadHashesForSegment($segmentId)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->loadHashesForSegment($segmentId);
+    }
+
+    public function loadSegmentAncestor($segment, $segmentStart)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->loadSegmentAncestor($segment, $segmentStart);
     }
 
     public function createIndexGenesis(BlockHeaderInterface $header)
@@ -139,12 +168,6 @@ class DebugDb implements DbInterface
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->fetchChainState($headers);
-    }
-
-    public function insertToBlockIndex(BufferInterface $index)
-    {
-        echo __FUNCTION__ . PHP_EOL;
-        return $this->db->insertToBlockIndex($index);
     }
 
     public function insertBlockTransactions($blockId, BlockInterface $block, HashStorage $hashStorage)

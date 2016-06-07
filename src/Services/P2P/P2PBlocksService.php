@@ -2,6 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Services\P2P;
 
+use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
@@ -64,6 +65,7 @@ class P2PBlocksService extends EventEmitter
     public function onHeaders(PeerState $state, Peer $peer, HeadersBatch $batch)
     {
         if (count($batch->getIndices()) < 2000) {
+            echo "start downloading blocks\n";
             $this->blockDownload->start($batch->getTip(), $peer);
         }
     }
@@ -75,8 +77,10 @@ class P2PBlocksService extends EventEmitter
      */
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
-        $best = $this->node->chain();
-        $blockView = $best->bestBlocksCache();
+        echo "Got inv!\n";
+        $chains = $this->node->chains();
+        $best = $chains->best(Bitcoin::getMath());
+        $blockView = $chains->blocks($best->getSegment());
         $this->blockDownload->advertised($best, $blockView, $peer, $vInv);
     }
 
@@ -87,12 +91,12 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
+        echo "Starting block\n";
         $t1 = microtime(true);
         $node = $this->node;
         $best = $node->chain();
         $block = $blockMsg->getBlock();
 
-        $chainsIdx = $node->chains();
         $headerIdx = $node->headers();
         $blockIndex = $node->blocks();
 
@@ -103,7 +107,7 @@ class P2PBlocksService extends EventEmitter
         try {
             $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
 
-            $chainsIdx->checkTips();
+            //$chainsIdx->checkTips();
             $this->blockDownload->received($best, $peer, $index->getHash());
 
             $txcount = count($block->getTransactions());

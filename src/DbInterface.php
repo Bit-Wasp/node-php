@@ -46,6 +46,25 @@ interface DbInterface
     public function reset();
 
     /**
+     * @param array $history
+     * @return BlockIndexInterface
+     */
+    public function findSegmentBestBlock(array $history);
+    
+    /**
+     * @param int $segmentId
+     * @return array
+     */
+    public function loadHashesForSegment($segmentId);
+
+    /**
+     * @param int $segment
+     * @param int $segmentStart
+     * @return int
+     */
+    public function loadSegmentAncestor($segment, $segmentStart);
+
+    /**
      * Creates the Genesis block index
      * @param BlockHeaderInterface $header
      * @return bool
@@ -109,18 +128,14 @@ interface DbInterface
      * @return ChainStateInterface
      */
     public function fetchHistoricChain(Headers $headers, BufferInterface $hash);
+    
+    public function fetchChainSegments();
 
     /**
      * @param Headers $headers
      * @return ChainStateInterface[]
      */
     public function fetchChainState(Headers $headers);
-
-    /**
-     * @param BufferInterface $index
-     * @return int
-     */
-    public function insertToBlockIndex(BufferInterface $index);
 
     /**
      * @param int $blockId
