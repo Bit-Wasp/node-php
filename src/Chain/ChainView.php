@@ -31,6 +31,11 @@ class ChainView extends EventEmitter implements ChainViewInterface
     private $segments;
 
     /**
+     * @var array
+     */
+    private $heightMap = [];
+
+    /**
      * ChainView constructor.
      * @param ChainContainer $container
      * @param ChainSegment $segment
@@ -42,6 +47,10 @@ class ChainView extends EventEmitter implements ChainViewInterface
         $this->segments = $this->container->getHistory($segment);
         $this->segment = $segment;
         $this->block = $block;
+        foreach ($this->segments as $segment) {
+            $heights = $container->getHeights($segment);
+            $this->heightMap = array_merge($this->heightMap, $heights);
+        }
     }
 
     /**
@@ -100,12 +109,8 @@ class ChainView extends EventEmitter implements ChainViewInterface
      */
     public function getHashFromHeight($height)
     {
-        foreach ($this->segments as $segment) {
-            if ($height >= $segment->getStart() && $height <= $segment->getLast()->getHeight()) {
-                $hashes = $this->container->getHashes($segment);
-                $heightMap = array_flip($hashes);
-                return new Buffer($heightMap[$height], 32);
-            }
+        if (isset($this->heightMap[$height])) {
+            return new Buffer($this->heightMap[$height], 32);
         }
 
         throw new \RuntimeException('Height not found');

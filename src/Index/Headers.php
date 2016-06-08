@@ -11,6 +11,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainContainer;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
@@ -114,8 +115,12 @@ class Headers extends EventEmitter
      */
     public function accept(BufferInterface $hash, BlockHeaderInterface $header)
     {
+        $isTip = $this->chains->isTip($hash);
+        if ($isTip instanceof ChainViewInterface) {
+            return $isTip->getIndex();
+        }
+
         if ($this->chains->isKnownHeader($hash)) {
-            // todo: check for rejected block
             return $this->db->fetchIndex($hash);
         }
 

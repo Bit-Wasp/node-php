@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `active_fork` (
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS `outpoints` (
+  `id` int(11) default 0,
   `hashKey` varbinary(36) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

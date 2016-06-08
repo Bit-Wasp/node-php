@@ -230,10 +230,10 @@ class DebugDb implements DbInterface
      * @param array $newUtxos
      * @param array $specificDeletes
      */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos)
     {
         echo __FUNCTION__ . PHP_EOL;
-        $this->db->updateUtxoSet($serializer, $deleteOutPoints, $newUtxos, $specificDeletes);
+        $this->db->updateUtxoSet($serializer, $deleteOutPoints, $newUtxos);
     }
 
     /**

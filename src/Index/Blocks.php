@@ -220,10 +220,12 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
+        $u = microtime(True);
         $chainView = $this->chains->best($this->math);
         $blocksView = $this->chains->blocks($chainView->getSegment());
         echo "Try to fill ".$blocksView->getIndex()->getHeight().PHP_EOL;
         $hash = $block->getHeader()->getHash();
+        $v = microtime(true);
         $index = $headers->accept($hash, $block->getHeader());
 
         $txSerializer = new CachingTransactionSerializer();
@@ -231,7 +233,6 @@ class Blocks extends EventEmitter
 
         $blockData = $this->prepareBatch($block, $txSerializer);
 
-        $v = microtime(true);
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
@@ -251,7 +252,6 @@ class Blocks extends EventEmitter
 
         $nFees = 0;
         $nSigOps = 0;
-
         foreach ($block->getTransactions() as $tx) {
             $nSigOps += $this->blockCheck->getLegacySigOps($tx);
 
@@ -279,22 +279,24 @@ class Blocks extends EventEmitter
         }
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
-        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
 
         $m = microtime(true);
         $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
-            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
 
             if ($this->config->getItem('config', 'index_transactions', false)) {
                 $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }
         });
+
         echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
+        $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+
 
         $blocksView->updateTip($index);
         $this->forks->next($index);
-
+        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
+        echo "Wrapup: ".(microtime(true)-$u) . " seconds\n";
         return $index;
     }
 }

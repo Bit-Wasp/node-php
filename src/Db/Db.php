@@ -182,7 +182,7 @@ class Db implements DbInterface
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->truncateOutpointsStmt = $this->dbh->prepare('TRUNCATE outpoints');
-        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM outpoints o join utxo u on (o.hashKey = u.hashKey)");
+        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM outpoi o join utxo u on (o.id = u.id)");
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
         $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt FROM headerIndex h, iindex i WHERE h.hash = :hash AND i.header_id = h.id');
@@ -194,7 +194,8 @@ class Db implements DbInterface
             ');
         $this->deleteUtxoStmt = $this->dbh->prepare('DELETE FROM utxo WHERE hashKey = ?');
         $this->deleteUtxoByIdStmt = $this->dbh->prepare('DELETE FROM utxo WHERE id = :id');
-        $this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM outpoints o join utxo u on (o.hashKey = u.hashKey)');
+        //$this->deleteUtxosInView = $this->dbh->prepare('DELETE u FROM outpoints o join utxo u on (o.hashKey = u.hashKey)');
+        $this->deleteUtxosInView = $this->dbh->prepare('DELETE FROM outpoi WHERE 1');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
         $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
@@ -538,50 +539,45 @@ class Db implements DbInterface
     }
 
     /**
+     * @param array $utxos
+     */
+    private function insertUtxosToTable(OutPointSerializer $serializer, array $utxos)
+    {
+        $utxoQuery = [];
+        $utxoValues = [];
+        foreach ($utxos as $c => $utxo) {
+            $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+            $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
+            $utxoValues["v$c"] = $utxo->getOutput()->getValue();
+            $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
+        }
+
+        $insertUtxos = $this->dbh->prepare('INSERT INTO outpoi (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+        $insertUtxos->execute($utxoValues);
+    }
+
+    private function deleteUtxosInView()
+    {
+        $this->deleteUtxosInView->execute();
+    }
+
+    /**
      * @param OutPointSerializer $serializer
      * @param array $deleteOutPoints
      * @param array $newUtxos
-     * @param array $specificDeletes
      */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = [])
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos)
     {
-        $deleteUtxos = false;
-        $useAppendList = false;
-        if (true === $useAppendList) {
-            if (false === empty($specificDeletes)) {
-                $deleteUtxos = true;
-                $this->appendUtxoViewKeys($specificDeletes);
-            }
+        if (!empty($deleteOutPoints)) {
+            $d1 = microtime(true);
+            $this->deleteUtxosInView();
+            echo "Deletion: ".(microtime(true) - $d1) . "\n";
         }
 
-        if (!$deleteUtxos && count($deleteOutPoints) > 0) {
-            $deleteUtxos = true;
-        }
-
-        if (true === $deleteUtxos) {
-            $this->deleteUtxosInView->execute();
-        }
-
-        if (false === $useAppendList) {
-            if (count($specificDeletes) > 0) {
-                foreach ($specificDeletes as $delete) {
-                    $this->deleteUtxoStmt->execute([$delete]);
-                }
-            }
-        }
-
-        if (count($newUtxos) > 0) {
-            $utxoQuery = [];
-            $utxoValues = [];
-            foreach ($newUtxos as $c => $utxo) {
-                $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
-                $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
-                $utxoValues["v$c"] = $utxo->getOutput()->getValue();
-                $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
-            }
-
-            $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
-            $insertUtxos->execute($utxoValues);
+        if (!empty($newUtxos)) {
+            $d1 = microtime(true);
+            $this->insertUtxosToTable($serializer, $newUtxos);
+            echo "Insertion: ".(microtime(true) - $d1) . "\n";
         }
     }
 
@@ -987,6 +983,25 @@ WHERE tip.header_id = (
         return "INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList);
     }
 
+    private function createUtxoOutpointView(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
+    {
+        $joinList = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $queryValues['hk' . $i] = $serializer->serialize($outpoint)->getBinary();
+            $joinList[] = ":hk$i";
+        }
+
+        return "CREATE or REPLACE VIEW outpoi AS 
+            SELECT id, hashKey, value, scriptPubKey from utxo
+            WHERE hashKey in (".implode(",", $joinList).")";
+
+    }
+
+    private function fetchUtxosFromView()
+    {
+        return "SELECT * FROM outpoi";
+    }
+
     /**
      * @param OutPointSerializer $outpointSerializer
      * @param OutPointInterface[] $outpoints
@@ -999,17 +1014,16 @@ WHERE tip.header_id = (
             return [];
         }
 
-        $this->truncateOutpointsStmt->execute();
-
         $t1 = microtime(true);
 
         $iv = [];
-        $i = $this->dbh->prepare($this->createInsertJoinSql($outpointSerializer, $outpoints, $iv));
+        $i = $this->dbh->prepare($this->createUtxoOutpointView($outpointSerializer, $outpoints, $iv));
         $i->execute($iv);
-
+        echo "CreateView: " . (microtime(true) - $t1)  ." seconds\n";
+        $b = microtime(true);
         $this->selectUtxosByOutpointsStmt->execute();
         $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
-
+        echo "SelectView: " . (microtime(true) - $b)  ." seconds\n";
         $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));

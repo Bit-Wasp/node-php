@@ -77,7 +77,6 @@ class P2PBlocksService extends EventEmitter
      */
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
-        echo "Got inv!\n";
         $chains = $this->node->chains();
         $best = $chains->best(Bitcoin::getMath());
         $blockView = $chains->blocks($best->getSegment());
@@ -92,30 +91,35 @@ class P2PBlocksService extends EventEmitter
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
         echo "Starting block\n";
-        $t1 = microtime(true);
+        
         $node = $this->node;
+        $s1 = microtime(true);
         $best = $node->chain();
+        echo "first stick: " . (microtime(true) - $s1) . "\n";
         $block = $blockMsg->getBlock();
-
+        $s2 = microtime(true);
         $headerIdx = $node->headers();
         $blockIndex = $node->blocks();
-
+        echo "second stick: " . (microtime(true) - $s2) . "\n";
         $checkSignatures = (bool)$this->config->getItem('config', 'check_signatures', true);
         $checkSize = (bool)$this->config->getItem('config', 'check_block_size', true);
         $checkMerkleRoot = (bool)$this->config->getItem('config', 'check_merkle_root', true);
 
         try {
+            $t1 = microtime(true);
             $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
+            echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
 
             //$chainsIdx->checkTips();
-            $this->blockDownload->received($best, $peer, $index->getHash());
 
+            $dl = microtime(true);
+            $this->blockDownload->received($best, $peer, $index->getHash());
+            echo "Updating downloader: " . (microtime(True) - $dl) .PHP_EOL;
             $txcount = count($block->getTransactions());
             $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
                 return $r + count($v->getInputs());
             }, 0);
             $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'nTx' => $txcount, 'nSig' => $nSig]]);
-            echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
         } catch (\Exception $e) {
             $header = $block->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);

@@ -34,7 +34,7 @@ class BlockRequest
         if (!$headerChain->containsHash($startHash)) {
             throw new \RuntimeException('Hash not found in this chain');
         }
-
+        
         $startHeight = $headerChain->getHeightFromHash($startHash) + 1;
         $stopHeight = min($startHeight + self::DOWNLOAD_AMOUNT, $headerChain->getIndex()->getHeight());
         $nInFlight = count($this->inFlight);

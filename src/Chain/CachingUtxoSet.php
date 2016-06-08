@@ -118,6 +118,7 @@ class CachingUtxoSet
 
             return $utxos;
         } catch (\Exception $e) {
+            echo $e->getMessage().PHP_EOL;
             throw new \RuntimeException('Failed to find UTXOS in set');
         }
     }

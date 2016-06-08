@@ -127,7 +127,7 @@ interface DbInterface
      * @param array $specificDeletes
      * @return void
      */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos, array $specificDeletes = []);
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos);
 
     /**
      * @param HeadersBatch $batch

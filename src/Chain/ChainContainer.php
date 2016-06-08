@@ -35,6 +35,13 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     private $hashStorage = [];
 
     /**
+     * Map of height => hash ..
+     *
+     * @var array
+     */
+    private $heightStorage = [];
+
+    /**
      * Map of thisSeg => prevSeg
      *
      * @var array
@@ -108,6 +115,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         $this->hashStorage[$id] = [];
         foreach ($hashes as $row) {
             $this->hashStorage[$id][$row['hash']] = $row['height'];
+            $this->heightStorage[$id][$row['height']] = $row['hash'];
         }
 
         if ($segment->getStart() != 0) {
@@ -138,6 +146,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     {
         $segment->next($index);
         $this->hashStorage[$segment->getId()][$index->getHash()->getBinary()] = $index->getHeight();
+        $this->heightStorage[$segment->getId()][$index->getHeight()] = $index->getHash()->getBinary();
     }
 
     /**
@@ -192,6 +201,15 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     public function getHashes(ChainSegment $segment)
     {
         return $this->hashStorage[$segment->getId()];
+    }
+
+    /**
+     * @param ChainSegment $segment
+     * @return ChainSegment[]
+     */
+    public function getHeights(ChainSegment $segment)
+    {
+        return $this->heightStorage[$segment->getId()];
     }
 
     /**
