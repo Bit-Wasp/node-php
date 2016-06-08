@@ -9,7 +9,6 @@ use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
@@ -199,16 +198,14 @@ class Blocks extends EventEmitter
 
         try {
             echo "Utxoset - fetch view\n";
-            $utxoSet = $this->fetchUtxoSet();
-            $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
+            $remaining = $this->fetchUtxoSet()->fetchView($blockData->requiredOutpoints);
+            $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
+            return $blockData;
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
             echo $e->getTraceAsString().PHP_EOL;
             die();
         }
-
-        $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
-        return $blockData;
     }
 
     /**
