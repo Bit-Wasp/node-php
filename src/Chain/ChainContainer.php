@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 
+use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
@@ -11,10 +12,16 @@ use Evenement\EventEmitter;
 
 class ChainContainer extends EventEmitter implements ChainsInterface
 {
+
     /**
      * @var DbInterface
      */
     private $db;
+
+    /**
+     * @var Math
+     */
+    private $math;
 
     /**
      * Map of segId => (segment)
@@ -59,12 +66,19 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     private $genesis;
 
     /**
+     * @var ChainSegment
+     */
+    private $best;
+
+    /**
      * ChainContainer constructor.
+     * @param Math $math
      * @param ParamsInterface $params
      * @param array $segments
      */
-    public function __construct(ParamsInterface $params, array $segments = [])
+    public function __construct(Math $math, ParamsInterface $params, array $segments = [])
     {
+        $this->math = $math;
         $this->params = $params;
         $this->segmentBlock = new \SplObjectStorage();
         foreach ($segments as $segment) {
@@ -92,6 +106,8 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         foreach ($this->segments as $segment) {
             $this->processSegment($db, $segment);
         }
+
+        $this->updateGreatestWork();
     }
 
     /**
@@ -144,9 +160,29 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     public function updateSegment(ChainSegment $segment, BlockIndexInterface $index)
     {
+        $prevBits = $segment->getLast()->getHeader()->getBits();
         $segment->next($index);
         $this->hashStorage[$segment->getId()][$index->getHash()->getBinary()] = $index->getHeight();
         $this->heightStorage[$segment->getId()][$index->getHeight()] = $index->getHash()->getBinary();
+        $math = $this->math;
+        if ($math->cmp($math->mod($index->getHeight(), $this->params->powRetargetInterval()), 0) === 0) {
+            $this->emit('retarget', [$segment, $prevBits, $index]);
+        }
+
+        $this->updateGreatestWork();
+    }
+
+    private function updateGreatestWork()
+    {
+        $segments = $this->segments;
+        if (count($this->segments) > 1) {
+            usort($segments, new ChainWorkComparator(Bitcoin::getMath()));
+        }
+
+        $best = end($segments);
+        if (is_null($this->best) || ($this->best instanceof ChainSegment && $this->best->getLast() !== $best->getLast())) {
+            $this->best = $best;
+        }
     }
 
     /**
@@ -248,18 +284,11 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     }
 
     /**
-     * @param Math $math
      * @return ChainView
      */
-    public function best(Math $math)
+    public function best()
     {
-        $segments = $this->segments;
-        if (count($this->segments) > 1) {
-            usort($segments, new ChainWorkComparator($math));
-        }
-
-        $best = end($segments);
-        return $this->view($best);
+        return $this->view($this->best);
     }
 
     /**

@@ -52,7 +52,7 @@ class BitcoinNode extends EventEmitter implements NodeInterface
         $math = Bitcoin::getMath();
         $adapter = Bitcoin::getEcAdapter($math);
 
-        $this->chains = new ChainContainer($params);
+        $this->chains = new ChainContainer($math, $params);
         $consensus = new Consensus($math, $params);
 
         $pow = new ProofOfWork($math, $params);

@@ -223,7 +223,7 @@ class Headers extends EventEmitter
             $tip->updateTip($index);
         }
 
-        $this->emit('headers', [$batch]);
+        $this->emit('tip', [$batch]);
 
         return $this;
     }

@@ -78,7 +78,7 @@ class P2PBlocksService extends EventEmitter
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
         $chains = $this->node->chains();
-        $best = $chains->best(Bitcoin::getMath());
+        $best = $chains->best();
         $blockView = $chains->blocks($best->getSegment());
         $this->blockDownload->advertised($best, $blockView, $peer, $vInv);
     }

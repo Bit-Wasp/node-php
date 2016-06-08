@@ -16,7 +16,7 @@ class InfoCommand extends Command
     {
         $chains = $node->chains();
         $nChain = count($chains);
-        $best = $chains->best(Bitcoin::getMath());
+        $best = $chains->best();
 
         return [
             'best_header' => $this->convertIndexToArray($best->getIndex()),

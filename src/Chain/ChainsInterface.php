@@ -10,10 +10,9 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
 {
 
     /**
-     * @param Math $math
      * @return ChainView
      */
-    public function best(Math $math);
+    public function best();
 
     /**
      * @param ChainSegment $segment

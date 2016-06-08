@@ -2,8 +2,11 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Debug;
 
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
+use BitWasp\Buffertools\BufferInterface;
 use React\ZMQ\Context;
 use React\ZMQ\SocketWrapper;
 
@@ -24,18 +27,24 @@ class ZmqDebug implements DebugInterface
         $this->socket = $context->getSocket(\ZMQ::SOCKET_PUB);
         $this->socket->bind('tcp://127.0.0.1:5566');
         $node->on('event', function ($event, array $params) {
-            echo "Node emitted debuggable event\n";
             $this->log($event, $params);
         });
 
-        $node->chains()->on('newtip', function (ChainStateInterface $tip) {
-            $index = $tip->getIndex();
-            $this->log('chain.newtip', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'work' => $index->getWork()]);
+        $node->headers()->on('tip', function (HeadersBatch $batch) {
+            $index = $batch->getTip()->getIndex();
+            $this->log('newtip', ['count' => count($batch->getIndices()), 'tip' => [
+                'hash' => $index->getHash()->getHex(),
+                'height' => $index->getHeight()
+            ]]);
         });
 
-        $node->chains()->on('retarget', function (ChainStateInterface $tip) {
-            $index = $tip->getIndex();
-            $this->log('chain.retarget', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight()]);
+        $node->chains()->on('retarget', function (ChainSegment $segment, BufferInterface $bits, BlockIndexInterface $index) {
+            $this->log('retarget', [
+                'hash' => $index->getHash()->getHex(),
+                'height' => $index->getHeight(),
+                'prevBits' => $bits->getHex(),
+                'newBits' => $index->getHeader()->getBits()->getHex()
+            ]);
         });
     }
 
