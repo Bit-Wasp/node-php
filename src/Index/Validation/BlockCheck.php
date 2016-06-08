@@ -79,7 +79,7 @@ class BlockCheck implements BlockCheckInterface
                 ->getOutput()
                 ->getScript();
 
-            if ($scriptPubKey->classify($outputScript)->isPayToScriptHash()) {
+            if ($scriptPubKey->classify()->isPayToScriptHash($outputScript)) {
                 $nSigOps += $outputScript->countP2shSigOps($input->getScript());
             }
         }
@@ -204,7 +204,7 @@ class BlockCheck implements BlockCheckInterface
         } else {
             foreach ($inputs as $input) {
                 if ($input->isCoinBase()) {
-                    throw new \RuntimeException('CheckTransaction: a non-coinbase transaction input was null');
+                    throw new \RuntimeException('CheckTransaction: a non-coinbase tx input was null');
                 }
             }
         }

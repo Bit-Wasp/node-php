@@ -4,9 +4,6 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Node\ChainContainer;
-use BitWasp\Bitcoin\Node\ChainSegment;
-use BitWasp\Bitcoin\Node\ChainView;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;

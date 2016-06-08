@@ -6,7 +6,7 @@ use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
-use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerState;

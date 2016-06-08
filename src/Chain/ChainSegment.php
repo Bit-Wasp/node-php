@@ -1,9 +1,8 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Chain;
 
 
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use Evenement\EventEmitter;
 
 class ChainSegment extends EventEmitter

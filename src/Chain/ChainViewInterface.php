@@ -4,7 +4,6 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Node\ChainSegment;
 use BitWasp\Buffertools\BufferInterface;
 
 interface ChainViewInterface

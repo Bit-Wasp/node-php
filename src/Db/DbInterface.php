@@ -1,21 +1,19 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Db;
 
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
-use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
-use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\BufferInterface;
 
 interface DbInterface
@@ -103,13 +101,6 @@ interface DbInterface
     public function getTransaction(BufferInterface $tipHash, BufferInterface $txid);
 
     /**
-     * @param BufferInterface $tipHash
-     * @param OutPointInterface[] $outpoints
-     * @return Utxo[]
-     */
-    public function fetchUtxoList(BufferInterface $tipHash, array $outpoints);
-
-    /**
      * @param OutPointSerializer $outpointSerializer
      * @param OutPointInterface[] $outpoints
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]
@@ -117,25 +108,9 @@ interface DbInterface
     public function fetchUtxoDbList(OutPointSerializer $outpointSerializer, array $outpoints);
 
     /**
-     * @param string[] $cacheHits
-     * @return mixed
+     * @return ChainSegment[]
      */
-    public function appendUtxoViewKeys(array $cacheHits);
-
-    /**
-     * @param Headers $headers
-     * @param BufferInterface $hash
-     * @return ChainStateInterface
-     */
-    public function fetchHistoricChain(Headers $headers, BufferInterface $hash);
-    
     public function fetchChainSegments();
-
-    /**
-     * @param Headers $headers
-     * @return ChainStateInterface[]
-     */
-    public function fetchChainState(Headers $headers);
 
     /**
      * @param int $blockId
@@ -168,16 +143,6 @@ interface DbInterface
      * @return int
      */
     public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer);
-
-    /**
-     * We use this to help other nodes sync headers. Identify last common
-     * hash in our chain
-     *
-     * @param ChainStateInterface $activeChain
-     * @param BlockLocator $locator
-     * @return BufferInterface
-     */
-    public function findFork(ChainStateInterface $activeChain, BlockLocator $locator);
 
     /**
      * Here, we return max 2000 headers following $hash.

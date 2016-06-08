@@ -52,7 +52,7 @@ ADD KEY `hkidx` (`hashKey`);
 CREATE TABLE IF NOT EXISTS `blockIndex` (
   `id` int(9) NOT NULL,
   `hash` int(19) NOT NULL,
-  `block` blob NOT NULL
+  `block` longblob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------

@@ -4,7 +4,6 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Node\ChainSegment;
 
 class ChainWorkComparator
 {

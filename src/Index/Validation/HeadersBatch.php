@@ -1,9 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Chain;
+namespace BitWasp\Bitcoin\Node\Index\Validation;
 
-use BitWasp\Bitcoin\Node\ChainSegment;
-use BitWasp\Bitcoin\Node\ChainView;
+use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainView;
 
 class HeadersBatch
 {

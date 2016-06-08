@@ -1,7 +1,8 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node\Chain;
+namespace BitWasp\Bitcoin\Node\Index\Validation;
 
+use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Utxo\Utxo;

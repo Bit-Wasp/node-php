@@ -3,7 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 use BitWasp\Bitcoin\Node\Config\ConfigLoader;
-use BitWasp\Bitcoin\Node\Db;
+use BitWasp\Bitcoin\Node\Db\Db;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 

@@ -38,14 +38,7 @@ class UtxoView implements \Countable
      */
     private function addUtxo(Utxo $utxo)
     {
-        $hash = $utxo->getOutPoint()->getTxId()->getBinary();
-        $vout = $utxo->getOutPoint()->getVout();
-
-        if (!isset($this->utxo[$hash])) {
-            $this->utxo[$hash] = [$vout => $utxo];
-        } else {
-            $this->utxo[$hash][$vout] = $utxo;
-        }
+        $this->utxo[$utxo->getOutPoint()->getTxId()->getBinary() . $utxo->getOutPoint()->getVout()] = $utxo;
     }
 
     /**
@@ -54,10 +47,7 @@ class UtxoView implements \Countable
      */
     public function have(OutPointInterface $outpoint)
     {
-        $txid = $outpoint->getTxId()->getBinary();
-        $vout = $outpoint->getVout();
-        return array_key_exists($txid, $this->utxo)
-        && array_key_exists($vout, $this->utxo[$txid]);
+        return array_key_exists($outpoint->getTxId()->getBinary() . $outpoint->getVout(), $this->utxo);
     }
 
     /**
@@ -66,11 +56,12 @@ class UtxoView implements \Countable
      */
     public function fetch(OutPointInterface $outpoint)
     {
-        if (!$this->have($outpoint)) {
+        $key = $outpoint->getTxId()->getBinary() . $outpoint->getVout();
+        if (!isset($this->utxo[$key])) {
             throw new \RuntimeException('Utxo not found in this UtxoView');
         }
 
-        return $this->utxo[$outpoint->getTxId()->getBinary()][$outpoint->getVout()];
+        return $this->utxo[$key];
     }
 
     /**

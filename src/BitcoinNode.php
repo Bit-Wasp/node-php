@@ -5,9 +5,12 @@ namespace BitWasp\Bitcoin\Node;
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
+use BitWasp\Bitcoin\Node\Chain\ChainContainer;
 use BitWasp\Bitcoin\Node\Chain\Chains;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainView;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 

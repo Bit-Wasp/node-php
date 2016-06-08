@@ -1,24 +1,22 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Db;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainState;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
-use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\Index\Headers;
+use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
@@ -29,7 +27,6 @@ use BitWasp\Bitcoin\Transaction\Transaction;
 use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
-use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Packaged\Config\ConfigProviderInterface;
@@ -838,82 +835,7 @@ class Db implements DbInterface
     }
 
     /**
-     * @param Headers $headers
-     * @param BufferInterface $hash
-     * @return ChainStateInterface
-     */
-    public function fetchHistoricChain(Headers $headers, BufferInterface $hash)
-    {
-        $math = Bitcoin::getMath();
-
-        if ($this->fetchIndexStmt->execute(['hash' => $hash->getBinary()])) {
-            $row = $this->fetchIndexStmt->fetch(\PDO::FETCH_ASSOC);
-            if (empty($row)) {
-                throw new \RuntimeException('Not found');
-            }
-
-            $index = new BlockIndex(
-                new Buffer($row['hash'], 32),
-                $row['height'],
-                $row['work'],
-                new BlockHeader(
-                    $row['version'],
-                    new Buffer($row['prevBlock'], 32),
-                    new Buffer($row['merkleRoot'], 32),
-                    $row['nTimestamp'],
-                    Buffer::int((string)$row['nBits'], 4),
-                    $row['nNonce']
-                )
-            );
-
-            $this->fetchChainStmt->execute(['id' => $row['id']]);
-            $map = $this->fetchChainStmt->fetchAll(\PDO::FETCH_COLUMN);
-
-            $this->loadLastBlockStmt->execute(['id' => $row['id']]);
-            $block = $this->loadLastBlockStmt->fetch(\PDO::FETCH_ASSOC);
-
-            $lastBlock = new BlockIndex(
-                new Buffer($block['hash'], 32),
-                $block['height'],
-                $block['work'],
-                new BlockHeader(
-                    $block['version'],
-                    new Buffer($block['prevBlock'], 32),
-                    new Buffer($block['merkleRoot'], 32),
-                    $block['nTimestamp'],
-                    Buffer::int($block['nBits'], 4, $math),
-                    $block['nNonce']
-                )
-            );
-
-            return new ChainState(
-                $map,
-                $index,
-                $headers,
-                $math,
-                $lastBlock
-            );
-
-        }
-
-        throw new \RuntimeException('Failed to load historic chain?');
-    }
-
-    public function buildChain()
-    {
-        $loadTip = $this->newLoadTipStmt;
-        if ($loadTip->execute()) {
-            $states = [];
-            foreach ($loadTip->fetchAll(\PDO::FETCH_ASSOC) as $entry) {
-                $bestHeader = $this->fetchIndexById($entry['id']);
-                $segment = new ChainSegment($entry['segment'], $entry['minh'], $bestHeader);
-
-            }
-        }
-    }
-
-    /**
-     * @return array
+     * @return ChainSegment[]
      */
     public function fetchChainSegments()
     {
@@ -927,91 +849,6 @@ class Db implements DbInterface
         }
 
         return $segments;
-    }
-
-    /**
-     * @param Headers $headers
-     * @return ChainStateInterface[]
-     */
-    public function fetchChainState(Headers $headers)
-    {
-        //$loadTip = $this->loadTipStmt;
-        $loadTip = $this->newLoadTipStmt;
-        $math = Bitcoin::getMath();
-
-        if ($loadTip->execute()) {
-            $states = [];
-            foreach ($loadTip->fetchAll(\PDO::FETCH_ASSOC) as $index) {
-                $bestHeader = $this->fetchIndexById($index['id']);
-                
-                $this->loadLastBlockByCoord->execute(['lft' => $index['lft'], 'rgt' => $index['rgt']]);
-                $block = $this->loadLastBlockByCoord->fetchAll(\PDO::FETCH_ASSOC);
-
-                if (count($block) === 1) {
-                    $block = $block[0];
-                    $lastBlock = new BlockIndex(
-                        new Buffer($block['hash'], 32),
-                        $block['height'],
-                        $block['work'],
-                        new BlockHeader(
-                            $block['version'],
-                            new Buffer($block['prevBlock'], 32),
-                            new Buffer($block['merkleRoot'], 32),
-                            $block['nTimestamp'],
-                            Buffer::int($block['nBits'], 4, $math),
-                            $block['nNonce']
-                        )
-                    );
-                } else {
-                    $lastBlock = $bestHeader;
-                }
-
-                $states[] = new ChainState(
-                    $map,
-                    $bestHeader,
-                    $headers,
-                    $math,
-                    $lastBlock
-                );
-            }
-
-            return $states;
-        }
-
-        throw new \RuntimeException('Failed to fetch block progress');
-
-    }
-
-    /**
-     * We use this to help other nodes sync headers. Identify last common
-     * hash in our chain
-     *
-     * @param ChainStateInterface $activeChain
-     * @param BlockLocator $locator
-     * @return BufferInterface
-     */
-    public function findFork(ChainStateInterface $activeChain, BlockLocator $locator)
-    {
-        $hashes = [$activeChain->getIndex()->getHash()->getBinary()];
-        foreach ($locator->getHashes() as $hash) {
-            $hashes[] = $hash->getBinary();
-        }
-
-        $stmt = $this->dbh->prepare('
-            SELECT    node.hash
-            FROM      headerIndex AS node,
-                      headerIndex AS parent
-            WHERE     parent.hash = ? AND node.hash IN (' . rtrim(str_repeat('?, ', count($hashes) - 1), ', ') . ')
-            ORDER BY  node.rgt LIMIT 1
-        ');
-
-        if ($stmt->execute($hashes)) {
-            $column = $stmt->fetch();
-            $stmt->closeCursor();
-            return new Buffer($column['hash'], 32);
-        }
-
-        throw new \RuntimeException('Failed to execute findFork');
     }
 
     /**
@@ -1184,52 +1021,6 @@ WHERE tip.header_id = (
         }
 
         echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
-        return $outputSet;
-    }
-
-    /**
-     * @param BufferInterface $tipHash
-     * @param OutPointInterface[] $outpoints
-     * @return Utxo[]
-     * @throws \Exception
-     */
-    public function fetchUtxoList(BufferInterface $tipHash, array $outpoints)
-    {
-        $requiredCount = count($outpoints);
-        if (0 === count($outpoints)) {
-            return [];
-        }
-
-        $queryValues = [];
-        $innerJoin = $this->createOutpointsJoinSql($outpoints, $queryValues);
-
-        $this->fetchLftRgtByHash->execute(['hash' => $tipHash->getBinary()]);
-        $id = $this->fetchLftRgtByHash->fetch(\PDO::FETCH_ASSOC);
-
-        $fetchUtxoStmt = $this->dbh->prepare('
-SELECT o.hashPrevOut AS txid, o.nOutput AS vout, ou.* FROM transactions t
-JOIN (' . $innerJoin . ') o ON (o.hashPrevOut = t.hash)
-JOIN transaction_output ou ON (ou.parent_tx = t.id AND ou.nOutput = o.nOutput)
-LEFT JOIN transaction_input ti ON (ti.hashPrevOut = t.hash AND ti.nPrevOut = o.nOutput)
-JOIN block_transactions bt ON (bt.transaction_hash = t.id)
-JOIN iindex i ON (i.header_id = bt.block_hash)
-WHERE i.lft <= :lft AND i.rgt >= :rgt AND ti.nPrevOut IS NULL
-');
-        $queryValues['rgt'] = $id['rgt'];
-        $queryValues['lft'] = $id['lft'];
-
-        $fetchUtxoStmt->execute($queryValues);
-        $rows = $fetchUtxoStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        $outputSet = [];
-        foreach ($rows as $utxo) {
-            $outputSet[] = new Utxo(new OutPoint(new Buffer($utxo['txid'], 32), $utxo['vout']), new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
-        }
-
-        if (count($outputSet) < $requiredCount) {
-            throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
-        }
-
         return $outputSet;
     }
 

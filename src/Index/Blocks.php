@@ -6,16 +6,16 @@ use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
-use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Serializer\Block\CachingBlockSerializer;
@@ -183,7 +183,7 @@ class Blocks extends EventEmitter
         if (null === $this->utxoSet) {
             $this->utxoSet = new CachingUtxoSet($this->db);
         }
-        
+
         return $this->utxoSet;
     }
 
@@ -196,19 +196,14 @@ class Blocks extends EventEmitter
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
 
-        if ($this->config->getItem('config', 'index_utxos', true)) {
-            try {
-                echo "Utxoset - fetch view\n";
-                $utxoSet = $this->fetchUtxoSet();
-                $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
-            } catch (\Exception $e) {
-                echo $e->getMessage().PHP_EOL;
-                echo $e->getTraceAsString().PHP_EOL;
-                die();
-            }
-
-        } else {
-            $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);
+        try {
+            echo "Utxoset - fetch view\n";
+            $utxoSet = $this->fetchUtxoSet();
+            $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
+        } catch (\Exception $e) {
+            echo $e->getMessage().PHP_EOL;
+            echo $e->getTraceAsString().PHP_EOL;
+            die();
         }
 
         $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
@@ -289,16 +284,13 @@ class Blocks extends EventEmitter
         $m = microtime(true);
         $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
+            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
 
-            if ($this->config->getItem('config', 'index_transactions', true)) {
+            if ($this->config->getItem('config', 'index_transactions', false)) {
                 $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
             }
         });
         echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
-
-        if ($this->config->getItem('config', 'index_utxos', true)) {
-            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-        }
 
         $blocksView->updateTip($index);
         $this->forks->next($index);

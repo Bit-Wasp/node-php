@@ -3,8 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Node\ChainSegment;
-use BitWasp\Bitcoin\Node\ChainView;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitterInterface;
 
@@ -37,13 +35,13 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
 
     /**
      * @param BufferInterface $hash
-     * @return false|ChainStateInterface
+     * @return false|ChainViewInterface
      */
     public function isKnownHeader(BufferInterface $hash);
 
     /**
      * @param BufferInterface $hash
-     * @return false|ChainStateInterface
+     * @return false|ChainViewInterface
      */
     public function isTip(BufferInterface $hash);
 }

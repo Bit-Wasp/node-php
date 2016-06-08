@@ -1,11 +1,9 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
@@ -143,15 +141,6 @@ class ChainView extends EventEmitter implements ChainViewInterface
     public function getLastBlock()
     {
         return $this->block;
-    }
-
-    /**
-     * @param BlockIndexInterface $index
-     */
-    public function updateLastBlock(BlockIndexInterface $index)
-    {
-        echo "Called updateLastBlock\n";
-        die('heheheheh');
     }
 
     private function heightMap()

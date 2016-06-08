@@ -1,16 +1,11 @@
 <?php
 
-namespace BitWasp\Bitcoin\Node;
+namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
-use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainAccess;
-use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainWorkComparator;
-use BitWasp\Bitcoin\Node\Chain\GuidedChainView;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
@@ -33,7 +28,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     private $segmentBlock;
 
     /**
-     * Map of hash => [(segment), height]
+     * Map of hash => height
      *
      * @var array
      */
