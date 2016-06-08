@@ -166,6 +166,7 @@ class Headers extends EventEmitter
             // TODO: forks
             //$segment = $this->db->fetchHistoricChain($this, $bestPrev);
             //$this->chains->trackState($segment);
+            die('fork');
         }
 
         $prevIndex = $view->getIndex();
