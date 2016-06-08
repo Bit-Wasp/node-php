@@ -37,7 +37,7 @@ class BlockData
     /**
      * @var int
      */
-    public $nFees = 0;
+    public $nFees = '0';
 
     /**
      * @var int
