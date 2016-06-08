@@ -2,8 +2,10 @@
 
 namespace BitWasp\Bitcoin\Node\Services\Debug;
 
+use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Buffertools\BufferInterface;
@@ -34,8 +36,22 @@ class ZmqDebug implements DebugInterface
             $index = $batch->getTip()->getIndex();
             $this->log('newtip', ['count' => count($batch->getIndices()), 'tip' => [
                 'hash' => $index->getHash()->getHex(),
-                'height' => $index->getHeight()
+                'height' => $index->getHeight(),
             ]]);
+        });
+        
+        $node->blocks()->on('block', function (BlockIndexInterface $index, BlockInterface $block, BlockData $blockData) {
+            $this->log('block', [
+                'hash' => $index->getHash()->getHex(),
+                'height' => $index->getHeight(),
+                'txs' => count($block->getTransactions()),
+                'nFees' => $blockData->nFees,
+                'nSigOps' => $blockData->nSigOps,
+                'utxos' => [
+                    'created' => count($blockData->remainingNew),
+                    'removed' => count($blockData->requiredOutpoints)
+                ]
+            ]);
         });
 
         $node->chains()->on('retarget', function (ChainSegment $segment, BufferInterface $bits, BlockIndexInterface $index) {
@@ -43,7 +59,7 @@ class ZmqDebug implements DebugInterface
                 'hash' => $index->getHash()->getHex(),
                 'height' => $index->getHeight(),
                 'prevBits' => $bits->getHex(),
-                'newBits' => $index->getHeader()->getBits()->getHex()
+                'newBits' => $index->getHeader()->getBits()->getHex(),
             ]);
         });
     }

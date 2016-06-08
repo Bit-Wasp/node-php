@@ -27,6 +27,7 @@ use BitWasp\Bitcoin\Transaction\Transaction;
 use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
+use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Packaged\Config\ConfigProviderInterface;
@@ -1027,7 +1028,7 @@ WHERE tip.header_id = (
         $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[] = new Utxo($outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) < $requiredCount) {

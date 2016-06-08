@@ -218,17 +218,14 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
-        $u = microtime(True);
-        $chainView = $this->chains->best($this->math);
-        $blocksView = $this->chains->blocks($chainView->getSegment());
-        echo "Try to fill ".$blocksView->getIndex()->getHeight().PHP_EOL;
+        $chainView = $this->chains->best();
         $hash = $block->getHeader()->getHash();
-        $v = microtime(true);
         $index = $headers->accept($hash, $block->getHeader());
 
         $txSerializer = new CachingTransactionSerializer();
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
+        $v = microtime(true);
         $blockData = $this->prepareBatch($block, $txSerializer);
 
         $this
@@ -248,25 +245,23 @@ class Blocks extends EventEmitter
         $flags = $forks->getFlags();
         $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
-        $nFees = 0;
-        $nSigOps = 0;
         foreach ($block->getTransactions() as $tx) {
-            $nSigOps += $this->blockCheck->getLegacySigOps($tx);
+            $blockData->nSigOps += $this->blockCheck->getLegacySigOps($tx);
 
-            if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
+            if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                 throw new \RuntimeException('Blocks::accept() - too many sigops');
             }
 
             if (!$tx->isCoinbase()) {
                 if ($flags & InterpreterInterface::VERIFY_P2SH) {
-                    $nSigOps = $this->blockCheck->getP2shSigOps($utxoView, $tx);
-                    if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
+                    $blockData->nSigOps = $this->blockCheck->getP2shSigOps($utxoView, $tx);
+                    if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');
                     }
                 }
 
                 $fee = $this->math->sub($utxoView->getValueIn($this->math, $tx), $tx->getValueOut());
-                $nFees = $this->math->add($nFees, $fee);
+                $blockData->nFees = $this->math->add($blockData->nFees, $fee);
 
                 $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);
             }
@@ -276,7 +271,8 @@ class Blocks extends EventEmitter
             throw new \RuntimeException('ScriptValidation failed!');
         }
 
-        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
+        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $index->getHeight());
+        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
 
         $m = microtime(true);
         $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
@@ -289,12 +285,11 @@ class Blocks extends EventEmitter
 
         echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
         $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-
-
-        $blocksView->updateTip($index);
+        $this->chains->blocks($chainView->getSegment())->updateTip($index);
         $this->forks->next($index);
-        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
-        echo "Wrapup: ".(microtime(true)-$u) . " seconds\n";
+
+        $this->emit('block', [$index, $block, $blockData]);
+
         return $index;
     }
 }

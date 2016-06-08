@@ -33,4 +33,14 @@ class BlockData
      * @var HashStorage
      */
     public $hashStorage;
+
+    /**
+     * @var int
+     */
+    public $nFees = 0;
+
+    /**
+     * @var int
+     */
+    public $nSigOps = 0;
 }
