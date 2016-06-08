@@ -182,7 +182,7 @@ class Db implements DbInterface
         $this->dbh->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->truncateOutpointsStmt = $this->dbh->prepare('TRUNCATE outpoints');
-        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM outpoi o join utxo u on (o.hashKey = u.hashKey)");
+        $this->selectUtxosByOutpointsStmt = $this->dbh->prepare("SELECT u.* FROM utxo u join outpoi o on (o.hashKey = u.hashKey)");
         $this->fetchIndexStmt = $this->dbh->prepare('SELECT h.* FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchLftStmt = $this->dbh->prepare('SELECT i.lft FROM iindex i JOIN headerIndex h ON h.id = i.header_id WHERE h.hash = :prevBlock');
         $this->fetchLftRgtByHash = $this->dbh->prepare('SELECT i.lft,i.rgt FROM headerIndex h, iindex i WHERE h.hash = :hash AND i.header_id = h.id');
@@ -992,7 +992,7 @@ WHERE tip.header_id = (
         }
 
         return "CREATE or REPLACE VIEW outpoi AS 
-            SELECT id, hashKey, value, scriptPubKey from utxo
+            SELECT hashKey, value, scriptPubKey from utxo
             WHERE hashKey in (".implode(",", $joinList).")";
 
     }
