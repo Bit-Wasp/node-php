@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
@@ -181,7 +182,7 @@ class Blocks extends EventEmitter
     private function fetchUtxoSet()
     {
         if (null === $this->utxoSet) {
-            $this->utxoSet = new CachingUtxoSet($this->db);
+            $this->utxoSet = new UtxoSet($this->db);
         }
 
         return $this->utxoSet;
