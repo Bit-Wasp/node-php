@@ -7,8 +7,8 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
@@ -70,7 +70,7 @@ class Blocks extends EventEmitter
     private $consensus;
 
     /**
-     * @var CachingUtxoSet
+     * @var UtxoSet
      */
     private $utxoSet;
 
@@ -176,7 +176,7 @@ class Blocks extends EventEmitter
     }
 
     /**
-     * @return CachingUtxoSet
+     * @return UtxoSet
      */
     private function fetchUtxoSet()
     {

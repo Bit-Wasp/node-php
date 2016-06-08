@@ -24,6 +24,7 @@ class ZmqDebug implements DebugInterface
         $this->socket = $context->getSocket(\ZMQ::SOCKET_PUB);
         $this->socket->bind('tcp://127.0.0.1:5566');
         $node->on('event', function ($event, array $params) {
+            echo "Node emitted debuggable event\n";
             $this->log($event, $params);
         });
 
