@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -158,7 +159,13 @@ interface DbInterface
      * @return array
      */
     public function findSuperMajorityInfoByHash(BufferInterface $hash, $numAncestors = 1000);
-
+    
+    /**
+     * @param ChainViewInterface $view
+     * @param int $numAncestors
+     * @return array
+     */
+    public function findSuperMajorityInfoByView(ChainViewInterface $view, $numAncestors = 1000);
     /**
      * @param callable $function
      * @return void

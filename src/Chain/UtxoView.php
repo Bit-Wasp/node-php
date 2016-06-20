@@ -76,13 +76,13 @@ class UtxoView implements \Countable
     /**
      * @param Math $math
      * @param TransactionInterface $tx
-     * @return int|string
+     * @return \GMP
      */
     public function getValueIn(Math $math, TransactionInterface $tx)
     {
-        $value = 0;
+        $value = gmp_init(0);
         foreach ($tx->getInputs() as $input) {
-            $value = $math->add($value, $this->fetchByInput($input)->getOutput()->getValue());
+            $value = $math->add($value, gmp_init($this->fetchByInput($input)->getOutput()->getValue()));
         }
 
         return $value;
@@ -91,13 +91,10 @@ class UtxoView implements \Countable
     /**
      * @param Math $math
      * @param TransactionInterface $tx
-     * @return int|string
+     * @return \GMP
      */
     public function getFeePaid(Math $math, TransactionInterface $tx)
     {
-        $valueIn = $this->getValueIn($math, $tx);
-        $valueOut = $tx->getValueOut();
-
-        return $math->sub($valueIn, $valueOut);
+        return $math->sub($this->getValueIn($math, $tx), gmp_init($tx->getValueOut()));
     }
 }

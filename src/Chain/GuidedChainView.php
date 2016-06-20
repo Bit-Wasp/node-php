@@ -71,6 +71,24 @@ class GuidedChainView extends EventEmitter implements ChainViewInterface
     }
 
     /**
+     * @return ChainSegment[]
+     */
+    public function getHistory()
+    {
+        $height = $this->index->getHeight();
+        $history = [];
+        foreach ($this->getHistory() as $segment) {
+            if ($segment->getLast()->getHeight() <= $height) {
+                $history[] = $segment;
+            } else {
+                break;
+            }
+        }
+
+        return $history;
+    }
+
+    /**
      * @return int
      */
     public function count()

@@ -258,6 +258,17 @@ class DebugDb implements DbInterface
     }
 
     /**
+     * @param Chain\ChainViewInterface $view
+     * @param int $numAncestors
+     * @return array
+     */
+    public function findSuperMajorityInfoByView(Chain\ChainViewInterface $view, $numAncestors = 1000)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->findSuperMajorityInfoByView($view, $numAncestors);
+    }
+
+    /**
      * @param callable $function
      */
     public function transaction(callable $function)

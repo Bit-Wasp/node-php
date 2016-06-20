@@ -55,19 +55,19 @@ class Consensus implements ConsensusInterface
     public function getSubsidy($height)
     {
         $halvings = $height / $this->params->subsidyHalvingInterval();
-        if ($halvings >= 0) {
+        if ($halvings >= 64) {
             return 0;
         }
 
         $subsidy = 50 * Amount::COIN;
-        $subsidy = $subsidy << $halvings;
+        $subsidy = $subsidy >> $halvings;
         return $subsidy;
     }
 
     /**
      * @param BlockIndexInterface $prevIndex
      * @param int $timeFirstBlock
-     * @return int|string
+     * @return int
      */
     public function calculateNextWorkRequired(BlockIndexInterface $prevIndex, $timeFirstBlock)
     {
@@ -85,7 +85,7 @@ class Consensus implements ConsensusInterface
             $new = $limit;
         }
 
-        return $math->encodeCompact($new, false);
+        return gmp_strval($math->encodeCompact($new, false), 10);
     }
 
     /**
@@ -115,16 +115,16 @@ class Consensus implements ConsensusInterface
      */
     public function calculateWorkTimespan($timeFirstBlock, BlockHeaderInterface $header)
     {
-        $timespan = $this->math->sub($header->getTimestamp(), $timeFirstBlock);
+        $timespan = $header->getTimestamp() - $timeFirstBlock;
         
-        $lowest = $this->math->div($this->params->powTargetTimespan(), 4);
-        $highest = $this->math->mul($this->params->powTargetTimespan(), 4);
+        $lowest = $this->params->powTargetTimespan() / 4;
+        $highest = $this->params->powTargetTimespan() * 4;
 
-        if ($this->math->cmp($timespan, $lowest) < 0) {
+        if ($timespan < $lowest) {
             $timespan = $lowest;
         }
 
-        if ($this->math->cmp($timespan, $highest) > 0) {
+        if ($timespan > $highest) {
             $timespan = $highest;
         }
         

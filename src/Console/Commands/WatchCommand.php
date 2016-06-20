@@ -29,9 +29,14 @@ class WatchCommand extends AbstractCommand
         $all = $input->getOption('all');
         $events = $input->getOption('events');
 
+        // No filter if no options set
+        // No filter if $all set
+        // Filter if events set & !$all.
         $filter = [];
         if (!$all) {
-            $filter = explode(",", $events);
+            if ($events) {
+                $filter = explode(",", $events);
+            }
         }
 
         $loop = \React\EventLoop\Factory::create();

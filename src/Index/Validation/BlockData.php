@@ -35,12 +35,17 @@ class BlockData
     public $hashStorage;
 
     /**
-     * @var int
+     * @var \GMP
      */
-    public $nFees = '0';
+    public $nFees;
 
     /**
      * @var int
      */
     public $nSigOps = 0;
+
+    public function __construct()
+    {
+        $this->nFees = gmp_init(0);
+    }
 }

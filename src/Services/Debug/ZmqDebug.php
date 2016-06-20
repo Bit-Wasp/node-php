@@ -8,7 +8,6 @@ use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
-use BitWasp\Buffertools\BufferInterface;
 use React\ZMQ\Context;
 use React\ZMQ\SocketWrapper;
 
@@ -32,36 +31,60 @@ class ZmqDebug implements DebugInterface
             $this->log($event, $params);
         });
 
-        $node->headers()->on('tip', function (HeadersBatch $batch) {
-            $index = $batch->getTip()->getIndex();
-            $this->log('newtip', ['count' => count($batch->getIndices()), 'tip' => [
-                'hash' => $index->getHash()->getHex(),
-                'height' => $index->getHeight(),
-            ]]);
-        });
-        
-        $node->blocks()->on('block', function (BlockIndexInterface $index, BlockInterface $block, BlockData $blockData) {
-            $this->log('block', [
-                'hash' => $index->getHash()->getHex(),
-                'height' => $index->getHeight(),
-                'txs' => count($block->getTransactions()),
-                'nFees' => $blockData->nFees,
-                'nSigOps' => $blockData->nSigOps,
-                'utxos' => [
-                    'created' => count($blockData->remainingNew),
-                    'removed' => count($blockData->requiredOutpoints)
-                ]
-            ]);
-        });
+        $node->headers()->on('tip', [$this, 'logTip']);
+        $node->blocks()->on('block', [$this, 'logBlock']);
+        $node->chains()->on('retarget', [$this, 'logRetarget']);
 
-        $node->chains()->on('retarget', function (ChainSegment $segment, BufferInterface $bits, BlockIndexInterface $index) {
-            $this->log('retarget', [
+    }
+
+    /**
+     * @param ChainSegment $segment
+     * @param int $prevBits
+     * @param BlockIndexInterface $index
+     */
+    public function logRetarget(ChainSegment $segment, $prevBits, BlockIndexInterface $index)
+    {
+        $this->log('retarget', [
+            'hash' => $index->getHash()->getHex(),
+            'height' => $index->getHeight(),
+            'prevBits' => $prevBits,
+            'newBits' => $index->getHeader()->getBits(),
+        ]);
+    }
+
+    /**
+     * @param BlockIndexInterface $index
+     * @param BlockInterface $block
+     * @param BlockData $blockData
+     */
+    public function logBlock (BlockIndexInterface $index, BlockInterface $block, BlockData $blockData)
+    {
+        $this->log('block', [
+            'hash' => $index->getHash()->getHex(),
+            'height' => $index->getHeight(),
+            'txs' => count($block->getTransactions()),
+            'nFees' => gmp_strval($blockData->nFees, 10),
+            'nSigOps' => $blockData->nSigOps,
+            'utxos' => [
+                'created' => count($blockData->remainingNew),
+                'removed' => count($blockData->requiredOutpoints)
+            ]
+        ]);
+    }
+
+    /**
+     * @param HeadersBatch $batch
+     */
+    public function logTip (HeadersBatch $batch)
+    {
+        $index = $batch->getTip()->getIndex();
+        $this->log('tip', [
+            'count' => count($batch->getIndices()),
+            'tip' => [
                 'hash' => $index->getHash()->getHex(),
                 'height' => $index->getHeight(),
-                'prevBits' => $bits->getHex(),
-                'newBits' => $index->getHeader()->getBits(),
-            ]);
-        });
+            ]
+        ]);
     }
 
     /**

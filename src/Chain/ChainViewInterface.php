@@ -20,6 +20,11 @@ interface ChainViewInterface
     public function getSegment();
 
     /**
+     * @return ChainSegment[]
+     */
+    public function getHistory();
+        
+    /**
      * @return BlockIndexInterface
      */
     public function getIndex();

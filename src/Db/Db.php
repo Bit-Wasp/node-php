@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
@@ -871,74 +872,16 @@ WHERE tip.header_id = (
         return $transaction;
     }
 
-    /**
-     * @param OutPointInterface[] $outpoints
-     * @param array $queryValues
-     * @return mixed
-     */
-    private function createOutpointsJoinSql(array $outpoints, array & $queryValues)
-    {
-        $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i] = $outpoint->getTxId()->getBinary();
-            $queryValues['noutparent' . $i] = $outpoint->getVout();
-
-            if (0 === $i) {
-                $joinList[] = 'SELECT :hashParent' . $i . ' as hashPrevOut, :noutparent' . $i . ' as nOutput';
-            } else {
-                $joinList[] = '  SELECT :hashParent' . $i . ', :noutparent' . $i;
-            }
-        }
-
-        return implode(PHP_EOL . "   UNION ALL " . PHP_EOL, $joinList);
-    }
-
-    /**
-     * @param OutPointSerializer $serializer
-     * @param array $outpoints
-     * @param array $queryValues
-     * @return string
-     */
-    private function createInsertJoinSql(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
-    {
-        $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hashParent' . $i] = $serializer->serialize($outpoint)->getBinary();
-            $joinList[] = "(:hashParent$i)";
-        }
-
-        return "INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList);
-    }
-
     public function selectUtxoByOutpoint(OutPointSerializer $serializer, array $outpoints, array & $values)
     {
         $list = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $values['hash' . $i] = $serializer->serialize($outpoint)->getBinary();
-            $list[] = "SELECT * from utxo where hashKey = hash$i";
+        foreach ($outpoints as $v => $outpoint) {
+            $values[] = $serializer->serialize($outpoint)->getBinary();
+            $list[] = "SELECT * from utxo where hashKey = ?";
         }
 
-        $query = implode("UNION", $list);
+        $query = implode(" UNION ", $list);
         return $query;
-    }
-
-    private function createUtxoOutpointView(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
-    {
-        $joinList = [];
-        foreach ($outpoints as $i => $outpoint) {
-            $queryValues['hk' . $i] = $serializer->serialize($outpoint)->getBinary();
-            $joinList[] = ":hk$i";
-        }
-
-        return "CREATE or REPLACE VIEW outpoi AS 
-            SELECT hashKey, value, scriptPubKey from utxo
-            WHERE hashKey in (".implode(",", $joinList).")";
-
-    }
-
-    private function fetchUtxosFromView()
-    {
-        return "SELECT * FROM outpoi";
     }
 
     /**
@@ -1046,6 +989,50 @@ WHERE tip.header_id = (
         $this->fetchSuperMajorityVersions->execute(['lft' => $id['lft'], 'rgt' => $id['rgt']]);
         $stream = $this->fetchSuperMajorityVersions->fetchAll(\PDO::FETCH_COLUMN);
         return $stream;
+    }
+
+    /**
+     * @param ChainViewInterface $view
+     * @param int $numAncestors
+     * @return array
+     */
+    public function findSuperMajorityInfoByView(ChainViewInterface $view, $numAncestors = 1000)
+    {
+        $tipHeight = $view->getIndex()->getHeight();
+        $min = max($tipHeight - $numAncestors, 0);
+
+        $pointer = $tipHeight;
+        $history = $view->getHistory();
+
+        $values = [];
+        $query = [];
+        $c = 0;
+        while ($pointer !== $min && count($history) > 0) {
+            /**
+             * @var ChainSegment $segment
+             */
+            $segment = array_pop($history);
+            $end = $segment->getLast()->getHeight();
+            if ($end !== $pointer) {
+                throw new \RuntimeException('Pointer inconsistent');
+            }
+
+            $size = min($numAncestors, $end - $segment->getStart());
+            $start = $end - $size;
+            $values['segid' . $c] = $segment->getId();
+            $values['heightlast' . $c] = $end;
+            $values['heightstart' . $c] = $start;
+            $query[] = "SELECT h.version from headerIndex h where h.segment = :segid" . $c . " AND h.height BETWEEN :heightstart" . $c . " AND :heightlast" . $c ;
+            $pointer -= $size;
+            $c++;
+        }
+        
+        $query = implode("UNION ALL", $query);
+        $statement = $this->dbh->prepare($query);
+        $statement->execute($values);
+        $results = $statement->fetchAll(\PDO::FETCH_COLUMN);
+        
+        return $results;
     }
 
     /**

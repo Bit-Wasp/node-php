@@ -53,6 +53,7 @@ class UtxoSet
             return $utxos;
         } catch (\Exception $e) {
             echo "Internal: ".$e->getMessage().PHP_EOL;
+            echo "Internal: ".$e->getTraceAsString().PHP_EOL;
             
             throw new \RuntimeException('Failed to find UTXOS in set');
         }

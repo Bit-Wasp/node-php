@@ -110,9 +110,7 @@ class Forks
      */
     private function updateCount($version)
     {
-        if ($version >= 5) {
-            $this->versionCount['v5']++;
-        } else if ($version >= 4) {
+        if ($version >= 4) {
             $this->versionCount['v4']++;
         } else if ($version >= 3) {
             $this->versionCount['v3']++;
@@ -128,9 +126,7 @@ class Forks
      */
     private function dropCount($version)
     {
-        if ($version >= 5) {
-            $this->versionCount['v5']--;
-        } else if ($version >= 4) {
+        if ($version >= 4) {
             $this->versionCount['v4']--;
         } else if ($version >= 3) {
             $this->versionCount['v3']--;
@@ -172,10 +168,6 @@ class Forks
             $this->cltv = true;
         }
 
-        if (($highest >= 5)) {
-            $this->witness = true;
-        }
-
         // Calculate flags
         $this->flags = $this->p2sh ? InterpreterInterface::VERIFY_NONE : InterpreterInterface::VERIFY_P2SH;
         if ($this->derSig) {
@@ -184,10 +176,6 @@ class Forks
 
         if ($this->cltv) {
             $this->flags |= InterpreterInterface::VERIFY_CHECKLOCKTIMEVERIFY;
-        }
-
-        if ($this->witness) {
-            $this->flags |= InterpreterInterface::VERIFY_WITNESS;
         }
     }
 
@@ -283,9 +271,6 @@ class Forks
      */
     private function majorityVersion()
     {
-        if (($this->versionCount['v5'] / 1000) > 0.95) {
-            return 5;
-        }
 
         if (($this->versionCount['v4'] / 1000) > 0.95) {
             return 4;
@@ -307,9 +292,6 @@ class Forks
      */
     public function getMajorityVersion()
     {
-        if ($this->witness) {
-            return 5;
-        }
 
         if ($this->cltv) {
             return 4;

@@ -63,7 +63,6 @@ class P2PBlocksService extends EventEmitter
     public function onHeaders(PeerState $state, Peer $peer, HeadersBatch $batch)
     {
         if (count($batch->getIndices()) < 2000) {
-            echo "start downloading blocks\n";
             $this->blockDownload->start($batch->getTip(), $peer);
         }
     }

@@ -55,11 +55,6 @@ class Headers extends EventEmitter
     private $proofOfWork;
 
     /**
-     * @var Forks
-     */
-    private $forks;
-
-    /**
      * Headers constructor.
      * @param DbInterface $db
      * @param EcAdapterInterface $ecAdapter
@@ -174,7 +169,8 @@ class Headers extends EventEmitter
 
         $batch = [];
         if ($firstUnknown !== null) {
-            $versionInfo = $this->db->findSuperMajorityInfoByHash($prevIndex->getHash());
+            $versionInfo = $this->db->findSuperMajorityInfoByView($view);
+
             $forks = new Forks($this->consensus->getParams(), $prevIndex, $versionInfo);
 
             for ($i = $firstUnknown; $i < $countHeaders; $i++) {
@@ -190,7 +186,7 @@ class Headers extends EventEmitter
                 $index = new BlockIndex(
                     $hash,
                     $prevIndex->getHeight() + 1,
-                    $this->math->toString($this->math->add(gmp_init($this->proofOfWork->getWork($header->getBits())), gmp_init($prevIndex->getWork()))),
+                    $this->math->toString($this->math->add($this->proofOfWork->getWork($header->getBits()), gmp_init($prevIndex->getWork()))),
                     $header
                 );
 

@@ -27,11 +27,11 @@ interface BlockCheckInterface
 
     /**
      * @param TransactionInterface $coinbase
-     * @param int $nFees
+     * @param \GMP $nFees
      * @param int $height
      * @return $this
      */
-    public function checkCoinbaseSubsidy(TransactionInterface $coinbase, $nFees, $height);
+    public function checkCoinbaseSubsidy(TransactionInterface $coinbase, \GMP $nFees, $height);
 
     /**
      * @param TransactionInterface $tx

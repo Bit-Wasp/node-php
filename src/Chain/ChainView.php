@@ -148,6 +148,14 @@ class ChainView extends EventEmitter implements ChainViewInterface
         return $this->block;
     }
 
+    /**
+     * @return ChainSegment[]
+     */
+    public function getHistory()
+    {
+        return $this->segments;
+    }
+
     private function heightMap()
     {
         $map = [];

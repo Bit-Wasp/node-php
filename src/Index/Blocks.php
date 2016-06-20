@@ -197,7 +197,6 @@ class Blocks extends EventEmitter
         $blockData = $this->parseUtxos($block, $txSerializer);
 
         try {
-            echo "Utxoset - fetch view\n";
             $remaining = $this->fetchUtxoSet()->fetchView($blockData->requiredOutpoints);
             $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
             return $blockData;
@@ -260,7 +259,7 @@ class Blocks extends EventEmitter
                     }
                 }
 
-                $fee = $this->math->sub($utxoView->getValueIn($this->math, $tx), $tx->getValueOut());
+                $fee = $utxoView->getFeePaid($this->math, $tx);
                 $blockData->nFees = $this->math->add($blockData->nFees, $fee);
 
                 $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);

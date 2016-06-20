@@ -66,7 +66,7 @@ class HeaderCheck implements HeaderCheckInterface
     /**
      * @param ChainAccessInterface $chain
      * @param BlockIndexInterface $prevIndex
-     * @return int|string
+     * @return int
      */
     public function getWorkRequired(ChainAccessInterface $chain, BlockIndexInterface $prevIndex)
     {
@@ -79,7 +79,6 @@ class HeaderCheck implements HeaderCheckInterface
         // Re-target
         $heightLastRetarget = $prevIndex->getHeight() - ($params->powRetargetInterval() - 1);
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
-
         return $this->consensus->calculateNextWorkRequired($prevIndex, $lastTime);
     }
 
@@ -94,13 +93,14 @@ class HeaderCheck implements HeaderCheckInterface
     public function checkContextual(ChainAccessInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
     {
         $work = $this->getWorkRequired($chain, $prevIndex);
-
         $header = $index->getHeader();
-        if ($this->math->cmp(gmp_init($header->getBits()), gmp_init($work)) != 0) {
+        if ($this->math->cmp(gmp_init($header->getBits(), 10), gmp_init($work, 10)) != 0) {
             throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits() . '? ' . $work);
         }
 
         if ($header->getVersion() < $forks->getMajorityVersion()) {
+            echo $index->getHash()->getHex().PHP_EOL;
+            echo "Heaader: " . $header->getVersion() . "\nMajority: " . $forks->getMajorityVersion().PHP_EOL;
             throw new \RuntimeException('Rejected version');
         }
 
