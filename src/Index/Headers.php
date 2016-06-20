@@ -189,8 +189,8 @@ class Headers extends EventEmitter
 
                 $index = new BlockIndex(
                     $hash,
-                    $this->math->add($prevIndex->getHeight(), 1),
-                    $this->math->add($this->proofOfWork->getWork($header->getBits()), $prevIndex->getWork()),
+                    $prevIndex->getHeight() + 1,
+                    $this->math->toString($this->math->add(gmp_init($this->proofOfWork->getWork($header->getBits())), gmp_init($prevIndex->getWork()))),
                     $header
                 );
 

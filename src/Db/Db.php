@@ -14,7 +14,6 @@ use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
-use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
@@ -78,7 +77,7 @@ class Db implements DbInterface
      * @var \PDOStatement
      */
     private $loadLastBlockStmt;
-    private $loadSegmentBestBlockStmt;
+
     /**
      * @var \PDOStatement
      */
@@ -375,7 +374,6 @@ class Db implements DbInterface
      */
     public function createIndexGenesis(BlockHeaderInterface $header)
     {
-        //$stmtIndex = $this->dbh->prepare('INSERT INTO iindex (header_id, lft, rgt) VALUES (:headerId, :lft, :rgt)');
         $stmtHeader = $this->dbh->prepare('INSERT INTO headerIndex (
             hash, segment, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce
           ) VALUES (
@@ -391,20 +389,12 @@ class Db implements DbInterface
             'version' => $header->getVersion(),
             'prevBlock' => $header->getPrevBlock()->getBinary(),
             'merkleRoot' => $header->getMerkleRoot()->getBinary(),
-            'nBits' => $header->getBits()->getInt(),
+            'nBits' => $header->getBits(),
             'nTimestamp' => $header->getTimestamp(),
             'nNonce' => $header->getNonce()
         ))
         ) {
-
-            //if ($stmtIndex->execute([
-            //    'headerId' => $this->dbh->lastInsertId(),
-            //    'lft' => 1,
-             //   'rgt' => 2
-            //])
-            //) {
-                return true;
-            //}
+            return true;
         }
 
         throw new \RuntimeException('Failed to update insert Genesis block index!');
@@ -539,47 +529,9 @@ class Db implements DbInterface
         $append->execute($queryValues);
     }
 
-    /**
-     * @param array $utxos
-     */
-    private function insertUtxosToTable(OutPointSerializer $serializer, array $utxos)
-    {
-        $utxoQuery = [];
-        $utxoValues = [];
-        foreach ($utxos as $c => $utxo) {
-            $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
-            $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
-            $utxoValues["v$c"] = $utxo->getOutput()->getValue();
-            $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
-        }
-
-        $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
-        $insertUtxos->execute($utxoValues);
-    }
-
     private function deleteUtxosInView()
     {
         $this->deleteUtxosInView->execute();
-    }
-
-    /**
-     * @param OutPointSerializer $serializer
-     * @param array $deleteOutPoints
-     * @param array $newUtxos
-     */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos)
-    {
-        if (!empty($deleteOutPoints)) {
-            $d1 = microtime(true);
-            $this->deleteUtxosInView();
-            echo "Deletion: ".(microtime(true) - $d1) . "\n";
-        }
-
-        if (!empty($newUtxos)) {
-            $d1 = microtime(true);
-            $this->insertUtxosToTable($serializer, $newUtxos);
-            echo "Insertion: ".(microtime(true) - $d1) . "\n";
-        }
     }
 
     /**
@@ -612,7 +564,7 @@ class Db implements DbInterface
                 new Buffer($result['prevBlock'], 32),
                 new Buffer($result['merkleRoot'], 32),
                 $result['nTimestamp'],
-                Buffer::int($result['nBits'], 4),
+                $result['nBits'],
                 $result['nNonce']
             )
         );
@@ -627,40 +579,15 @@ class Db implements DbInterface
      */
     public function insertHeaderBatch(HeadersBatch $batch)
     {
-        //$fetchParent = $this->fetchLftStmt;
-        //$resizeIndex = $this->updateIndicesStmt;
-
-        //$fetchParent->bindValue(':prevBlock', $batch->getTip()->getIndex()->getHash()->getBinary());
-        //if ($fetchParent->execute()) {
-//            foreach ($fetchParent->fetchAll() as $record) {
-//                $myLeft = $record['lft'];
-//            }
-//        }
-
-//        $fetchParent->closeCursor();
-//        if (!isset($myLeft)) {
-//            throw new \RuntimeException('Failed to extract header position');
-//        }
 
         $index = $batch->getIndices();
         $segment = $batch->getTip()->getSegment()->getId();
-        //$totalN = count($index);
-        //$nTimesTwo = 2 * $totalN;
-        //$leftOffset = $myLeft;
-        //$rightOffset = $myLeft + $nTimesTwo;
-
         $this->transaction(function () use ($index, $segment) {
-            //$resizeIndex->execute(['nTimes2' => $nTimesTwo, 'myLeft' => $myLeft]);
-            //$resizeIndex->closeCursor();
 
             $headerValues = [];
             $headerQuery = [];
 
-            //$indexValues = [];
-            //$indexQuery = [];
-
-            $c = 0;
-            foreach ($index as $i) {
+            foreach ($index as $c => $i) {
                 $headerQuery[] = "(:hash$c , :segment$c , :height$c , :work$c ,
                 :version$c , :prevBlock$c , :merkleRoot$c ,
                 :nBits$c , :nTimestamp$c , :nNonce$c  )";
@@ -674,11 +601,10 @@ class Db implements DbInterface
                 $headerValues['version' . $c] = $header->getVersion();
                 $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
                 $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
-                $headerValues['nBits' . $c] = $header->getBits()->getInt();
+                $headerValues['nBits' . $c] = $header->getBits();
                 $headerValues['nTimestamp' . $c] = $header->getTimestamp();
                 $headerValues['nNonce' . $c] = $header->getNonce();
-                
-                $c++;
+
             }
 
             $insertHeaders = $this->dbh->prepare('
@@ -718,7 +644,7 @@ class Db implements DbInterface
                         new Buffer($row['prevBlock'], 32),
                         new Buffer($row['merkleRoot'], 32),
                         $row['nTimestamp'],
-                        Buffer::int((string)$row['nBits'], 4),
+                        $row['nBits'],
                         $row['nNonce']
                     )
                 );
@@ -748,7 +674,7 @@ class Db implements DbInterface
                         new Buffer($row['prevBlock'], 32),
                         new Buffer($row['merkleRoot'], 32),
                         $row['nTimestamp'],
-                        Buffer::int((string)$row['nBits'], 4),
+                        $row['nBits'],
                         $row['nNonce']
                     )
                 );
@@ -820,7 +746,7 @@ class Db implements DbInterface
                         new Buffer($r['prevBlock'], 32),
                         new Buffer($r['merkleRoot'], 32),
                         $r['nTimestamp'],
-                        Buffer::int($r['nBits'], 4),
+                        $r['nBits'],
                         $r['nNonce']
                     ),
                     $this->fetchBlockTransactions($r['id'])
@@ -874,7 +800,7 @@ class Db implements DbInterface
                     new Buffer($row['prevBlock'], 32),
                     new Buffer($row['merkleRoot'], 32),
                     $row['nTimestamp'],
-                    Buffer::int($row['nBits'], 4),
+                    $row['nBits'],
                     $row['nNonce']
                 );
             }
@@ -984,6 +910,18 @@ WHERE tip.header_id = (
         return "INSERT INTO outpoints (hashKey) VALUES " . implode(", ", $joinList);
     }
 
+    public function selectUtxoByOutpoint(OutPointSerializer $serializer, array $outpoints, array & $values)
+    {
+        $list = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $values['hash' . $i] = $serializer->serialize($outpoint)->getBinary();
+            $list[] = "SELECT * from utxo where hashKey = hash$i";
+        }
+
+        $query = implode("UNION", $list);
+        return $query;
+    }
+
     private function createUtxoOutpointView(OutPointSerializer $serializer, array $outpoints, array & $queryValues)
     {
         $joinList = [];
@@ -1017,14 +955,12 @@ WHERE tip.header_id = (
 
         $t1 = microtime(true);
 
-        $iv = [];
-        $i = $this->dbh->prepare($this->createUtxoOutpointView($outpointSerializer, $outpoints, $iv));
-        $i->execute($iv);
-        echo "CreateView: " . (microtime(true) - $t1)  ." seconds\n";
-        $b = microtime(true);
-        $this->selectUtxosByOutpointsStmt->execute();
-        $rows = $this->selectUtxosByOutpointsStmt->fetchAll(\PDO::FETCH_ASSOC);
-        echo "SelectView: " . (microtime(true) - $b)  ." seconds\n";
+        $values = [];
+        $query = $this->dbh->prepare($this->selectUtxoByOutpoint($outpointSerializer, $outpoints, $values));
+        $query->execute($values);
+
+        $rows = $query->fetchAll(\PDO::FETCH_ASSOC);
+
         $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
@@ -1037,6 +973,64 @@ WHERE tip.header_id = (
 
         echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
         return $outputSet;
+    }
+
+    /**
+     * @param array $utxos
+     */
+    private function insertUtxosToTable(OutPointSerializer $serializer, array $utxos)
+    {
+        $utxoQuery = [];
+        $utxoValues = [];
+        foreach ($utxos as $c => $utxo) {
+            $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
+            $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
+            $utxoValues["v$c"] = $utxo->getOutput()->getValue();
+            $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
+        }
+
+        $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
+        $insertUtxos->execute($utxoValues);
+    }
+
+    /**
+     * @param OutPointSerializer $serializer
+     * @param array $outpoints
+     * @param array $values
+     * @return string
+     */
+    public function deleteUtxosByOutpoint(OutPointSerializer $serializer, array $outpoints, array & $values)
+    {
+        $list = [];
+        foreach ($outpoints as $i => $outpoint) {
+            $values['hash' . $i] = $serializer->serialize($outpoint)->getBinary();
+            $list[] = "'hash$i'";
+        }
+
+        $query = "DELETE FROM utxo WHERE hashKey in (".implode(",", $list).")";
+        return $query;
+    }
+
+    /**
+     * @param OutPointSerializer $serializer
+     * @param array $deleteOutPoints
+     * @param array $newUtxos
+     */
+    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos)
+    {
+        if (!empty($deleteOutPoints)) {
+            $d1 = microtime(true);
+            $deleteValues = [];
+            $delete = $this->dbh->prepare($this->deleteUtxosByOutpoint($serializer, $deleteOutPoints, $deleteValues));
+            $delete->execute($deleteValues);
+            echo "Deletion: ".(microtime(true) - $d1) . "\n";
+        }
+
+        if (!empty($newUtxos)) {
+            $d1 = microtime(true);
+            $this->insertUtxosToTable($serializer, $newUtxos);
+            echo "Insertion: ".(microtime(true) - $d1) . "\n";
+        }
     }
 
     /**

@@ -164,8 +164,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         $segment->next($index);
         $this->hashStorage[$segment->getId()][$index->getHash()->getBinary()] = $index->getHeight();
         $this->heightStorage[$segment->getId()][$index->getHeight()] = $index->getHash()->getBinary();
-        $math = $this->math;
-        if ($math->cmp($math->mod($index->getHeight(), $this->params->powRetargetInterval()), 0) === 0) {
+        if (($index->getHeight() % $this->params->powRetargetInterval()) === 0) {
             $this->emit('retarget', [$segment, $prevBits, $index]);
         }
 

@@ -59,7 +59,7 @@ class ZmqDebug implements DebugInterface
                 'hash' => $index->getHash()->getHex(),
                 'height' => $index->getHeight(),
                 'prevBits' => $bits->getHex(),
-                'newBits' => $index->getHeader()->getBits()->getHex(),
+                'newBits' => $index->getHeader()->getBits(),
             ]);
         });
     }

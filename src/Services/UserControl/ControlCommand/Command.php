@@ -135,7 +135,7 @@ abstract class Command implements CommandInterface
             'version' => $header->getVersion(),
             'prevBlock' => $header->getPrevBlock()->getHex(),
             'merkleRoot' => $header->getMerkleRoot()->getHex(),
-            'nBits' => $header->getBits()->getInt(),
+            'nBits' => $header->getBits(),
             'nTimestamp' => $header->getTimestamp(),
             'nNonce' => $header->getNonce()
         ];
@@ -148,7 +148,7 @@ abstract class Command implements CommandInterface
     public function convertOutpointToArray(OutPointInterface $outpoint)
     {
         return [
-            'txid' => $outpoint->getTxid()->getHex(),
+            'txid' => $outpoint->getTxId()->getHex(),
             'vout' => $outpoint->getVout()
         ];
     }

@@ -53,7 +53,7 @@ class HeaderCheck implements HeaderCheckInterface
     {
         try {
             if ($checkPow) {
-                $this->pow->check($hash, $header->getBits()->getInt());
+                $this->pow->check($hash, $header->getBits());
             }
 
         } catch (\Exception $e) {
@@ -71,13 +71,13 @@ class HeaderCheck implements HeaderCheckInterface
     public function getWorkRequired(ChainAccessInterface $chain, BlockIndexInterface $prevIndex)
     {
         $params = $this->consensus->getParams();
-        if ($this->math->cmp($this->math->mod($this->math->add($prevIndex->getHeight(), 1), $params->powRetargetInterval()), 0) !== 0) {
+        if ((($prevIndex->getHeight() + 1) % $params->powRetargetInterval()) !== 0) {
             // No change in difficulty
-            return $prevIndex->getHeader()->getBits()->getInt();
+            return $prevIndex->getHeader()->getBits();
         }
 
         // Re-target
-        $heightLastRetarget = $this->math->sub($prevIndex->getHeight(), $this->math->sub($params->powRetargetInterval(), 1));
+        $heightLastRetarget = $prevIndex->getHeight() - ($params->powRetargetInterval() - 1);
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
 
         return $this->consensus->calculateNextWorkRequired($prevIndex, $lastTime);
@@ -96,11 +96,11 @@ class HeaderCheck implements HeaderCheckInterface
         $work = $this->getWorkRequired($chain, $prevIndex);
 
         $header = $index->getHeader();
-        if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {
-            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
+        if ($this->math->cmp(gmp_init($header->getBits()), gmp_init($work)) != 0) {
+            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits() . '? ' . $work);
         }
 
-        if ($this->math->cmp($header->getVersion(), $forks->getMajorityVersion()) < 0) {
+        if ($header->getVersion() < $forks->getMajorityVersion()) {
             throw new \RuntimeException('Rejected version');
         }
 

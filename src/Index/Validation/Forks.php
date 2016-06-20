@@ -149,7 +149,7 @@ class Forks
         $header = $this->index->getHeader();
 
         // Check all active features
-        if ($this->math->cmp($header->getTimestamp(), $this->params->p2shActivateTime())) {
+        if ($header->getTimestamp() >= $this->params->p2shActivateTime()) {
             $this->p2sh = true;
         }
 
@@ -160,19 +160,19 @@ class Forks
         );
 
         $highest = $this->majorityVersion();
-        if ($this->math->cmp($highest, 2) >= 0) {
+        if (($highest >= 2)) {
             $this->bip34 = true;
         }
 
-        if ($this->math->cmp($highest, 3) >= 0) {
+        if (($highest >= 3)) {
             $this->derSig = true;
         }
 
-        if ($this->math->cmp($highest, 4) >= 0) {
+        if (($highest >= 4)) {
             $this->cltv = true;
         }
 
-        if ($this->math->cmp($highest, 5) >= 0) {
+        if (($highest >= 5)) {
             $this->witness = true;
         }
 
