@@ -12,7 +12,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
-use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\BufferInterface;
@@ -102,11 +102,11 @@ interface DbInterface
     public function getTransaction(BufferInterface $tipHash, BufferInterface $txid);
 
     /**
-     * @param OutPointSerializer $outpointSerializer
+     * @param OutPointSerializerInterface $outpointSerializer
      * @param OutPointInterface[] $outpoints
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]
      */
-    public function fetchUtxoDbList(OutPointSerializer $outpointSerializer, array $outpoints);
+    public function fetchUtxoDbList(OutPointSerializerInterface $outpointSerializer, array $outpoints);
 
     /**
      * @return ChainSegment[]
@@ -122,13 +122,13 @@ interface DbInterface
     public function insertBlockTransactions($blockId, BlockInterface $block, HashStorage $hashStorage);
 
     /**
-     * @param OutPointSerializer $serializer
+     * @param OutPointSerializerInterface $serializer
      * @param array $deleteOutPoints
      * @param array $newUtxos
      * @param array $specificDeletes
      * @return void
      */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos);
+    public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos);
 
     /**
      * @param HeadersBatch $batch

@@ -10,7 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
-use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
 use BitWasp\Buffertools\BufferInterface;
 
 class DebugDb implements DbInterface
@@ -195,18 +195,12 @@ class DebugDb implements DbInterface
         return $this->db->getTransaction($tipHash, $txid);
     }
 
-    public function fetchUtxoList(BufferInterface $tipHash, array $outpoints)
-    {
-        echo __FUNCTION__ . PHP_EOL;
-        return $this->db->fetchUtxoList($tipHash, $outpoints);
-    }
-
     /**
-     * @param OutPointSerializer $outpointSerializer
+     * @param OutPointSerializerInterface $outpointSerializer
      * @param array $outpoints
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]
      */
-    public function fetchUtxoDbList(OutPointSerializer $outpointSerializer, array $outpoints)
+    public function fetchUtxoDbList(OutPointSerializerInterface $outpointSerializer, array $outpoints)
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->fetchUtxoDbList($outpointSerializer, $outpoints);
@@ -225,12 +219,12 @@ class DebugDb implements DbInterface
     }
 
     /**
-     * @param OutPointSerializer $serializer
+     * @param OutPointSerializerInterface $serializer
      * @param array $deleteOutPoints
      * @param array $newUtxos
      * @param array $specificDeletes
      */
-    public function updateUtxoSet(OutPointSerializer $serializer, array $deleteOutPoints, array $newUtxos)
+    public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos)
     {
         echo __FUNCTION__ . PHP_EOL;
         $this->db->updateUtxoSet($serializer, $deleteOutPoints, $newUtxos);
