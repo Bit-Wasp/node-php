@@ -74,6 +74,7 @@ class P2PBlocksService extends EventEmitter
      */
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
+        echo "GOT INV\n";
         $chains = $this->node->chains();
         $best = $chains->best();
         $blockView = $chains->blocks($best->getSegment());
@@ -99,7 +100,7 @@ class P2PBlocksService extends EventEmitter
 
         try {
             $t1 = microtime(true);
-            $index = $blockIndex->accept($blockMsg->getBlock(), $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
+            $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
             echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
 
             //$chainsIdx->checkTips();

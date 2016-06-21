@@ -138,6 +138,7 @@ class ChainView extends EventEmitter implements ChainViewInterface
     public function updateTip(BlockIndexInterface $index)
     {
         $this->container->updateSegment($this->latestSegment(), $index);
+        $this->heightMap[$index->getHeight()] = $index->getHash()->getBinary();
     }
 
     /**

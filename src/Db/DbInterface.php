@@ -10,6 +10,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
@@ -123,12 +124,9 @@ interface DbInterface
 
     /**
      * @param OutPointSerializerInterface $serializer
-     * @param array $deleteOutPoints
-     * @param array $newUtxos
-     * @param array $specificDeletes
-     * @return void
+     * @param BlockData $blockData
      */
-    public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos);
+    public function updateUtxoSet(OutPointSerializerInterface $serializer, BlockData $blockData);
 
     /**
      * @param HeadersBatch $batch

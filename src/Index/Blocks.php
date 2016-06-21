@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
@@ -195,17 +196,17 @@ class Blocks extends EventEmitter
 
     /**
      * @param BlockInterface $block
+     * @param ChainViewInterface $chainView
      * @param Headers $headers
      * @param bool $checkSignatures
-     * @param bool $checkMerkleRoot
      * @param bool $checkSize
+     * @param bool $checkMerkleRoot
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
+    public function accept(BlockInterface $block, ChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
 
         $v = microtime(true);
-        $chainView = $this->chains->best();
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader());
 
@@ -266,7 +267,7 @@ class Blocks extends EventEmitter
          //   if ($this->config->getItem('config', 'index_transactions', false)) {
         //        $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
          //   }
-            $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+            $utxoSet->applyBlock($blockData);
 
         });
 
