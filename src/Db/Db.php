@@ -974,8 +974,8 @@ WHERE tip.header_id = (
     {
         $list = [];
         foreach ($utxos as $i => $utxo) {
-            $values['id' . $i] = $utxo->getId();
-            $list[] = "'id$i'";
+            $values[] = $utxo->getId();
+            $list[] = "?";
         }
 
         $query = "DELETE FROM utxo WHERE id in (".implode(",", $list).")";
