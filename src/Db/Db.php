@@ -551,9 +551,7 @@ class Db implements DbInterface
         }
 
         $tail = implode(" OR ", $queryValues);
-//        $query = "SELECT MAX(b.id) as maxid, h.* FROM blockIndex b JOIN headerIndex h on (b.hash = h.id) WHERE " . $tail . " GROUP BY b.id";
         $query = "SELECT * from headerIndex where id = (SELECT MAX(b.hash) FROM blockIndex b JOIN headerIndex h on (b.hash = h.id) WHERE " . $tail . " LIMIT 1)";
-        echo "Generated: $query\n";
         $sql = $this->dbh->prepare($query);
         $sql->execute($queryBind);
         $result = $sql->fetch(\PDO::FETCH_ASSOC);

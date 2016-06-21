@@ -10,19 +10,26 @@ use BitWasp\Bitcoin\Transaction\OutPointInterface;
 
 class CachingOutPointSerializer implements OutPointSerializerInterface
 {
-    /**
-     * @var array
-     */
-    private $cache = [];
 
     /**
      * @var OutPointSerializer
      */
     private $serializer;
-
+    private $parse = 0;
+    private $serialize = 0;
+    private $cached = 0;
+    /**
+     * @var \SplObjectStorage
+     */
+    private $cachedObj;
+    /**
+     * @var array
+     */
+    private $cachedStr = [];
     public function __construct()
     {
         $this->serializer = new OutPointSerializer();
+        $this->cachedObj = new \SplObjectStorage();
     }
 
     /**
@@ -31,26 +38,44 @@ class CachingOutPointSerializer implements OutPointSerializerInterface
      */
     public function serialize(OutPointInterface $outpoint)
     {
-        $txid = $outpoint->getTxId()->getBinary() ;
-        $vout = $outpoint->getVout();
-        if (isset($this->cache[$txid . $vout])) {
-            return $this->cache[$txid . $vout];
-        } else {
-            $buffer = $this->serializer->serialize($outpoint);
-            $this->cache[$txid . $vout] = $buffer;
-            return $buffer;
+        if (isset($this->cachedObj[$outpoint])) {
+            $this->cached++;
+            return $this->cachedObj[$outpoint];
         }
+
+        $buffer = $this->serializer->serialize($outpoint);
+        $this->cachedObj[$outpoint] = $buffer;
+        $this->cachedStr[$buffer->getBinary()] = $outpoint;
+        $this->serialize++;
+        return $buffer;
     }
 
+    /**
+     * @param \BitWasp\Buffertools\BufferInterface|string $data
+     * @return array|OutPointInterface
+     */
     public function parse($data)
     {
         return $this->fromParser(new Parser($data));
     }
 
+    /**
+     * @param Parser $parser
+     * @return array|OutPointInterface
+     */
     public function fromParser(Parser $parser)
     {
+        $buffer = $parser->getBuffer();
+        if ($buffer->getSize() > 36) {
+            $buffer = $buffer->slice(0, 36);
+            if (isset($this->cachedStr[$buffer->getBinary()])) {
+                $this->cached++;
+                return $this->cachedStr[$buffer->getBinary()];
+            }
+        }
+
         $parsed = $this->serializer->fromParser($parser);
-        $this->serialize($parsed);
+        $this->parse++;
         return $parsed;
     }
 }

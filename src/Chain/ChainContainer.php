@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Bitcoin;
+use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
@@ -324,6 +325,25 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         foreach ($this->segments as $segment) {
             if ($hash->equals($segment->getLast()->getHash())) {
                 return $this->view($segment);
+            }
+        }
+
+        return false;
+    }
+
+
+    /**
+     * @param BlockHeaderInterface $header
+     * @return BlockIndexInterface|bool
+     */
+    public function hasBlockTip(BlockHeaderInterface $header)
+    {
+        echo "CheckHashBlockTip - " . count($this->segments) . PHP_EOL;
+        foreach ($this->segments as $segment) {
+            /** @var BlockIndexInterface $segBlock */
+            $segBlock = $this->segmentBlock->offsetGet($segment);
+            if ($header->getPrevBlock()->equals($segBlock->getHash())) {
+                return $segBlock;
             }
         }
 

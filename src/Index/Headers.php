@@ -108,11 +108,18 @@ class Headers extends EventEmitter
      * @return BlockIndexInterface
      * @throws \Exception
      */
-    public function accept(BufferInterface $hash, BlockHeaderInterface $header)
+    public function accept(BufferInterface $hash, BlockHeaderInterface $header, $haveBlock = false)
     {
         $isTip = $this->chains->isTip($hash);
         if ($isTip instanceof ChainViewInterface) {
             return $isTip->getIndex();
+        }
+        
+        if ($haveBlock) {
+            $hasBlockTip = $this->chains->hasBlockTip($header);
+            if ($hasBlockTip instanceof BlockIndexInterface) {
+                return $this->getNextIndex($hash, $hasBlockTip, $header);
+            }
         }
 
         if ($this->chains->isKnownHeader($hash)) {
@@ -124,6 +131,22 @@ class Headers extends EventEmitter
         $this->applyBatch($batch);
 
         return $index;
+    }
+
+    /**
+     * @param BufferInterface $hash
+     * @param BlockIndexInterface $prevIndex
+     * @param BlockHeaderInterface $header
+     * @return BlockIndex
+     */
+    public function getNextIndex(BufferInterface $hash, BlockIndexInterface $prevIndex, BlockHeaderInterface $header)
+    {
+        return new BlockIndex(
+            $hash,
+            $prevIndex->getHeight() + 1,
+            $this->math->toString($this->math->add($this->proofOfWork->getWork($header->getBits()), gmp_init($prevIndex->getWork()))),
+            $header
+        );
     }
 
     /**
@@ -180,16 +203,10 @@ class Headers extends EventEmitter
                  */
                 $header = $headers[$i];
                 $hash = $hashStorage[$header];
-
                 $this->headerCheck->check($hash, $header);
 
-                $index = new BlockIndex(
-                    $hash,
-                    $prevIndex->getHeight() + 1,
-                    $this->math->toString($this->math->add($this->proofOfWork->getWork($header->getBits()), gmp_init($prevIndex->getWork()))),
-                    $header
-                );
-
+                $index = $this->getNextIndex($hash, $prevIndex, $header);
+                
                 $forks->next($index);
                 $this->headerCheck->checkContextual($access, $index, $prevIndex, $forks);
 

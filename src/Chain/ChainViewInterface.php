@@ -55,9 +55,4 @@ interface ChainViewInterface
      */
     public function getHeadersLocator(BufferInterface $hashStop = null);
 
-    /**
-     * @param BufferInterface|null $hashStop
-     * @return BlockLocator
-     */
-    public function getBlockLocator(BufferInterface $hashStop = null);
 }
