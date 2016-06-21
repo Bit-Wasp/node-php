@@ -214,8 +214,9 @@ ADD KEY `txidx` (`transaction_hash`,`block_hash`);
 --
 ALTER TABLE `headerIndex`
 ADD PRIMARY KEY (`id`),
-ADD UNIQUE KEY `hash` (`hash`) USING HASH,
-ADD KEY `prevBlock` (`prevBlock`);
+  ADD UNIQUE KEY `hash` (`hash`) USING HASH,
+  ADD INDEX `chain` (`segment`, `height`),
+  ADD KEY `prevBlock` (`prevBlock`);
 
 --
 -- Indexes for table `iindex`

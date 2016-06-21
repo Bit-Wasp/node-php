@@ -11,7 +11,7 @@ use Evenement\EventEmitter;
 class GuidedChainView extends EventEmitter implements ChainViewInterface
 {
     /**
-     * @var ChainContainer
+     * @var ChainsInterface
      */
     private $container;
     
@@ -21,7 +21,7 @@ class GuidedChainView extends EventEmitter implements ChainViewInterface
     private $index;
 
     /**
-     * @var ChainView
+     * @var ChainViewInterface
      */
     private $view;
 
@@ -32,11 +32,11 @@ class GuidedChainView extends EventEmitter implements ChainViewInterface
 
     /**
      * GuidedChainView constructor.
-     * @param ChainContainer $container
-     * @param ChainView $view
+     * @param ChainsInterface $container
+     * @param ChainViewInterface $view
      * @param BlockIndexInterface $lead
      */
-    public function __construct(ChainContainer $container, ChainView $view, BlockIndexInterface $lead)
+    public function __construct(ChainsInterface $container, ChainViewInterface $view, BlockIndexInterface $lead)
     {
         $this->container = $container;
         $this->view = $view;

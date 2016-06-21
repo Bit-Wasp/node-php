@@ -19,10 +19,12 @@ use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Serializer\Block\CachingBlockSerializer;
+use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingOutPointSerializer;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionInputSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
@@ -68,11 +70,6 @@ class Blocks extends EventEmitter
      * @var Consensus
      */
     private $consensus;
-
-    /**
-     * @var UtxoSet
-     */
-    private $utxoSet;
 
     /**
      * Blocks constructor.
@@ -176,28 +173,17 @@ class Blocks extends EventEmitter
     }
 
     /**
-     * @return UtxoSet
-     */
-    private function fetchUtxoSet()
-    {
-        if (null === $this->utxoSet) {
-            $this->utxoSet = new UtxoSet($this->db);
-        }
-
-        return $this->utxoSet;
-    }
-
-    /**
      * @param BlockInterface $block
      * @param TransactionSerializerInterface $txSerializer
+     * @param UtxoSet $utxoSet
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer)
+    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
 
         try {
-            $remaining = $this->fetchUtxoSet()->fetchView($blockData->requiredOutpoints);
+            $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
             $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
             return $blockData;
         } catch (\Exception $e) {
@@ -217,21 +203,27 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
+
+        $v = microtime(true);
         $chainView = $this->chains->best();
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader());
 
-        $txSerializer = new CachingTransactionSerializer();
+        $outpointSerializer = new CachingOutPointSerializer();
+        $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
+        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
 
-        $v = microtime(true);
-        $blockData = $this->prepareBatch($block, $txSerializer);
+        $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
 
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
             ->checkContextual($block, $chainView->getLastBlock());
+        echo "Blocks::accept 1 " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
 
+        $a = microtime(true);
         $utxoView = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
@@ -240,7 +232,9 @@ class Blocks extends EventEmitter
             $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
             $forks = $this->forks = new Forks($this->consensus->getParams(), $chainView->getLastBlock(), $versionInfo);
         }
-
+        $b = microtime(true);
+        $cumu = 0;
+        echo "Fence: " . ($b - $a). " seconds\n";
         $flags = $forks->getFlags();
         $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
@@ -262,18 +256,20 @@ class Blocks extends EventEmitter
                 $fee = $utxoView->getFeePaid($this->math, $tx);
                 $blockData->nFees = $this->math->add($blockData->nFees, $fee);
 
+                $b = microtime(true);
                 $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);
+                $cumu += (microtime(true) - $b);
             }
         }
 
         if ($scriptCheckState->active() && !$scriptCheckState->result()) {
             throw new \RuntimeException('ScriptValidation failed!');
         }
+        echo "Script validation time: " . $cumu.PHP_EOL;
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $index->getHeight());
-        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
-
-        $m = microtime(true);
+        echo "Blocks::accept 2 [".count($block->getTransactions())."] " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
         $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
 
@@ -282,12 +278,16 @@ class Blocks extends EventEmitter
             }
         });
 
-        echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
-        $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-        $this->chains->blocks($chainView->getSegment())->updateTip($index);
-        $this->forks->next($index);
+        $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+        echo "Blocks::accept 3 " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
 
+        $this->chains->blocksView($chainView)->updateTip($index);
+        $this->forks->next($index);
+        echo "Blocks::accept 4 " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
         $this->emit('block', [$index, $block, $blockData]);
+        echo "Blocks::accept 5 " . (microtime(true) - $v) . " seconds\n";
 
         return $index;
     }

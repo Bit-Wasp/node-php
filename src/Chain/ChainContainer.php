@@ -274,12 +274,21 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     }
 
     /**
+     * @param ChainViewInterface $view
+     * @return GuidedChainView
+     */
+    public function blocksView(ChainViewInterface $view)
+    {
+        return new GuidedChainView($this, $view, $this->segmentBlock->offsetGet($view->getSegment()));
+    }
+
+    /**
      * @param ChainSegment $segment
      * @return GuidedChainView
      */
     public function blocks(ChainSegment $segment)
     {
-        return new GuidedChainView($this, $this->view($segment), $this->segmentBlock->offsetGet($segment));
+        return $this->blocksView($this->view($segment));
     }
 
     /**

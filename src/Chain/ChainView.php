@@ -156,17 +156,6 @@ class ChainView extends EventEmitter implements ChainViewInterface
         return $this->segments;
     }
 
-    private function heightMap()
-    {
-        $map = [];
-        foreach ($this->segments as $segment) {
-            $hashes = $this->container->getHashes($segment);
-            $map = array_merge($map, array_flip($hashes));
-        }
-
-        return $map;
-    }
-
     /**
      * Produce a block locator for a given block height.
      * @param int $height
@@ -177,7 +166,7 @@ class ChainView extends EventEmitter implements ChainViewInterface
     {
         $step = 1;
         $hashes = [];
-        $map = $this->heightMap();
+        $map = $this->heightMap;
         if ($height > count($map)) {
             throw new \RuntimeException('Height too great to produce locator');
         }

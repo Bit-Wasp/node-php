@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitterInterface;
 
@@ -21,6 +20,18 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
     public function view(ChainSegment $segment);
 
     /**
+     * @param ChainSegment $segment
+     * @param BlockIndexInterface $index
+     */
+    public function updateSegment(ChainSegment $segment, BlockIndexInterface $index);
+    
+    /**
+     * @param ChainSegment $segment
+     * @param BlockIndexInterface $index
+     */
+    public function updateSegmentBlock(ChainSegment $segment, BlockIndexInterface $index);
+    
+    /**
      * @param ChainViewInterface $view
      * @return ChainAccessInterface
      */
@@ -31,6 +42,12 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
      * @return GuidedChainView
      */
     public function blocks(ChainSegment $segment);
+
+    /**
+     * @param ChainViewInterface $view
+     * @return GuidedChainView
+     */
+    public function blocksView(ChainViewInterface $view);
 
     /**
      * @param BufferInterface $hash

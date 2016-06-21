@@ -19,7 +19,6 @@ use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
-use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
 use BitWasp\Bitcoin\Transaction\OutPoint;
@@ -917,11 +916,11 @@ WHERE tip.header_id = (
             $outputSet[] = new Utxo($outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
-        if (count($outputSet) < $requiredCount) {
+        if (count($outputSet) !== $requiredCount) {
             throw new \RuntimeException('Less than (' . count($outputSet) . ') required amount (' . $requiredCount . ')returned');
         }
 
-        echo "utxos took " . (microtime(true) - $t1) . " seconds\n";
+        echo "Loading UTXOs (".count($outpoints).") took " . (microtime(true) - $t1) . " seconds\n";
         return $outputSet;
     }
 
@@ -970,17 +969,13 @@ WHERE tip.header_id = (
     public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos)
     {
         if (!empty($deleteOutPoints)) {
-            $d1 = microtime(true);
             $deleteValues = [];
             $delete = $this->dbh->prepare($this->deleteUtxosByOutpoint($serializer, $deleteOutPoints, $deleteValues));
             $delete->execute($deleteValues);
-            echo "Deletion: ".(microtime(true) - $d1) . "\n";
         }
 
         if (!empty($newUtxos)) {
-            $d1 = microtime(true);
             $this->insertUtxosToTable($serializer, $newUtxos);
-            echo "Insertion: ".(microtime(true) - $d1) . "\n";
         }
     }
 
