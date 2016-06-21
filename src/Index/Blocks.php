@@ -8,7 +8,7 @@ use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
+use BitWasp\Bitcoin\Node\Chain\HeaderChainViewInterface;
 use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
@@ -181,29 +181,26 @@ class Blocks extends EventEmitter
      */
     public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
     {
+        $t = microtime(true);
         $blockData = $this->parseUtxos($block, $txSerializer);
-
-        try {
-            $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
-            $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
-            return $blockData;
-        } catch (\Exception $e) {
-            echo $e->getMessage().PHP_EOL;
-            echo $e->getTraceAsString().PHP_EOL;
-            die();
-        }
+        $blockData->utxoView = new UtxoView(array_merge(
+            $utxoSet->fetchView($blockData->requiredOutpoints),
+            $blockData->parsedUtxos
+        ));
+        echo "preparebatch: " . (microtime(true) - $t) . PHP_EOL;
+        return $blockData;
     }
 
     /**
      * @param BlockInterface $block
-     * @param ChainViewInterface $chainView
+     * @param HeaderChainViewInterface $chainView
      * @param Headers $headers
      * @param bool $checkSignatures
      * @param bool $checkSize
      * @param bool $checkMerkleRoot
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, ChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
+    public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
 
         $v = microtime(true);
@@ -275,7 +272,7 @@ class Blocks extends EventEmitter
         echo "Blocks::accept 3 " . (microtime(true) - $v) . " [db updates] seconds\n";
         $v = microtime(true);
 
-        $this->chains->blocksView($chainView)->updateTip($index);
+        $chainView->blocks()->updateTip($index);
         $this->forks->next($index);
         echo "Blocks::accept 4 " . (microtime(true) - $v) . " seconds\n";
         $v = microtime(true);

@@ -8,7 +8,7 @@ use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
-class ChainView extends EventEmitter implements ChainViewInterface
+class ChainView extends EventEmitter implements HeaderChainViewInterface
 {
     /**
      * @var ChainContainer
@@ -36,6 +36,11 @@ class ChainView extends EventEmitter implements ChainViewInterface
     private $heightMap = [];
 
     /**
+     * @var GuidedChainView
+     */
+    private $blockView;
+    
+    /**
      * ChainView constructor.
      * @param ChainContainer $container
      * @param ChainSegment $segment
@@ -51,8 +56,18 @@ class ChainView extends EventEmitter implements ChainViewInterface
             $heights = $container->getHeights($segment);
             $this->heightMap = array_merge($this->heightMap, $heights);
         }
+
+        $this->blockView = new GuidedChainView($container, $this, $block);
     }
 
+    /**
+     * @return GuidedChainView
+     */
+    public function blocks()
+    {
+        return $this->blockView;
+    }
+    
     /**
      * @return int|string
      */
@@ -204,15 +219,6 @@ class ChainView extends EventEmitter implements ChainViewInterface
      * @return BlockLocator
      */
     public function getHeadersLocator(BufferInterface $hashStop = null)
-    {
-        return $this->getLocator($this->getIndex()->getHeight(), $hashStop);
-    }
-
-    /**
-     * @param BufferInterface|null $hashStop
-     * @return BlockLocator
-     */
-    public function getBlockLocator(BufferInterface $hashStop = null)
     {
         return $this->getLocator($this->getIndex()->getHeight(), $hashStop);
     }
