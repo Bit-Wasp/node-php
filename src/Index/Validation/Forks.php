@@ -110,9 +110,7 @@ class Forks
      */
     private function updateCount($version)
     {
-        if ($version >= 5) {
-            $this->versionCount['v5']++;
-        } else if ($version >= 4) {
+        if ($version >= 4) {
             $this->versionCount['v4']++;
         } else if ($version >= 3) {
             $this->versionCount['v3']++;
@@ -128,9 +126,7 @@ class Forks
      */
     private function dropCount($version)
     {
-        if ($version >= 5) {
-            $this->versionCount['v5']--;
-        } else if ($version >= 4) {
+        if ($version >= 4) {
             $this->versionCount['v4']--;
         } else if ($version >= 3) {
             $this->versionCount['v3']--;
@@ -149,7 +145,7 @@ class Forks
         $header = $this->index->getHeader();
 
         // Check all active features
-        if ($this->math->cmp($header->getTimestamp(), $this->params->p2shActivateTime())) {
+        if ($header->getTimestamp() >= $this->params->p2shActivateTime()) {
             $this->p2sh = true;
         }
 
@@ -160,20 +156,16 @@ class Forks
         );
 
         $highest = $this->majorityVersion();
-        if ($this->math->cmp($highest, 2) >= 0) {
+        if (($highest >= 2)) {
             $this->bip34 = true;
         }
 
-        if ($this->math->cmp($highest, 3) >= 0) {
+        if (($highest >= 3)) {
             $this->derSig = true;
         }
 
-        if ($this->math->cmp($highest, 4) >= 0) {
+        if (($highest >= 4)) {
             $this->cltv = true;
-        }
-
-        if ($this->math->cmp($highest, 5) >= 0) {
-            $this->witness = true;
         }
 
         // Calculate flags
@@ -184,10 +176,6 @@ class Forks
 
         if ($this->cltv) {
             $this->flags |= InterpreterInterface::VERIFY_CHECKLOCKTIMEVERIFY;
-        }
-
-        if ($this->witness) {
-            $this->flags |= InterpreterInterface::VERIFY_WITNESS;
         }
     }
 
@@ -283,9 +271,6 @@ class Forks
      */
     private function majorityVersion()
     {
-        if (($this->versionCount['v5'] / 1000) > 0.95) {
-            return 5;
-        }
 
         if (($this->versionCount['v4'] / 1000) > 0.95) {
             return 4;
@@ -307,9 +292,6 @@ class Forks
      */
     public function getMajorityVersion()
     {
-        if ($this->witness) {
-            return 5;
-        }
 
         if ($this->cltv) {
             return 4;

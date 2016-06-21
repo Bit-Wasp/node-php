@@ -7,7 +7,6 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
 
 class Consensus implements ConsensusInterface
 {
@@ -41,13 +40,12 @@ class Consensus implements ConsensusInterface
     }
 
     /**
-     * @param int|string $amount
+     * @param int $amount
      * @return bool
      */
     public function checkAmount($amount)
     {
-        return $this->math->cmp($amount, 0) < 0
-        || $this->math->cmp($amount, $this->math->mul($this->params->maxMoney(), Amount::COIN)) < 0;
+        return $amount < 0 || $amount < ($this->params->maxMoney() * Amount::COIN);
     }
 
     /**
@@ -56,21 +54,20 @@ class Consensus implements ConsensusInterface
      */
     public function getSubsidy($height)
     {
-        $math = $this->math;
-        $halvings = $math->div($height, $this->params->subsidyHalvingInterval());
-        if ($math->cmp($halvings, 64) >= 0) {
+        $halvings = $height / $this->params->subsidyHalvingInterval();
+        if ($halvings >= 64) {
             return 0;
         }
 
-        $subsidy = $math->mul(50, Amount::COIN);
-        $subsidy = $math->rightShift($subsidy, $halvings);
+        $subsidy = 50 * Amount::COIN;
+        $subsidy = $subsidy >> $halvings;
         return $subsidy;
     }
 
     /**
      * @param BlockIndexInterface $prevIndex
      * @param int $timeFirstBlock
-     * @return int|string
+     * @return int
      */
     public function calculateNextWorkRequired(BlockIndexInterface $prevIndex, $timeFirstBlock)
     {
@@ -81,14 +78,14 @@ class Consensus implements ConsensusInterface
 
         $negative = false;
         $overflow = false;
-        $target = $math->writeCompact($header->getBits()->getInt(), $negative, $overflow);
-        $limit = $this->math->writeCompact($this->params->powBitsLimit(), $negative, $overflow);
-        $new = bcdiv(bcmul($target, $timespan), $this->params->powTargetTimespan());
+        $target = $math->decodeCompact($header->getBits(), $negative, $overflow);
+        $limit = $this->math->decodeCompact($this->params->powBitsLimit(), $negative, $overflow);
+        $new = gmp_init(bcdiv(bcmul($target, $timespan), $this->params->powTargetTimespan()), 10);
         if ($math->cmp($new, $limit) > 0) {
             $new = $limit;
         }
 
-        return $math->parseCompact($new, false);
+        return gmp_strval($math->encodeCompact($new, false), 10);
     }
 
     /**
@@ -118,16 +115,16 @@ class Consensus implements ConsensusInterface
      */
     public function calculateWorkTimespan($timeFirstBlock, BlockHeaderInterface $header)
     {
-        $timespan = $this->math->sub($header->getTimestamp(), $timeFirstBlock);
+        $timespan = $header->getTimestamp() - $timeFirstBlock;
         
-        $lowest = $this->math->div($this->params->powTargetTimespan(), 4);
-        $highest = $this->math->mul($this->params->powTargetTimespan(), 4);
+        $lowest = $this->params->powTargetTimespan() / 4;
+        $highest = $this->params->powTargetTimespan() * 4;
 
-        if ($this->math->cmp($timespan, $lowest) < 0) {
+        if ($timespan < $lowest) {
             $timespan = $lowest;
         }
 
-        if ($this->math->cmp($timespan, $highest) > 0) {
+        if ($timespan > $highest) {
             $timespan = $highest;
         }
         

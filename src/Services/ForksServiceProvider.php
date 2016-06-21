@@ -4,9 +4,9 @@ namespace BitWasp\Bitcoin\Node\Services;
 
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
-use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
+use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
 use Pimple\Container;

@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `active_fork` (
 -- --------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS `outpoints` (
+  `id` int(11) default 0,
   `hashKey` varbinary(36) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -52,7 +53,7 @@ ADD KEY `hkidx` (`hashKey`);
 CREATE TABLE IF NOT EXISTS `blockIndex` (
   `id` int(9) NOT NULL,
   `hash` int(19) NOT NULL,
-  `block` blob NOT NULL
+  `block` longblob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS `block_transactions` (
 
 CREATE TABLE IF NOT EXISTS `headerIndex` (
   `id` int(9) NOT NULL,
+  `segment` int(9) NOT NULL,
   `hash` varbinary(32) NOT NULL,
   `height` bigint(20) NOT NULL,
   `work` varchar(64) NOT NULL,
@@ -132,13 +134,12 @@ CREATE TABLE IF NOT EXISTS `retarget` (
 CREATE TABLE IF NOT EXISTS `transactions` (
   `id` int(9) NOT NULL,
   `hash` varbinary(32) NOT NULL,
-  `transaction` text NOT NULL,
   `nOut` int(9) NOT NULL,
   `valueOut` bigint(32) NOT NULL,
   `valueFee` bigint(32) NOT NULL,
   `version` int(11) NOT NULL,
   `nLockTime` int(11) NOT NULL,
-  `isCoinbase` tinyint(1) NOT NULL DEFAULT '0'
+  `isCoinbase` boolean DEFAULT false
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -150,7 +151,7 @@ CREATE TABLE IF NOT EXISTS `transactions` (
 CREATE TABLE IF NOT EXISTS `transaction_input` (
   `id` bigint(20) NOT NULL,
   `hashPrevOut` varbinary(32) NOT NULL,
-  `nPrevOut` int(32) NOT NULL,
+  `nPrevOut` bigint(32) NOT NULL,
   `scriptSig` blob NOT NULL,
   `nSequence` bigint(19) NOT NULL,
   `parent_tx` int(15) NOT NULL,
@@ -178,12 +179,11 @@ CREATE TABLE IF NOT EXISTS `transaction_output` (
 --
 
 CREATE TABLE IF NOT EXISTS `utxo` (
-  `id` int(11) NOT NULL,
+  `id` int(16) NOT NULL,
   `hashKey` varbinary(36) NOT NULL,
   `value` bigint(32) NOT NULL,
   `scriptPubKey` blob NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
 --
 -- Indexes for dumped tables
 --
@@ -214,8 +214,9 @@ ADD KEY `txidx` (`transaction_hash`,`block_hash`);
 --
 ALTER TABLE `headerIndex`
 ADD PRIMARY KEY (`id`),
-ADD UNIQUE KEY `hash` (`hash`) USING HASH,
-ADD KEY `prevBlock` (`prevBlock`);
+  ADD UNIQUE KEY `hash` (`hash`) USING HASH,
+  ADD INDEX `chain` (`segment`, `height`),
+  ADD KEY `prevBlock` (`prevBlock`);
 
 --
 -- Indexes for table `iindex`
@@ -256,8 +257,8 @@ ADD KEY `parent_tx` (`parent_tx`);
 -- Indexes for table `utxo`
 --
 ALTER TABLE `utxo`
-ADD PRIMARY KEY (`id`),
-ADD KEY `hashKeyIdx` (`hashKey`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `hashKeyIdx` (`hashKey`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -307,7 +308,8 @@ MODIFY `id` int(9) NOT NULL AUTO_INCREMENT;
 -- AUTO_INCREMENT for table `utxo`
 --
 ALTER TABLE `utxo`
-MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+MODIFY `id` int(15) NOT NULL AUTO_INCREMENT;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

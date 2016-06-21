@@ -2,6 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand;
 
+use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Node\NodeInterface;
 
 class InfoCommand extends Command
@@ -15,10 +16,11 @@ class InfoCommand extends Command
     {
         $chains = $node->chains();
         $nChain = count($chains);
+        $best = $chains->best();
 
         return [
-            'best_header' => $this->convertIndexToArray($chains->best()->getIndex()),
-            'best_block' => $this->convertIndexToArray($chains->best()->getLastBlock()),
+            'best_header' => $this->convertIndexToArray($best->getIndex()),
+            'best_block' => $this->convertIndexToArray($best->getLastBlock()),
             'nChain' => $nChain
         ];
     }

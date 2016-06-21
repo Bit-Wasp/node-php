@@ -7,42 +7,57 @@ use Evenement\EventEmitterInterface;
 
 interface ChainsInterface extends \Countable, EventEmitterInterface
 {
-    /**
-     * @return ChainStateInterface[]
-     */
-    public function getStates();
 
     /**
-     * @param ChainStateInterface $a
-     * @param ChainStateInterface $b
-     * @return int
-     */
-    public function compareChainStateWork(ChainStateInterface $a, ChainStateInterface $b);
-
-    /**
-     * @return void
-     */
-    public function checkTips();
-
-    /**
-     * @param ChainStateInterface $state
-     */
-    public function trackState(ChainStateInterface $state);
-
-    /**
-     * @return ChainStateInterface
+     * @return ChainView
      */
     public function best();
 
     /**
+     * @param ChainSegment $segment
+     * @return ChainViewInterface
+     */
+    public function view(ChainSegment $segment);
+
+    /**
+     * @param ChainSegment $segment
+     * @param BlockIndexInterface $index
+     */
+    public function updateSegment(ChainSegment $segment, BlockIndexInterface $index);
+    
+    /**
+     * @param ChainSegment $segment
+     * @param BlockIndexInterface $index
+     */
+    public function updateSegmentBlock(ChainSegment $segment, BlockIndexInterface $index);
+    
+    /**
+     * @param ChainViewInterface $view
+     * @return ChainAccessInterface
+     */
+    public function access(ChainViewInterface $view);
+
+    /**
+     * @param ChainSegment $segment
+     * @return GuidedChainView
+     */
+    public function blocks(ChainSegment $segment);
+
+    /**
+     * @param ChainViewInterface $view
+     * @return GuidedChainView
+     */
+    public function blocksView(ChainViewInterface $view);
+
+    /**
      * @param BufferInterface $hash
-     * @return false|ChainStateInterface
+     * @return false|ChainViewInterface
      */
     public function isKnownHeader(BufferInterface $hash);
 
     /**
      * @param BufferInterface $hash
-     * @return false|ChainStateInterface
+     * @return false|ChainViewInterface
      */
     public function isTip(BufferInterface $hash);
 }

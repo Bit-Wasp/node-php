@@ -6,7 +6,7 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ProofOfWork;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainAccessInterface;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -38,8 +38,6 @@ class HeaderCheck implements HeaderCheckInterface
         EcAdapterInterface $ecAdapter,
         ProofOfWork $proofOfWork
     ) {
-    
-
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
         $this->pow = $proofOfWork;
@@ -55,7 +53,7 @@ class HeaderCheck implements HeaderCheckInterface
     {
         try {
             if ($checkPow) {
-                $this->pow->check($hash, $header->getBits()->getInt());
+                $this->pow->check($hash, $header->getBits());
             }
 
         } catch (\Exception $e) {
@@ -66,43 +64,43 @@ class HeaderCheck implements HeaderCheckInterface
     }
 
     /**
-     * @param ChainStateInterface $chain
+     * @param ChainAccessInterface $chain
      * @param BlockIndexInterface $prevIndex
-     * @return int|string
+     * @return int
      */
-    public function getWorkRequired(ChainStateInterface $chain, BlockIndexInterface $prevIndex)
+    public function getWorkRequired(ChainAccessInterface $chain, BlockIndexInterface $prevIndex)
     {
         $params = $this->consensus->getParams();
-        if ($this->math->cmp($this->math->mod($this->math->add($prevIndex->getHeight(), 1), $params->powRetargetInterval()), 0) !== 0) {
+        if ((($prevIndex->getHeight() + 1) % $params->powRetargetInterval()) !== 0) {
             // No change in difficulty
-            return $prevIndex->getHeader()->getBits()->getInt();
+            return $prevIndex->getHeader()->getBits();
         }
 
         // Re-target
-        $heightLastRetarget = $this->math->sub($prevIndex->getHeight(), $this->math->sub($params->powRetargetInterval(), 1));
+        $heightLastRetarget = $prevIndex->getHeight() - ($params->powRetargetInterval() - 1);
         $lastTime = $chain->fetchAncestor($heightLastRetarget)->getHeader()->getTimestamp();
-
         return $this->consensus->calculateNextWorkRequired($prevIndex, $lastTime);
     }
 
 
     /**
-     * @param ChainStateInterface $chain
+     * @param ChainAccessInterface $chain
      * @param BlockIndexInterface $index
      * @param BlockIndexInterface $prevIndex
      * @param Forks $forks
      * @return $this
      */
-    public function checkContextual(ChainStateInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
+    public function checkContextual(ChainAccessInterface $chain, BlockIndexInterface $index, BlockIndexInterface $prevIndex, Forks $forks)
     {
         $work = $this->getWorkRequired($chain, $prevIndex);
-
         $header = $index->getHeader();
-        if ($this->math->cmp($header->getBits()->getInt(), $work) != 0) {
-            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits()->getInt() . '? ' . $work);
+        if ($this->math->cmp(gmp_init($header->getBits(), 10), gmp_init($work, 10)) != 0) {
+            throw new \RuntimeException('Headers::CheckContextual(): invalid proof of work : ' . $header->getBits() . '? ' . $work);
         }
 
-        if ($this->math->cmp($header->getVersion(), $forks->getMajorityVersion()) < 0) {
+        if ($header->getVersion() < $forks->getMajorityVersion()) {
+            echo $index->getHash()->getHex().PHP_EOL;
+            echo "Heaader: " . $header->getVersion() . "\nMajority: " . $forks->getMajorityVersion().PHP_EOL;
             throw new \RuntimeException('Rejected version');
         }
 

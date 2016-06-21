@@ -3,7 +3,7 @@
 namespace BitWasp\Bitcoin\Node;
 
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainStateInterface;
+use BitWasp\Bitcoin\Node\Chain\ChainView;
 use Evenement\EventEmitterInterface;
 
 interface NodeInterface extends EventEmitterInterface
@@ -26,7 +26,7 @@ interface NodeInterface extends EventEmitterInterface
     public function transactions();
 
     /**
-     * @return ChainStateInterface
+     * @return ChainView
      */
     public function chain();
 

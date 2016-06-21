@@ -6,11 +6,10 @@ use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\Block;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
-use BitWasp\Bitcoin\Node\Chain\HeadersBatch;
+use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\Request\BlockDownloader;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerState;
-use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
@@ -49,7 +48,7 @@ class P2PBlocksService extends EventEmitter
 
         /** @var P2PHeadersService $headers */
         $headers = $container['p2p.headers'];
-        $headers->on('headers', [$this, 'onHeaders']);
+        $headers->on(Message::HEADERS, [$this, 'onHeaders']);
         
         /** @var P2PInvService $inv */
         $inv = $container['p2p.inv'];
@@ -75,8 +74,9 @@ class P2PBlocksService extends EventEmitter
      */
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
-        $best = $this->node->chain();
-        $blockView = $best->bestBlocksCache();
+        $chains = $this->node->chains();
+        $best = $chains->best();
+        $blockView = $chains->blocks($best->getSegment());
         $this->blockDownload->advertised($best, $blockView, $peer, $vInv);
     }
 
@@ -87,33 +87,29 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
-        $t1 = microtime(true);
-        $node = $this->node;
-        $best = $node->chain();
-        $block = $blockMsg->getBlock();
+        echo "Starting block\n";
 
-        $chainsIdx = $node->chains();
-        $headerIdx = $node->headers();
-        $blockIndex = $node->blocks();
+        $best = $this->node->chain();
+        $headerIdx = $this->node->headers();
+        $blockIndex = $this->node->blocks();
 
         $checkSignatures = (bool)$this->config->getItem('config', 'check_signatures', true);
         $checkSize = (bool)$this->config->getItem('config', 'check_block_size', true);
         $checkMerkleRoot = (bool)$this->config->getItem('config', 'check_merkle_root', true);
 
         try {
-            $index = $blockIndex->accept($block, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
-
-            $chainsIdx->checkTips();
-            $this->blockDownload->received($best, $peer, $index->getHash());
-
-            $txcount = count($block->getTransactions());
-            $nSig = array_reduce($block->getTransactions()->all(), function ($r, TransactionInterface $v) {
-                return $r + count($v->getInputs());
-            }, 0);
-            $this->node->emit('event', ['p2p.block', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'nTx' => $txcount, 'nSig' => $nSig]]);
+            $t1 = microtime(true);
+            $index = $blockIndex->accept($blockMsg->getBlock(), $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
             echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
+
+            //$chainsIdx->checkTips();
+
+            $dl = microtime(true);
+            $this->blockDownload->received($best, $peer, $index->getHash());
+            echo "Updating downloader: " . (microtime(True) - $dl) .PHP_EOL;
+
         } catch (\Exception $e) {
-            $header = $block->getHeader();
+            $header = $blockMsg->getBlock()->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
         }
     }

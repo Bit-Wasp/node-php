@@ -60,6 +60,10 @@ txrelay=0
 # defaults to off
 websocket=0
 
+## P2P Connections - enable p2p servicec
+# defaults to on
+p2p=1
+
 ');
         return 0;
     }

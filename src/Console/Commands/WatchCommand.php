@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Console\Commands;
 
 use React\ZMQ\Context;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class WatchCommand extends AbstractCommand
@@ -12,7 +13,10 @@ class WatchCommand extends AbstractCommand
     {
         $this
             ->setName('watch')
-            ->setDescription('Watch for messages from the bitcoin node');
+            ->setDescription('Watch for messages from the bitcoin node')
+            ->addOption('all', 'a', InputOption::VALUE_OPTIONAL, 'Display all messages', false)
+            ->addOption('events', 'e', InputOption::VALUE_OPTIONAL, 'Comma separated list of messages to filter', false)
+        ;
     }
 
     /**
@@ -22,12 +26,33 @@ class WatchCommand extends AbstractCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $all = $input->getOption('all');
+        $events = $input->getOption('events');
+
+        // No filter if no options set
+        // No filter if $all set
+        // Filter if events set & !$all.
+        $filter = [];
+        if (!$all) {
+            if ($events) {
+                $filter = explode(",", $events);
+            }
+        }
+
         $loop = \React\EventLoop\Factory::create();
         $context = new Context($loop);
         $cmdControl = $context->getSocket(\ZMQ::SOCKET_SUB);
         $cmdControl->connect('tcp://127.0.0.1:5566');
         $cmdControl->subscribe('');
-        $cmdControl->on('message', function ($e) {
+
+        $cmdControl->on('message', function ($e) use ($filter) {
+            if (!empty($filter)) {
+                $parsed = json_decode($e, true);
+                if (!in_array($parsed['event'], $filter)) {
+                    return;
+                }
+            }
+
             echo $e . PHP_EOL;
         });
         $loop->run();

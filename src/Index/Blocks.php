@@ -6,23 +6,25 @@ use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Crypto\Hash;
-use BitWasp\Bitcoin\Node\Chain\BlockData;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\CachingUtxoSet;
 use BitWasp\Bitcoin\Node\Chain\ChainsInterface;
+use BitWasp\Bitcoin\Node\Chain\UtxoSet;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
-use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\Forks;
 use BitWasp\Bitcoin\Node\Index\Validation\ScriptValidation;
 use BitWasp\Bitcoin\Node\Serializer\Block\CachingBlockSerializer;
+use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingOutPointSerializer;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionInputSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\OutPoint;
@@ -70,11 +72,6 @@ class Blocks extends EventEmitter
     private $consensus;
 
     /**
-     * @var CachingUtxoSet
-     */
-    private $utxoSet;
-
-    /**
      * Blocks constructor.
      * @param DbInterface $db
      * @param ConfigProviderInterface $config
@@ -109,9 +106,8 @@ class Blocks extends EventEmitter
         try {
             $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
-            $math = Bitcoin::getMath();
-            $bs = new BlockSerializer($math, new BlockHeaderSerializer(), new TransactionSerializer());
-            $this->db->insertBlock($index->getHash(), $genesisBlock, $bs);
+            echo $e->getMessage().PHP_EOL;
+            $this->db->insertBlock($index->getHash(), $genesisBlock, new BlockSerializer(Bitcoin::getMath(), new BlockHeaderSerializer(), new TransactionSerializer()));
         }
     }
 
@@ -177,43 +173,24 @@ class Blocks extends EventEmitter
     }
 
     /**
-     * @return CachingUtxoSet
-     */
-    private function fetchUtxoSet()
-    {
-        if (null === $this->utxoSet) {
-            $this->utxoSet = new CachingUtxoSet($this->db);
-        }
-        
-        return $this->utxoSet;
-    }
-
-    /**
      * @param BlockInterface $block
      * @param TransactionSerializerInterface $txSerializer
+     * @param UtxoSet $utxoSet
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer)
+    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
     {
         $blockData = $this->parseUtxos($block, $txSerializer);
 
-        if ($this->config->getItem('config', 'index_utxos', true)) {
-            try {
-                echo "Utxoset - fetch view\n";
-                $utxoSet = $this->fetchUtxoSet();
-                $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
-            } catch (\Exception $e) {
-                echo $e->getMessage().PHP_EOL;
-                echo $e->getTraceAsString().PHP_EOL;
-                die();
-            }
-
-        } else {
-            $remaining = $this->db->fetchUtxoList($block->getHeader()->getPrevBlock(), $blockData->requiredOutpoints);
+        try {
+            $remaining = $utxoSet->fetchView($blockData->requiredOutpoints);
+            $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
+            return $blockData;
+        } catch (\Exception $e) {
+            echo $e->getMessage().PHP_EOL;
+            echo $e->getTraceAsString().PHP_EOL;
+            die();
         }
-
-        $blockData->utxoView = new UtxoView(array_merge($remaining, $blockData->parsedUtxos));
-        return $blockData;
     }
 
     /**
@@ -226,56 +203,53 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
-        $state = $this->chains->best();
 
+        $v = microtime(true);
+        $chainView = $this->chains->best();
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader());
 
-        $txSerializer = new CachingTransactionSerializer();
+        $outpointSerializer = new CachingOutPointSerializer();
+        $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
+        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
 
-        $blockData = $this->prepareBatch($block, $txSerializer);
+        $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
 
-        $v = microtime(true);
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
-            ->checkContextual($block, $state->getLastBlock());
+            ->checkContextual($block, $chainView->getLastBlock());
+        echo "Blocks::accept 1 " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
 
-        $view = $blockData->utxoView;
+        $utxoView = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
             $forks = $this->forks;
         } else {
             $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
-            $forks = $this->forks = new Forks($this->consensus->getParams(), $state->getLastBlock(), $versionInfo);
+            $forks = $this->forks = new Forks($this->consensus->getParams(), $chainView->getLastBlock(), $versionInfo);
         }
-
         $flags = $forks->getFlags();
         $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
-        $nFees = 0;
-        $nSigOps = 0;
-
         foreach ($block->getTransactions() as $tx) {
-            $nSigOps += $this->blockCheck->getLegacySigOps($tx);
-
-            if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
+            $blockData->nSigOps += $this->blockCheck->getLegacySigOps($tx);
+            if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                 throw new \RuntimeException('Blocks::accept() - too many sigops');
             }
 
             if (!$tx->isCoinbase()) {
                 if ($flags & InterpreterInterface::VERIFY_P2SH) {
-                    $nSigOps = $this->blockCheck->getP2shSigOps($view, $tx);
-                    if ($nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
+                    $blockData->nSigOps += $this->blockCheck->getP2shSigOps($utxoView, $tx);
+                    if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');
                     }
                 }
 
-                $fee = $this->math->sub($view->getValueIn($this->math, $tx), $tx->getValueOut());
-                $nFees = $this->math->add($nFees, $fee);
-
-                $this->blockCheck->checkInputs($view, $tx, $index->getHeight(), $flags, $scriptCheckState);
+                $blockData->nFees = $this->math->add($blockData->nFees, $utxoView->getFeePaid($this->math, $tx));
+                $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);
             }
         }
 
@@ -283,25 +257,29 @@ class Blocks extends EventEmitter
             throw new \RuntimeException('ScriptValidation failed!');
         }
 
-        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $nFees, $index->getHeight());
-        echo "Validation: " . (microtime(true) - $v) . " seconds\n";
-
-        $m = microtime(true);
-        $this->db->transaction(function () use ($hash, $state, $block, $blockData, $blockSerializer) {
+        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $index->getHeight());
+        echo "Blocks::accept 2 " . (microtime(true) - $v) . " seconds - validation [".count($block->getTransactions())."] \n";
+        $v = microtime(true);
+        $this->db->transaction(function () use ($hash, $block, $blockSerializer, $blockData, $utxoSet) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
 
-            if ($this->config->getItem('config', 'index_transactions', true)) {
-                $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
-            }
+         //   if ($this->config->getItem('config', 'index_transactions', false)) {
+        //        $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
+         //   }
+            $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+
         });
-        echo "Block insert: ".(microtime(true)-$m) . " seconds\n";
 
-        if ($this->config->getItem('config', 'index_utxos', true)) {
-            $this->utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-        }
 
-        $state->updateLastBlock($index);
+        echo "Blocks::accept 3 " . (microtime(true) - $v) . " [db updates] seconds\n";
+        $v = microtime(true);
+
+        $this->chains->blocksView($chainView)->updateTip($index);
         $this->forks->next($index);
+        echo "Blocks::accept 4 " . (microtime(true) - $v) . " seconds\n";
+        $v = microtime(true);
+        $this->emit('block', [$index, $block, $blockData]);
+        echo "Blocks::accept 5 " . (microtime(true) - $v) . " seconds\n";
 
         return $index;
     }

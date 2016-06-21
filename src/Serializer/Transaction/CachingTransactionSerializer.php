@@ -2,7 +2,11 @@
 
 namespace BitWasp\Bitcoin\Node\Serializer\Transaction;
 
+use BitWasp\Bitcoin\Serializer\Script\ScriptWitnessSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\OldTransactionSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionInputSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionOutputSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\BufferInterface;
@@ -22,10 +26,13 @@ class CachingTransactionSerializer implements TransactionSerializerInterface
 
     /**
      * CachingTransactionSerializer constructor.
+     * @param TransactionInputSerializer|null $txInSer
+     * @param TransactionOutputSerializer|null $txOutSer
+     * @param ScriptWitnessSerializer|null $witSer
      */
-    public function __construct()
+    public function __construct(TransactionInputSerializer $txInSer = null, TransactionOutputSerializer $txOutSer = null, ScriptWitnessSerializer $witSer = null)
     {
-        $this->txSerializer = new OldTransactionSerializer();
+        $this->txSerializer = new TransactionSerializer($txInSer, $txOutSer, $witSer);
         $this->storage = new \SplObjectStorage();
     }
 

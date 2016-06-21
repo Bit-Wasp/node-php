@@ -2,7 +2,7 @@
 
 namespace BitWasp\Bitcoin\Node\Services;
 
-use BitWasp\Bitcoin\Node\DbInterface;
+use BitWasp\Bitcoin\Node\Db\DbInterface;
 
 class DbServiceProvider extends GenericInstanceServiceProvider
 {

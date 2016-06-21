@@ -79,7 +79,7 @@ class BlockCheck implements BlockCheckInterface
                 ->getOutput()
                 ->getScript();
 
-            if ($scriptPubKey->classify($outputScript)->isPayToScriptHash()) {
+            if ($scriptPubKey->classify()->isPayToScriptHash($outputScript)) {
                 $nSigOps += $outputScript->countP2shSigOps($input->getScript());
             }
         }
@@ -89,14 +89,15 @@ class BlockCheck implements BlockCheckInterface
 
     /**
      * @param TransactionInterface $coinbase
-     * @param int $nFees
+     * @param \GMP $nFees
      * @param int $height
      * @return $this
      */
-    public function checkCoinbaseSubsidy(TransactionInterface $coinbase, $nFees, $height)
+    public function checkCoinbaseSubsidy(TransactionInterface $coinbase, \GMP $nFees, $height)
     {
-        $nBlockReward = $this->math->add($this->consensus->getSubsidy($height), $nFees);
-        if ($this->math->cmp($coinbase->getValueOut(), $nBlockReward) > 0) {
+        $subsidy = gmp_init($this->consensus->getSubsidy($height), 10);
+        $nBlockReward = $this->math->add($subsidy, $nFees);
+        if ($this->math->cmp(gmp_init($coinbase->getValueOut(), 10), $nBlockReward) > 0) {
             throw new \RuntimeException('Accept(): Coinbase pays too much');
         }
 
@@ -116,8 +117,8 @@ class BlockCheck implements BlockCheckInterface
             return true;
         }
 
-        $basis = $this->math->cmp($nLockTime, Locktime::BLOCK_MAX) < 0 ? $height : $time;
-        if ($this->math->cmp($nLockTime, $basis) < 0) {
+        $basis = $nLockTime < Locktime::BLOCK_MAX ? $height : $time;
+        if ($nLockTime < $basis) {
             return true;
         }
 
@@ -136,10 +137,10 @@ class BlockCheck implements BlockCheckInterface
     public function checkOutputsAmount(TransactionOutputCollection $outputs)
     {
         // Check output values
-        $value = 0;
+        $value = gmp_init(0, 10);
         foreach ($outputs as $output) {
             $this->consensus->checkAmount($output->getValue());
-            $value = $this->math->add($value, $output->getValue());
+            $value = $this->math->add($value, gmp_init($output->getValue(), 10));
             $this->consensus->checkAmount($value);
         }
 
@@ -204,7 +205,7 @@ class BlockCheck implements BlockCheckInterface
         } else {
             foreach ($inputs as $input) {
                 if ($input->isCoinBase()) {
-                    throw new \RuntimeException('CheckTransaction: a non-coinbase transaction input was null');
+                    throw new \RuntimeException('CheckTransaction: a non-coinbase tx input was null');
                 }
             }
         }
@@ -248,7 +249,7 @@ class BlockCheck implements BlockCheckInterface
             }
 
             // Check if we need to repeat the last hash (odd number of transactions)
-            if (!$this->math->isEven($txCount)) {
+            if (!($txCount % 2 === 0)) {
                 $tree->set($txCount, $last);
             }
 
@@ -297,7 +298,7 @@ class BlockCheck implements BlockCheckInterface
             $nSigOps += $this->getLegacySigOps($transaction);
         }
 
-        if ($this->math->cmp($nSigOps, $params->getMaxBlockSigOps()) > 0) {
+        if ($nSigOps > $params->getMaxBlockSigOps()) {
             throw new \RuntimeException('BlockCheck: sigops exceeds maximum allowed');
         }
 
@@ -312,7 +313,7 @@ class BlockCheck implements BlockCheckInterface
      */
     public function checkContextualInputs(UtxoView $view, TransactionInterface $tx, $spendHeight)
     {
-        $valueIn = 0;
+        $valueIn = gmp_init(0);
 
         for ($i = 0, $nInputs = count($tx->getInputs()); $i < $nInputs; $i++) {
             /*if ($out->isCoinbase()) {
@@ -322,13 +323,14 @@ class BlockCheck implements BlockCheckInterface
                 }
             }*/
 
-            $valueIn = $this->math->add($valueIn, $view->fetchByInput($tx->getInput($i))->getOutput()->getValue());
+            $value = gmp_init($view->fetchByInput($tx->getInput($i))->getOutput()->getValue(), 10);
+            $valueIn = $this->math->add($valueIn, $value);
             $this->consensus->checkAmount($valueIn);
         }
 
-        $valueOut = 0;
+        $valueOut = gmp_init(0);
         foreach ($tx->getOutputs() as $output) {
-            $valueOut = $this->math->add($valueOut, $output->getValue());
+            $valueOut = $this->math->add($valueOut, gmp_init($output->getValue(), 10));
             $this->consensus->checkAmount($valueOut);
         }
 

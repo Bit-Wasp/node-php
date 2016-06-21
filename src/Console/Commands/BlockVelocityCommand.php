@@ -39,7 +39,7 @@ class BlockVelocityCommand extends AbstractCommand
 
         $pull->on('message', function ($msg) use (&$batch) {
             $arr = json_decode($msg);
-            if ($arr->event == 'p2p.block') {
+            if ($arr->event == 'block') {
                 $batch++;
             }
         });
