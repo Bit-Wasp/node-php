@@ -181,7 +181,6 @@ class Blocks extends EventEmitter
      */
     public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
     {
-
         $blockData = $this->parseUtxos($block, $txSerializer);
         $blockData->utxoView = new UtxoView(array_merge(
             $utxoSet->fetchView($blockData->requiredOutpoints),
@@ -208,6 +207,13 @@ class Blocks extends EventEmitter
         return $forks;
     }
 
+    /**
+     * @param BlockInterface $block
+     * @param BlockData $blockData
+     * @param bool $checkSignatures
+     * @param bool $flags
+     * @param $height
+     */
     public function checkBlockData(BlockInterface $block, BlockData $blockData, $checkSignatures, $flags, $height)
     {
         $validation = new ScriptValidation($checkSignatures, $flags);
@@ -234,6 +240,8 @@ class Blocks extends EventEmitter
         if ($validation->active() && !$validation->result()) {
             throw new \RuntimeException('ScriptValidation failed!');
         }
+
+        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $height);
     }
 
     /**
@@ -248,7 +256,11 @@ class Blocks extends EventEmitter
     public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
         $hash = $block->getHeader()->getHash();
-        $index = $headers->accept($hash, $block->getHeader());
+        if (!$chainView->getLastBlock()->getHash()->equals($block->getHeader()->getPrevBlock())) {
+            throw new \RuntimeException('Block is not for longest chain');
+        }
+
+        $index = $headers->accept($hash, $block->getHeader(), true);
 
         $outpointSerializer = new CachingOutPointSerializer();
         $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
@@ -256,6 +268,7 @@ class Blocks extends EventEmitter
         $utxoSet = new UtxoSet($this->db, $outpointSerializer);
 
         $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
+
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
@@ -263,7 +276,6 @@ class Blocks extends EventEmitter
 
         $forks = $this->prepareForks($chainView, $index);
         $this->checkBlockData($block, $blockData, $checkSignatures, $forks->getFlags(), $index->getHeight());
-        $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $index->getHeight());
 
         $this->db->transaction(function () use ($hash, $block, $blockSerializer, $utxoSet, $blockData) {
             $this->db->insertBlock($hash, $block, $blockSerializer);
