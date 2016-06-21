@@ -266,7 +266,7 @@ class Blocks extends EventEmitter
          //   if ($this->config->getItem('config', 'index_transactions', false)) {
         //        $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
          //   }
-            $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+            $utxoSet->applyBlock($blockData);
 
         });
 

@@ -15,7 +15,9 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
+use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -913,7 +915,7 @@ WHERE tip.header_id = (
         $outputSet = [];
         foreach ($rows as $utxo) {
             $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
-            $outputSet[] = new Utxo($outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) !== $requiredCount) {
@@ -961,21 +963,45 @@ WHERE tip.header_id = (
         return $query;
     }
 
+
     /**
      * @param OutPointSerializerInterface $serializer
-     * @param array $deleteOutPoints
-     * @param array $newUtxos
+     * @param DbUtxo[] $utxos
+     * @param array $values
+     * @return string
      */
-    public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos)
+    public function deleteUtxosByUtxo(array $utxos, array & $values)
     {
-        if (!empty($deleteOutPoints)) {
+        $list = [];
+        foreach ($utxos as $i => $utxo) {
+            $values['id' . $i] = $utxo->getId();
+            $list[] = "'id$i'";
+        }
+
+        $query = "DELETE FROM utxo WHERE id in (".implode(",", $list).")";
+        return $query;
+    }
+
+    /**
+     * @param OutPointSerializerInterface $outSer
+     * @param BlockData $blockData
+     */
+    public function updateUtxoSet(OutPointSerializerInterface $outSer, BlockData $blockData)
+    {
+        if (!empty($blockData->requiredOutpoints)) {
             $deleteValues = [];
-            $delete = $this->dbh->prepare($this->deleteUtxosByOutpoint($serializer, $deleteOutPoints, $deleteValues));
+            //$delete = $this->dbh->prepare($this->deleteUtxosByOutpoint($serializer, $deleteOutPoints, $deleteValues));
+            $utxos = [];
+            foreach ($blockData->requiredOutpoints as $outpoint) {
+                $utxos[] = $blockData->utxoView->fetch($outpoint);
+            }
+
+            $delete = $this->dbh->prepare($this->deleteUtxosByUtxo($utxos, $deleteValues));
             $delete->execute($deleteValues);
         }
 
-        if (!empty($newUtxos)) {
-            $this->insertUtxosToTable($serializer, $newUtxos);
+        if (!empty($blockData->remainingNew)) {
+            $this->insertUtxosToTable($outSer, $blockData->remainingNew);
         }
     }
 

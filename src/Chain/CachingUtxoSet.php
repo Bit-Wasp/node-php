@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 use BitWasp\Bitcoin\Node\Db\DbInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Script\Script;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Bitcoin\Transaction\OutPointInterface;
@@ -61,27 +62,26 @@ class CachingUtxoSet
     }
 
     /**
-     * @param OutPointInterface[] $deleteOutPoints
-     * @param Utxo[] $newUtxos
+     * @param BlockData $blockData
      */
-    public function applyBlock(array $deleteOutPoints, array $newUtxos)
+    public function applyBlock(BlockData $blockData)
     {
-        $this->db->updateUtxoSet($this->outpointSerializer, $deleteOutPoints, $newUtxos, $this->cacheHits);
+        $this->db->updateUtxoSet($this->outpointSerializer, $blockData);
         
         if ($this->caching) {
             foreach ($this->cacheHits as $key) {
                 $this->set->delete($key);
             }
 
-            foreach ($newUtxos as $c => $utxo) {
+            foreach ($blockData->remainingNew as $c => $utxo) {
                 $new = $this->outpointSerializer->serialize($utxo->getOutPoint())->getBinary();
                 $this->set->save($new, [
-                    $newUtxos[$c]->getOutput()-> getValue(),
-                    $newUtxos[$c]->getOutput()->getScript()->getBinary(),
+                    $utxo->getOutput()-> getValue(),
+                    $utxo->getOutput()->getScript()->getBinary(),
                 ], 500000);
             }
 
-            echo "Inserts: " . count($newUtxos). " | Deletes: " . count($deleteOutPoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
+            echo "Inserts: " . count($blockData->remainingNew). " | Deletes: " . count($blockData->requiredOutpoints). " | " . "CacheHits: " . count($this->cacheHits) .PHP_EOL;
 
             $this->cacheHits = [];
         }

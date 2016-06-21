@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
@@ -220,14 +221,12 @@ class DebugDb implements DbInterface
 
     /**
      * @param OutPointSerializerInterface $serializer
-     * @param array $deleteOutPoints
-     * @param array $newUtxos
-     * @param array $specificDeletes
+     * @param BlockData $blockData
      */
-    public function updateUtxoSet(OutPointSerializerInterface $serializer, array $deleteOutPoints, array $newUtxos)
+    public function updateUtxoSet(OutPointSerializerInterface $serializer, BlockData $blockData)
     {
         echo __FUNCTION__ . PHP_EOL;
-        $this->db->updateUtxoSet($serializer, $deleteOutPoints, $newUtxos);
+        return $this->db->updateUtxoSet($serializer, $blockData);
     }
 
     /**
