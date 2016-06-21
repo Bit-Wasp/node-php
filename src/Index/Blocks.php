@@ -253,7 +253,7 @@ class Blocks extends EventEmitter
 
             if (!$tx->isCoinbase()) {
                 if ($flags & InterpreterInterface::VERIFY_P2SH) {
-                    $blockData->nSigOps = $this->blockCheck->getP2shSigOps($utxoView, $tx);
+                    $blockData->nSigOps += $this->blockCheck->getP2shSigOps($utxoView, $tx);
                     if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                         throw new \RuntimeException('Blocks::accept() - too many sigops');
                     }

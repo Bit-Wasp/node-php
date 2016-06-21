@@ -48,7 +48,7 @@ class P2PBlocksService extends EventEmitter
 
         /** @var P2PHeadersService $headers */
         $headers = $container['p2p.headers'];
-        $headers->on('headers', [$this, 'onHeaders']);
+        $headers->on(Message::HEADERS, [$this, 'onHeaders']);
         
         /** @var P2PInvService $inv */
         $inv = $container['p2p.inv'];
