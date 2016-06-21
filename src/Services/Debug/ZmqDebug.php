@@ -59,6 +59,7 @@ class ZmqDebug implements DebugInterface
      */
     public function logBlock (BlockIndexInterface $index, BlockInterface $block, BlockData $blockData)
     {
+        echo count($blockData->remainingNew) . "created and ".count($blockData->requiredOutpoints) . " destroyed\n";
         $this->log('block', [
             'hash' => $index->getHash()->getHex(),
             'height' => $index->getHeight(),

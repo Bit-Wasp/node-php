@@ -49,7 +49,7 @@ class DebugDb implements DbInterface
     }
 
     /**
-     * 
+     *
      */
     public function stop()
     {

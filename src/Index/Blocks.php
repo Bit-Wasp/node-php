@@ -223,7 +223,6 @@ class Blocks extends EventEmitter
         echo "Blocks::accept 1 " . (microtime(true) - $v) . " seconds\n";
         $v = microtime(true);
 
-        $a = microtime(true);
         $utxoView = $blockData->utxoView;
 
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
@@ -232,15 +231,11 @@ class Blocks extends EventEmitter
             $versionInfo = $this->db->findSuperMajorityInfoByHash($block->getHeader()->getPrevBlock());
             $forks = $this->forks = new Forks($this->consensus->getParams(), $chainView->getLastBlock(), $versionInfo);
         }
-        $b = microtime(true);
-        $cumu = 0;
-        echo "Fence: " . ($b - $a). " seconds\n";
         $flags = $forks->getFlags();
         $scriptCheckState = new ScriptValidation($checkSignatures, $flags);
 
         foreach ($block->getTransactions() as $tx) {
             $blockData->nSigOps += $this->blockCheck->getLegacySigOps($tx);
-
             if ($blockData->nSigOps > $this->consensus->getParams()->getMaxBlockSigOps()) {
                 throw new \RuntimeException('Blocks::accept() - too many sigops');
             }
@@ -253,33 +248,30 @@ class Blocks extends EventEmitter
                     }
                 }
 
-                $fee = $utxoView->getFeePaid($this->math, $tx);
-                $blockData->nFees = $this->math->add($blockData->nFees, $fee);
-
-                $b = microtime(true);
+                $blockData->nFees = $this->math->add($blockData->nFees, $utxoView->getFeePaid($this->math, $tx));
                 $this->blockCheck->checkInputs($utxoView, $tx, $index->getHeight(), $flags, $scriptCheckState);
-                $cumu += (microtime(true) - $b);
             }
         }
 
         if ($scriptCheckState->active() && !$scriptCheckState->result()) {
             throw new \RuntimeException('ScriptValidation failed!');
         }
-        echo "Script validation time: " . $cumu.PHP_EOL;
 
         $this->blockCheck->checkCoinbaseSubsidy($block->getTransaction(0), $blockData->nFees, $index->getHeight());
-        echo "Blocks::accept 2 [".count($block->getTransactions())."] " . (microtime(true) - $v) . " seconds\n";
+        echo "Blocks::accept 2 " . (microtime(true) - $v) . " seconds - validation [".count($block->getTransactions())."] \n";
         $v = microtime(true);
-        $this->db->transaction(function () use ($hash, $chainView, $block, $blockData, $blockSerializer) {
+        $this->db->transaction(function () use ($hash, $block, $blockSerializer, $blockData, $utxoSet) {
             $blockId = $this->db->insertBlock($hash, $block, $blockSerializer);
 
-            if ($this->config->getItem('config', 'index_transactions', false)) {
-                $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
-            }
+         //   if ($this->config->getItem('config', 'index_transactions', false)) {
+        //        $this->db->insertBlockTransactions($blockId, $block, $blockData->hashStorage);
+         //   }
+            $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
+
         });
 
-        $utxoSet->applyBlock($blockData->requiredOutpoints, $blockData->remainingNew);
-        echo "Blocks::accept 3 " . (microtime(true) - $v) . " seconds\n";
+
+        echo "Blocks::accept 3 " . (microtime(true) - $v) . " [db updates] seconds\n";
         $v = microtime(true);
 
         $this->chains->blocksView($chainView)->updateTip($index);
