@@ -32,6 +32,12 @@ class CachingOutPointSerializer implements OutPointSerializerInterface
         $this->cachedObj = new \SplObjectStorage();
     }
 
+    public function stats()
+    {
+        return [
+            'cached' => $this->cached, 'serialize' => $this->serialize, 'parse' => $this->parse 
+        ];
+    }
     /**
      * @param OutPointInterface $outpoint
      * @return mixed

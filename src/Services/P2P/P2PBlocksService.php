@@ -74,7 +74,6 @@ class P2PBlocksService extends EventEmitter
      */
     public function onInvBlocks(PeerState $state, Peer $peer, array $vInv)
     {
-        echo "GOT INV\n";
         $chains = $this->node->chains();
         $best = $chains->best();
         $blockView = $chains->blocks($best->getSegment());
@@ -88,8 +87,6 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
-        echo "Starting block\n";
-
         $best = $this->node->chain();
         $headerIdx = $this->node->headers();
         $blockIndex = $this->node->blocks();
@@ -99,16 +96,9 @@ class P2PBlocksService extends EventEmitter
         $checkMerkleRoot = (bool)$this->config->getItem('config', 'check_merkle_root', true);
 
         try {
-            $t1 = microtime(true);
             $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
-            echo "------------------------------- block processing time: " . (microtime(true) - $t1) . " seconds\n";
-
-            //$chainsIdx->checkTips();
-
-            $dl = microtime(true);
             $this->blockDownload->received($best, $peer, $index->getHash());
-            echo "Updating downloader: " . (microtime(True) - $dl) .PHP_EOL;
-
+            
         } catch (\Exception $e) {
             $header = $blockMsg->getBlock()->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
