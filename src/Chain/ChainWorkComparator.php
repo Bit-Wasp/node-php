@@ -28,6 +28,6 @@ class ChainWorkComparator
      */
     public function __invoke(ChainSegment $a, ChainSegment $b)
     {
-        return $this->math->cmp($a->getLast()->getWork(), $b->getLast()->getWork());
+        return $this->math->cmp(gmp_init($a->getLast()->getWork(), 10), gmp_init($b->getLast()->getWork(), 10));
     }
 }
