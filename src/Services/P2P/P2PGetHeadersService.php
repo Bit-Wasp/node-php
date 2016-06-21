@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Services\P2P;
 
-use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\GetHeaders;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
@@ -53,10 +52,11 @@ class P2PGetHeadersService extends EventEmitter
      */
     public function onGetHeaders(PeerState $state, Peer $peer, GetHeaders $getHeaders)
     {
+        return;
+        
         $chain = $this->node->chain();
 
-        $math = Bitcoin::getMath();
-        if ($math->cmp($chain->getIndex()->getHeader()->getTimestamp(), (time() - 60 * 60 * 24)) >= 0) {
+        if ($chain->getIndex()->getHeader()->getTimestamp() >= (time() - 60 * 60 * 24)) {
             $locator = $getHeaders->getLocator();
             if (count($locator->getHashes()) === 0) {
                 $start = $locator->getHashStop();

@@ -256,14 +256,13 @@ class Blocks extends EventEmitter
     public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
         $hash = $block->getHeader()->getHash();
-
         $index = $headers->accept($hash, $block->getHeader(), true);
 
         $outpointSerializer = new CachingOutPointSerializer();
         $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
-        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
 
+        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
         $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
 
         $this
@@ -273,6 +272,7 @@ class Blocks extends EventEmitter
 
         $forks = $this->prepareForks($chainView, $index);
         $this->checkBlockData($block, $blockData, $checkSignatures, $forks->getFlags(), $index->getHeight());
+
         $this->db->transaction(function () use ($hash, $block, $blockSerializer, $utxoSet, $blockData) {
             $this->db->insertBlock($hash, $block, $blockSerializer);
             $utxoSet->applyBlock($blockData);
@@ -282,7 +282,7 @@ class Blocks extends EventEmitter
         $forks->next($index);
 
         $this->emit('block', [$index, $block, $blockData]);
-
+        print_r($outpointSerializer->stats());
         return $index;
     }
 }

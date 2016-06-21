@@ -181,10 +181,7 @@ class Headers extends EventEmitter
 
         $view = $this->chains->isTip($bestPrev);
         if ($view === false) {
-            // TODO: forks
-            //$segment = $this->db->fetchHistoricChain($this, $bestPrev);
-            //$this->chains->trackState($segment);
-            die('fork');
+            throw new \RuntimeException('Headers::accept(): Unhandled fork');
         }
 
         $prevIndex = $view->getIndex();

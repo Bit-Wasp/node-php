@@ -47,7 +47,6 @@ class P2PHeadersService extends EventEmitter
     {
         $chain = $this->node->chain();
         $height = $chain->getIndex()->getHeight();
-        //$height = ($height != 0) ? $height - 1 : $height;
 
         $peer->getheaders($chain->getLocator($height));
     }
@@ -63,31 +62,24 @@ class P2PHeadersService extends EventEmitter
 
         try {
             $vHeaders = $headersMsg->getHeaders();
-            echo "Processing " . count($vHeaders) . " headers\n";
-            $p1 = microtime(true);
             $batch = $headers->prepareBatch($vHeaders);
-            echo "Preparation: ".(microtime(true) - $p1) . " seconds\n";
             $count = count($batch->getIndices());
 
             if ($count > 0) {
-                $p1 = microtime(true);
                 $headers->applyBatch($batch);
                 $view = $batch->getTip();
                 $indices = $batch->getIndices();
                 $indexLast = end($indices);
 
                 $state->updateBlockAvailability($view, $indexLast->getHash());
-                echo "Application: ".(microtime(true) - $p1) . " seconds\n";
                 if ($count >= 1999) {
                     $peer->getheaders($view->getHeadersLocator());
-                    echo "Send getheaders\n";
                 }
             }
 
             $this->emit('headers', [$state, $peer, $batch]);
             
         } catch (\Exception $e) {
-            echo "onHeaders: exception\n";
             $this->debug->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }
