@@ -15,6 +15,11 @@ class ScriptValidation implements ScriptValidationInterface
     private $active;
 
     /**
+     * @var int
+     */
+    private $flags;
+
+    /**
      * @var \BitWasp\Bitcoin\Script\Consensus\ConsensusInterface
      */
     private $consensus;
@@ -41,7 +46,8 @@ class ScriptValidation implements ScriptValidationInterface
         }
 
         $this->active = $active;
-        $this->consensus = ScriptFactory::consensus($flags);
+        $this->flags = $flags;
+        $this->consensus = ScriptFactory::consensus();
     }
 
     /**
@@ -61,8 +67,7 @@ class ScriptValidation implements ScriptValidationInterface
     {
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
             $output = $utxoView->fetchByInput($tx->getInput($i))->getOutput();
-            $witness = isset($tx->getWitnesses()[$i]) ? $tx->getWitness($i) : null;
-            $this->results[] = $this->consensus->verify($tx, $output->getScript(), $i, $output->getValue(), $witness);
+            $this->results[] = $this->consensus->verify($tx, $output->getScript(), $this->flags, $i, $output->getValue());
         }
 
         return $this;

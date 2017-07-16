@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutputInterface;
+use BitWasp\Buffertools\Buffer;
 
 abstract class Command implements CommandInterface
 {
@@ -132,6 +133,7 @@ abstract class Command implements CommandInterface
             'height' => $index->getHeight(),
             'hash' => $index->getHash()->getHex(),
             'work' => $index->getWork(),
+            'workHex' => Buffer::int($index->getWork(), 32)->getHex(),
             'version' => $header->getVersion(),
             'prevBlock' => $header->getPrevBlock()->getHex(),
             'merkleRoot' => $header->getMerkleRoot()->getHex(),

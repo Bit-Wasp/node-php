@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 use BitWasp\Bitcoin\Bitcoin;
+use BitWasp\Bitcoin\Networking\DnsSeeds\MainNetDnsSeeds;
 use BitWasp\Bitcoin\Networking\Factory;
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\Addr;
@@ -102,7 +103,7 @@ class P2PService extends EventEmitter
         }
 
         $this->manager = new Manager($this->connector);
-        $this->locator = new Locator($dns);
+        $this->locator = new Locator(new MainNetDnsSeeds(), $dns);
 
         // Setup listener if required
         if ($this->config->getItem('config', 'listen', '0')) {

@@ -3,8 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
 use BitWasp\Bitcoin\Crypto\EcAdapter\Adapter\EcAdapterInterface;
 use BitWasp\Bitcoin\Exceptions\MerkleTreeEmpty;
 use BitWasp\Bitcoin\Locktime;
@@ -12,10 +10,12 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
-use BitWasp\Bitcoin\Script\ScriptFactory;
+use BitWasp\Bitcoin\Script\Classifier\OutputClassifier;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
+use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
+use BitWasp\Bitcoin\Transaction\TransactionOutputInterface;
 use BitWasp\Buffertools\Buffer;
 use Pleo\Merkle\FixedSizeTree;
 
@@ -25,6 +25,11 @@ class BlockCheck implements BlockCheckInterface
      * @var Consensus
      */
     private $consensus;
+
+    /**
+     * @var OutputClassifier
+     */
+    private $classifier;
 
     /**
      * @var \BitWasp\Bitcoin\Math\Math
@@ -39,6 +44,7 @@ class BlockCheck implements BlockCheckInterface
     {
         $this->consensus = $consensus;
         $this->math = $ecAdapter->getMath();
+        $this->classifier = new OutputClassifier();
     }
 
     /**
@@ -71,7 +77,6 @@ class BlockCheck implements BlockCheckInterface
         }
 
         $nSigOps = 0;
-        $scriptPubKey = ScriptFactory::scriptPubKey();
         for ($i = 0, $c = count($tx->getInputs()); $i < $c; $i++) {
             $input = $tx->getInput($i);
             $outputScript = $view
@@ -79,7 +84,7 @@ class BlockCheck implements BlockCheckInterface
                 ->getOutput()
                 ->getScript();
 
-            if ($scriptPubKey->classify()->isPayToScriptHash($outputScript)) {
+            if ($this->classifier->isPayToScriptHash($outputScript)) {
                 $nSigOps += $outputScript->countP2shSigOps($input->getScript());
             }
         }
@@ -131,10 +136,10 @@ class BlockCheck implements BlockCheckInterface
     }
 
     /**
-     * @param TransactionOutputCollection $outputs
+     * @param TransactionOutputInterface[] $outputs
      * @return $this
      */
-    public function checkOutputsAmount(TransactionOutputCollection $outputs)
+    public function checkOutputsAmount(array $outputs)
     {
         // Check output values
         $value = gmp_init(0, 10);
@@ -148,10 +153,10 @@ class BlockCheck implements BlockCheckInterface
     }
 
     /**
-     * @param TransactionInputCollection $inputs
+     * @param TransactionInputInterface[] $inputs
      * @return $this
      */
-    public function checkInputsForDuplicates(TransactionInputCollection $inputs)
+    public function checkInputsForDuplicates(array $inputs)
     {
         // Avoid duplicate inputs
         $ins = array();

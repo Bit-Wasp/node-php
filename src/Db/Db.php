@@ -7,10 +7,6 @@ use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionInputCollection;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionOutputCollection;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionWitnessCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndex;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
@@ -687,7 +683,7 @@ class Db implements DbInterface
 
     /**
      * @param int $blockId
-     * @return TransactionCollection
+     * @return TransactionInterface[]
      */
     public function fetchBlockTransactions($blockId)
     {
@@ -718,7 +714,7 @@ class Db implements DbInterface
         foreach ($builder as $b) {
             $collection[] = $b->get();
         }
-        return new TransactionCollection($collection);
+        return $collection;
     }
 
     /**
@@ -849,7 +845,7 @@ WHERE tip.header_id = (
 
         $transaction = new Transaction(
             $txInfo['version'],
-            new TransactionInputCollection(array_map(function (array $input) {
+            array_map(function (array $input) {
                 return new TransactionInput(
                     new OutPoint(
                         new Buffer($input['hashPrevOut'], 32),
@@ -858,14 +854,14 @@ WHERE tip.header_id = (
                     new Script(new Buffer($input['scriptSig'])),
                     $input['nSequence']
                 );
-            }, $inputs)),
-            new TransactionOutputCollection(array_map(function (array $input) {
+            }, $inputs),
+            array_map(function (array $input) {
                 return new TransactionOutput(
                     $input['value'],
                     new Script(new Buffer($input['scriptPubKey']))
                 );
-            }, $outputs)),
-            new TransactionWitnessCollection([]),
+            }, $outputs),
+            [],
             $txInfo['nLockTime']
         );
 
