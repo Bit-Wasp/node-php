@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\Services\ConfigServiceProvider;
 use BitWasp\Bitcoin\Node\Services\DbServiceProvider;
 use BitWasp\Bitcoin\Node\Services\Debug\ZmqDebug;
 use BitWasp\Bitcoin\Node\Services\LoopServiceProvider;
+use BitWasp\Bitcoin\Node\Services\NetworkServiceProvider;
 use BitWasp\Bitcoin\Node\Services\P2P\P2PBlocksServiceProvider;
 use BitWasp\Bitcoin\Node\Services\P2P\P2PHeadersServiceProvider;
 use BitWasp\Bitcoin\Node\Services\P2P\P2PInvServiceProvider;
@@ -114,6 +115,7 @@ class StartCommand extends AbstractCommand
         $services = [
             new LoopServiceProvider($loop),
             new ConfigServiceProvider($config),
+            new NetworkServiceProvider(),
             new DbServiceProvider($db),
             new ZmqServiceProvider(),
             new UserControlServiceProvider($node, $consoleCommands),

@@ -5,7 +5,6 @@ namespace BitWasp\Bitcoin\Node\Params;
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Chain\Params;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Script\Opcodes;
 use BitWasp\Bitcoin\Script\ScriptFactory;
 use BitWasp\Bitcoin\Transaction\Factory\TxBuilder;
@@ -110,14 +109,14 @@ class RegtestParams extends Params
         return new Block(
             $this->math,
             $this->getGenesisBlockHeader(),
-            new TransactionCollection([
+            [
                 (new TxBuilder())
                     ->version('1')
                     ->input(new Buffer('', 32), 0xffffffff, $inputScript)
                     ->output(5000000000, $outputScript)
                     ->locktime(0)
                     ->get()
-            ])
+            ]
         );
     }
 }

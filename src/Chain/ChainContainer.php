@@ -262,7 +262,8 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     public function view(ChainSegment $segment)
     {
-        return new ChainView($this, $segment, $this->segmentBlock->offsetGet($segment));
+        $got = $this->segmentBlock->offsetGet($segment);
+        return new ChainView($this, $segment, $got);
     }
 
     /**
@@ -289,6 +290,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     public function blocks(ChainSegment $segment)
     {
+        echo __FUNCTION__ . PHP_EOL;
         return $this->blocksView($this->view($segment));
     }
 
@@ -297,6 +299,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     public function best()
     {
+        echo __FUNCTION__ . PHP_EOL;
         return $this->view($this->best);
     }
 
@@ -324,13 +327,13 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     {
         foreach ($this->segments as $segment) {
             if ($hash->equals($segment->getLast()->getHash())) {
+                echo __FUNCTION__ . PHP_EOL;
                 return $this->view($segment);
             }
         }
 
         return false;
     }
-
 
     /**
      * @param BlockHeaderInterface $header

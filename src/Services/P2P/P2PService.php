@@ -3,8 +3,8 @@
 namespace BitWasp\Bitcoin\Node\Services\P2P;
 
 use BitWasp\Bitcoin\Bitcoin;
-use BitWasp\Bitcoin\Networking\DnsSeeds\MainNetDnsSeeds;
 use BitWasp\Bitcoin\Networking\Factory;
+use BitWasp\Bitcoin\Networking\Ip\Ipv4;
 use BitWasp\Bitcoin\Networking\Message;
 use BitWasp\Bitcoin\Networking\Messages\Addr;
 use BitWasp\Bitcoin\Networking\Messages\Block;
@@ -28,7 +28,6 @@ use BitWasp\Bitcoin\Networking\Messages\SendHeaders;
 use BitWasp\Bitcoin\Networking\Messages\Tx;
 use BitWasp\Bitcoin\Networking\Peer\ConnectionParams;
 use BitWasp\Bitcoin\Networking\Peer\Connector;
-use BitWasp\Bitcoin\Networking\Peer\Listener;
 use BitWasp\Bitcoin\Networking\Peer\Locator;
 use BitWasp\Bitcoin\Networking\Peer\Manager;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
@@ -38,13 +37,11 @@ use BitWasp\Bitcoin\Networking\Structure\NetworkAddressInterface;
 use BitWasp\Bitcoin\Node\Services\Debug\DebugInterface;
 use BitWasp\Bitcoin\Node\Services\P2P\State\Peers;
 use BitWasp\Bitcoin\Node\Services\P2P\State\PeerStateCollection;
-use Clue\React\Socks\Client;
 use Evenement\EventEmitter;
 use Packaged\Config\ConfigProviderInterface;
 use Pimple\Container;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
-use React\Socket\Server;
 
 class P2PService extends EventEmitter
 {
@@ -90,24 +87,23 @@ class P2PService extends EventEmitter
 
         /** @var ConnectionParams $params */
         $params = $container['p2p.params'];
-        $factory = new Factory($this->loop, Bitcoin::getNetwork());
-        $dns = $factory->getDns();
-        $messages = $factory->getMessages();
+        $factory = $container['p2p.factory'];
 
         if ((bool)$this->config->getItem('config', 'tor', false)) {
-            $socks = new Client('127.0.0.1:9050', $this->loop);
-            $socks->setResolveLocal(false);
-            $this->connector = new Connector($messages, $params, $this->loop, $dns, $socks->createConnector());
+            //$socks = new Client('127.0.0.1:9050', $this->loop);
+            //$socks->setResolveLocal(false);
+            //$this->connector = new Connector($messages, $params, $this->loop, $dns, $socks->createConnector());
+            $this->connector = $factory->getConnector($params);
         } else {
-            $this->connector = new Connector($messages, $params, $this->loop, $dns);
+            $this->connector = $factory->getConnector($params);
         }
 
-        $this->manager = new Manager($this->connector);
-        $this->locator = new Locator(new MainNetDnsSeeds(), $dns);
+        $this->manager = $factory->getManager($this->connector);
+        $this->locator = $factory->getLocator();
 
         // Setup listener if required
         if ($this->config->getItem('config', 'listen', '0')) {
-            $listener = new Listener($params, $messages, new Server($this->loop), $this->loop);
+            $listener = $factory->getListener($params, $factory->getAddress(new Ipv4('0.0.0.0', $factory->getSettings()->getDefaultP2PPort())));
             $this->manager->registerListener($listener);
         }
 

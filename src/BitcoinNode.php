@@ -108,7 +108,8 @@ class BitcoinNode extends EventEmitter implements NodeInterface
      */
     public function chain()
     {
-        return $this->chains->best(Bitcoin::getMath());
+        $best = $this->chains->best(Bitcoin::getMath());
+        return $best;
     }
 
     /**

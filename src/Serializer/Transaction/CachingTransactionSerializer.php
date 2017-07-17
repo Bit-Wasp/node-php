@@ -3,7 +3,6 @@
 namespace BitWasp\Bitcoin\Node\Serializer\Transaction;
 
 use BitWasp\Bitcoin\Serializer\Script\ScriptWitnessSerializer;
-use BitWasp\Bitcoin\Serializer\Transaction\OldTransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionInputSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionOutputSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
@@ -15,7 +14,7 @@ use BitWasp\Buffertools\Parser;
 class CachingTransactionSerializer implements TransactionSerializerInterface
 {
     /**
-     * @var OldTransactionSerializer
+     * @var TransactionSerializer
      */
     private $txSerializer;
 
@@ -38,9 +37,10 @@ class CachingTransactionSerializer implements TransactionSerializerInterface
 
     /**
      * @param TransactionInterface $tx
-     * @return BufferInterface
+     * @param int $optFlags
+     * @return BufferInterface|object
      */
-    public function serialize(TransactionInterface $tx)
+    public function serialize(TransactionInterface $tx, $optFlags = 0)
     {
         if ($this->storage->contains($tx)) {
             return $this->storage[$tx];

@@ -50,12 +50,20 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     {
         $this->container = $container;
         $this->segments = $this->container->getHistory($segment);
+
         $this->segment = $segment;
         $this->block = $block;
-        foreach ($this->segments as $segment) {
-            $heights = $container->getHeights($segment);
-            $this->heightMap = array_merge($this->heightMap, $heights);
-        }
+
+//        foreach ($this->segments as $segment) {
+//            $pre = memory_get_usage();
+//            $heights = $container->getHeights($segment);
+//            $post = memory_get_usage();
+//
+//            var_dump($pre, $post);
+//            echo "history " . ($post - $pre) / 1024 / 1024;
+//
+//            $this->heightMap = array_merge($this->heightMap, $heights);
+//        }
 
         $this->blockView = new GuidedChainView($container, $this, $block);
     }
@@ -124,8 +132,11 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
      */
     public function getHashFromHeight($height)
     {
-        if (isset($this->heightMap[$height])) {
-            return new Buffer($this->heightMap[$height], 32);
+        for ($i = 0, $l = count($this->segments); $i < $l; $i++) {
+            if ($i >= $this->segments[$i]->getStart() && $i <= $this->segments[$i]->getLast()->getHeight()) {
+                $r = $this->container->getHeights($this->segments[$i])[$height];
+                return new Buffer($r);
+            }
         }
 
         throw new \RuntimeException('Height not found');
@@ -153,7 +164,6 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     public function updateTip(BlockIndexInterface $index)
     {
         $this->container->updateSegment($this->latestSegment(), $index);
-        $this->heightMap[$index->getHeight()] = $index->getHash()->getBinary();
     }
 
     /**
@@ -182,12 +192,11 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     {
         $step = 1;
         $hashes = [];
-        $map = $this->heightMap;
-        if ($height > count($map)) {
+        if ($height > $this->getSegment()->getLast()->getHeight()) {
             throw new \RuntimeException('Height too great to produce locator');
         }
 
-        $headerHash = new Buffer($map[$height]);
+        $headerHash = $this->getHashFromHeight($height);
 
         while (true) {
             $hashes[] = $headerHash;
@@ -196,7 +205,7 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
             }
 
             $height = max($height - $step, 0);
-            $headerHash = new Buffer($map[$height], 32);
+            $headerHash = $this->getHashFromHeight($height);
             if (count($hashes) >= 10) {
                 $step *= 2;
             }
