@@ -56,6 +56,11 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
     public function isKnownHeader(BufferInterface $hash);
 
     /**
+     * @return ChainSegment[]
+     */
+    public function getSegments();
+
+    /**
      * @param BufferInterface $hash
      * @return false|ChainViewInterface
      */

@@ -169,11 +169,10 @@ class Forks
         }
 
         // Calculate flags
-        $this->flags = $this->p2sh ? InterpreterInterface::VERIFY_NONE : InterpreterInterface::VERIFY_P2SH;
+        $this->flags = $this->p2sh ? InterpreterInterface::VERIFY_P2SH : InterpreterInterface::VERIFY_NONE;
         if ($this->derSig) {
             $this->flags |= InterpreterInterface::VERIFY_DERSIG;
         }
-
         if ($this->cltv) {
             $this->flags |= InterpreterInterface::VERIFY_CHECKLOCKTIMEVERIFY;
         }
@@ -186,6 +185,10 @@ class Forks
     public function isNext(BlockIndexInterface $index)
     {
         return $this->index->isNext($index);
+    }
+
+    public function getLatest() {
+        return $this->index;
     }
 
     /**

@@ -22,9 +22,11 @@ class ChainsCommand extends Command
     public function execute(NodeInterface $node, array $params)
     {
         $chains = [];
-        foreach ($node->chains()->getStates() as $state) {
-            $bestHeaderIdx = $state->getIndex();
-            $bestBlockIdx = $state->getLastBlock();
+        $nodeChains = $node->chains();
+        foreach ($nodeChains->getSegments() as $segment) {
+            $bestHeaderIdx = $segment->getLast();
+            $view = $nodeChains->view($segment);
+            $bestBlockIdx = $nodeChains->blocksView($view)->getIndex();
 
             $chains[] = [
                 'best_header' => $this->convertIndexToArray($bestHeaderIdx),

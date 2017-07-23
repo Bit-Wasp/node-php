@@ -871,10 +871,22 @@ WHERE tip.header_id = (
     /**
      * @param OutPointSerializerInterface $serializer
      * @param array $outpoints
-     * @param array $values
+     * @param array $map
      * @return string
      */
-    public function selectUtxoByOutpoint(OutPointSerializerInterface $serializer, array $outpoints, array & $values)
+    public function selectUtxoByOutpoint(OutPointSerializerInterface $serializer, array $outpoints, array &$map = [])
+    {
+        foreach ($outpoints as $v => $outpoint) {
+            $key = $serializer->serialize($outpoint)->getBinary();
+            $map[$key] = $outpoint;
+        }
+
+        $parameters = implode(", ", array_fill(0, count($outpoints), "?"));
+        $query = "SELECT * from utxo where hashKey in ($parameters)";
+        return $query;
+    }
+
+    public function selectUtxoByOutpointOrig(OutPointSerializerInterface $serializer, array $outpoints, array & $values)
     {
         $list = [];
         foreach ($outpoints as $v => $outpoint) {
@@ -900,15 +912,33 @@ WHERE tip.header_id = (
 
         $t1 = microtime(true);
 
-        $values = [];
-        $query = $this->dbh->prepare($this->selectUtxoByOutpoint($outpointSerializer, $outpoints, $values));
-        $query->execute($values);
+        $hashKeyToOutpointMap = [];
+        $genStart = microtime(true);
+        $sql = $this->selectUtxoByOutpoint($outpointSerializer, $outpoints, $hashKeyToOutpointMap);
+        $query = $this->dbh->prepare($sql);
+
+        $genDiff = microtime(true)-$genStart;
+        try {
+            $query->execute(array_keys($hashKeyToOutpointMap));
+        } catch (\Exception $e) {
+            echo $sql.PHP_EOL;
+            var_dump(array_map('bin2hex', $hashKeyToOutpointMap));
+            throw $e;
+        }
+
 
         $rows = $query->fetchAll(\PDO::FETCH_ASSOC);
 
         $outputSet = [];
+        $pDiff = 0;
         foreach ($rows as $utxo) {
-            $outpoint = $outpointSerializer->parse(new Buffer($utxo['hashKey']));
+            $t = microtime(true);
+            if (!array_key_exists($utxo['hashKey'], $hashKeyToOutpointMap)) {
+                throw new \RuntimeException("UTXO key from database was not included in query parameters");
+            }
+
+            $outpoint = $hashKeyToOutpointMap[$utxo['hashKey']];
+            $pDiff += (microtime(true)-$t);
             $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
@@ -917,6 +947,7 @@ WHERE tip.header_id = (
         }
 
         echo "Loading UTXOs (".count($outpoints).") took " . (microtime(true) - $t1) . " seconds\n";
+        echo "[gen-query: {$genDiff}] [parse-results: {$pDiff}\n";
         return $outputSet;
     }
 
@@ -959,9 +990,8 @@ WHERE tip.header_id = (
 
 
     /**
-     * @param OutPointSerializerInterface $serializer
      * @param DbUtxo[] $utxos
-     * @param array $values
+     * @param array $values - passed by reference, the values for the query are written here
      * @return string
      */
     public function deleteUtxosByUtxo(array $utxos, array & $values)
@@ -984,7 +1014,6 @@ WHERE tip.header_id = (
     {
         if (!empty($blockData->requiredOutpoints)) {
             $deleteValues = [];
-            //$delete = $this->dbh->prepare($this->deleteUtxosByOutpoint($serializer, $deleteOutPoints, $deleteValues));
             $utxos = [];
             foreach ($blockData->requiredOutpoints as $outpoint) {
                 $utxos[] = $blockData->utxoView->fetch($outpoint);

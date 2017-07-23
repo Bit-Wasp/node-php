@@ -3,8 +3,11 @@
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Node\Chain\UtxoView;
+use BitWasp\Bitcoin\Node\Consensus\BitcoinConsensus;
+use BitWasp\Bitcoin\Script\Consensus\NativeConsensus;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Script\ScriptFactory;
+use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 
 class ScriptValidation implements ScriptValidationInterface
@@ -39,7 +42,7 @@ class ScriptValidation implements ScriptValidationInterface
      * @param bool $active
      * @param int $flags
      */
-    public function __construct($active = true, $flags = InterpreterInterface::VERIFY_NONE)
+    public function __construct($active = true, $flags = InterpreterInterface::VERIFY_NONE, TransactionSerializerInterface $txSerializer)
     {
         if (!is_bool($active)) {
             throw new \InvalidArgumentException('ScriptValidationState: $active should be bool');
@@ -47,7 +50,13 @@ class ScriptValidation implements ScriptValidationInterface
 
         $this->active = $active;
         $this->flags = $flags;
-        $this->consensus = ScriptFactory::consensus();
+
+        if (!extension_loaded('bitcoinconsensus')) {
+            $this->consensus = new NativeConsensus();
+        } else {
+            $this->consensus = new BitcoinConsensus($txSerializer);
+        }
+
     }
 
     /**
@@ -88,7 +97,7 @@ class ScriptValidation implements ScriptValidationInterface
         }
 
         $result = count(array_filter($this->results, function ($value) {
-                return !$value;
+            return !$value;
         })) === 0;
 
         $this->knownResult = $result;

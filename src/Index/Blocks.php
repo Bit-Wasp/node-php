@@ -144,9 +144,13 @@ class Blocks extends EventEmitter
             }
         }
 
+        $bytesHashed = 0;
+
         foreach ($block->getTransactions() as $tx) {
             /** @var BufferInterface $buffer */
             $buffer = $txSerializer->serialize($tx);
+            $bytesHashed += $buffer->getSize();
+
             $hash = Hash::sha256d($buffer)->flip();
             $hashStorage->attach($tx, $hash);
             $hashBin = $hash->getBinary();
@@ -168,8 +172,10 @@ class Blocks extends EventEmitter
             }
         }
 
+        echo "Prepare: {$bytesHashed} bytes hashed\n";
         $blockData->requiredOutpoints = array_values($unknown);
         $blockData->hashStorage = $hashStorage;
+
         return $blockData;
     }
 
@@ -181,12 +187,17 @@ class Blocks extends EventEmitter
      */
     public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
     {
+        $parseBegin = microtime(true);
         $blockData = $this->parseUtxos($block, $txSerializer);
+        $parseDiff = microtime(true)-$parseBegin;
+        $selectBegin = microtime(true);
         $blockData->utxoView = new UtxoView(array_merge(
             $utxoSet->fetchView($blockData->requiredOutpoints),
             $blockData->parsedUtxos
         ));
-
+        $selectDiff = microtime(true)-$selectBegin;
+        echo "UTXOS: [parse {$parseDiff}] [select: {$selectDiff}]\n";
+        
         return $blockData;
     }
 
@@ -211,12 +222,13 @@ class Blocks extends EventEmitter
      * @param BlockInterface $block
      * @param BlockData $blockData
      * @param bool $checkSignatures
-     * @param bool $flags
-     * @param $height
+     * @param int $flags
+     * @param int $height
+     * @param TransactionSerializerInterface $txSerializer
      */
-    public function checkBlockData(BlockInterface $block, BlockData $blockData, $checkSignatures, $flags, $height)
+    public function checkBlockData(BlockInterface $block, BlockData $blockData, $checkSignatures, $flags, $height, TransactionSerializerInterface $txSerializer)
     {
-        $validation = new ScriptValidation($checkSignatures, $flags);
+        $validation = new ScriptValidation($checkSignatures, $flags, $txSerializer);
 
         foreach ($block->getTransactions() as $tx) {
             $blockData->nSigOps += $this->blockCheck->getLegacySigOps($tx);
@@ -255,6 +267,8 @@ class Blocks extends EventEmitter
      */
     public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
     {
+        $start = microtime(true);
+        $init = ['start' => microtime(true), 'end' => null];
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader(), true);
 
@@ -264,25 +278,49 @@ class Blocks extends EventEmitter
 
         $utxoSet = new UtxoSet($this->db, $outpointSerializer);
         $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
+        $init['end'] = microtime(true);
 
+        $check = ['start' => microtime(true), 'end' => null];
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
             ->checkContextual($block, $chainView->getLastBlock());
+        $check['end'] = microtime(true);
 
         $forks = $this->prepareForks($chainView, $index);
-        $this->checkBlockData($block, $blockData, $checkSignatures, $forks->getFlags(), $index->getHeight());
 
+        $data = ['start' => microtime(true), 'end' => null];
+        $this->checkBlockData($block, $blockData, $checkSignatures, $forks->getFlags(), $index->getHeight(), $txSerializer);
+        $data['end'] = microtime(true);
+
+        $sql = ['start' => microtime(true), 'end' => null];
         $this->db->transaction(function () use ($hash, $block, $blockSerializer, $utxoSet, $blockData) {
             $this->db->insertBlock($hash, $block, $blockSerializer);
             $utxoSet->applyBlock($blockData);
         });
+        $sql['end'] = microtime(true);
 
+        $chainD = ['start' => microtime(true), 'end' => null];
         $chainView->blocks()->updateTip($index);
         $forks->next($index);
-
         $this->emit('block', [$index, $block, $blockData]);
-        print_r($outpointSerializer->stats());
+        $chainD['end'] = microtime(true);
+
+        $init = $init['end']-$init['start'];
+        $check = $check['end']-$check['start'];
+        $data = $data['end']-$data['start'];
+        $sql = $sql['end']-$sql['start'];
+        $chainD = $chainD['end']-$chainD['start'];
+
+        echo "Init: {$init}\t";
+        echo "Check: {$check}\t";
+        echo "Validation: {$data}\t";
+        echo "Sql: {$sql}\t";
+        echo "Chain: {$chainD}\t";
+        $total = microtime(true) - $start;
+        echo "Full {$total}\n";
+        echo PHP_EOL;
+
         return $index;
     }
 }

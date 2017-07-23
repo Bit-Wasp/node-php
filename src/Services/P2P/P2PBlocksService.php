@@ -88,7 +88,6 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
-
         $best = $this->node->chain();
         $headerIdx = $this->node->headers();
         $blockIndex = $this->node->blocks();
@@ -100,11 +99,12 @@ class P2PBlocksService extends EventEmitter
         try {
             $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
             $this->blockDownload->received($best, $peer, $index->getHash());
-            
+
         } catch (\Exception $e) {
+            echo $e->getMessage().PHP_EOL;
             $header = $blockMsg->getBlock()->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
+            die();
         }
-
     }
 }
