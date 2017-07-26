@@ -102,6 +102,7 @@ class P2PBlocksService extends EventEmitter
 
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
+            echo "Height was {$best->getIndex()->getHeight()}\n";
             $header = $blockMsg->getBlock()->getHeader();
             $this->node->emit('event', ['error.onBlock', ['ip' => $peer->getRemoteAddress()->getIp(), 'hash' => $header->getHash()->getHex(), 'error' => $e->getMessage() . PHP_EOL . $e->getTraceAsString()]]);
             die();

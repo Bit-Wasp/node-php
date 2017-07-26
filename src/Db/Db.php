@@ -874,14 +874,9 @@ WHERE tip.header_id = (
      * @param array $map
      * @return string
      */
-    public function selectUtxoByOutpoint(OutPointSerializerInterface $serializer, array $outpoints, array &$map = [])
+    public function selectUtxoByOutpoint($n)
     {
-        foreach ($outpoints as $v => $outpoint) {
-            $key = $serializer->serialize($outpoint)->getBinary();
-            $map[$key] = $outpoint;
-        }
-
-        $parameters = implode(", ", array_fill(0, count($outpoints), "?"));
+        $parameters = implode(", ", array_fill(0, $n, "?"));
         $query = "SELECT * from utxo where hashKey in ($parameters)";
         return $query;
     }
@@ -912,17 +907,16 @@ WHERE tip.header_id = (
 
         $t1 = microtime(true);
 
-        $hashKeyToOutpointMap = [];
         $genStart = microtime(true);
-        $sql = $this->selectUtxoByOutpoint($outpointSerializer, $outpoints, $hashKeyToOutpointMap);
+        $sql = $this->selectUtxoByOutpoint($requiredCount);
         $query = $this->dbh->prepare($sql);
 
         $genDiff = microtime(true)-$genStart;
         try {
-            $query->execute(array_keys($hashKeyToOutpointMap));
+            $query->execute(array_keys($outpoints));
         } catch (\Exception $e) {
             echo $sql.PHP_EOL;
-            var_dump(array_map('bin2hex', $hashKeyToOutpointMap));
+            var_dump(array_map('bin2hex', array_keys($outpoints)));
             throw $e;
         }
 
@@ -933,11 +927,11 @@ WHERE tip.header_id = (
         $pDiff = 0;
         foreach ($rows as $utxo) {
             $t = microtime(true);
-            if (!array_key_exists($utxo['hashKey'], $hashKeyToOutpointMap)) {
+            if (!array_key_exists($utxo['hashKey'], $outpoints)) {
                 throw new \RuntimeException("UTXO key from database was not included in query parameters");
             }
 
-            $outpoint = $hashKeyToOutpointMap[$utxo['hashKey']];
+            $outpoint = $outpoints[$utxo['hashKey']];
             $pDiff += (microtime(true)-$t);
             $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
@@ -959,11 +953,13 @@ WHERE tip.header_id = (
     {
         $utxoQuery = [];
         $utxoValues = [];
-        foreach ($utxos as $c => $utxo) {
+        $c = 0;
+        foreach ($utxos as $hashKey => $utxo) {
             $utxoQuery[] = "(:hash$c, :v$c, :s$c)";
-            $utxoValues["hash$c"] = $serializer->serialize($utxo->getOutPoint())->getBinary();
+            $utxoValues["hash$c"] = $hashKey;
             $utxoValues["v$c"] = $utxo->getOutput()->getValue();
             $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
+            $c++;
         }
 
         $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
@@ -988,19 +984,9 @@ WHERE tip.header_id = (
         return $query;
     }
 
-
-    /**
-     * @param DbUtxo[] $utxos
-     * @param array $values - passed by reference, the values for the query are written here
-     * @return string
-     */
-    public function deleteUtxosByUtxo(array $utxos, array & $values)
+    public function deleteUtxosByUtxo($n)
     {
-        $list = [];
-        foreach ($utxos as $i => $utxo) {
-            $values[] = $utxo->getId();
-            $list[] = "?";
-        }
+        $list = array_fill(0, $n, "?");
 
         $query = "DELETE FROM utxo WHERE id in (".implode(",", $list).")";
         return $query;
@@ -1013,14 +999,16 @@ WHERE tip.header_id = (
     public function updateUtxoSet(OutPointSerializerInterface $outSer, BlockData $blockData)
     {
         if (!empty($blockData->requiredOutpoints)) {
-            $deleteValues = [];
-            $utxos = [];
-            foreach ($blockData->requiredOutpoints as $outpoint) {
-                $utxos[] = $blockData->utxoView->fetch($outpoint);
+            $deleteIds = [];
+            $c = 0;
+            foreach ($blockData->requiredOutpoints as $outPoint) {
+                $utxo = $blockData->utxoView->fetch($outPoint);
+                $deleteIds[] = $utxo->getId();
+                $c++;
             }
 
-            $delete = $this->dbh->prepare($this->deleteUtxosByUtxo($utxos, $deleteValues));
-            $delete->execute($deleteValues);
+            $delete = $this->dbh->prepare($this->deleteUtxosByUtxo($c));
+            $delete->execute($deleteIds);
         }
 
         if (!empty($blockData->remainingNew)) {

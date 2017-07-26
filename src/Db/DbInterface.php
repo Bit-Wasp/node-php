@@ -104,10 +104,10 @@ interface DbInterface
 
     /**
      * @param OutPointSerializerInterface $outpointSerializer
-     * @param OutPointInterface[] $outpoints
+     * @param string[] $outpointKeys
      * @return \BitWasp\Bitcoin\Utxo\Utxo[]
      */
-    public function fetchUtxoDbList(OutPointSerializerInterface $outpointSerializer, array $outpoints);
+    public function fetchUtxoDbList(OutPointSerializerInterface $outpointSerializer, array $outpointKeys);
 
     /**
      * @return ChainSegment[]

@@ -40,11 +40,11 @@ class UtxoSet
     }
 
     /**
-     * @param OutPointInterface[] $required
-     * @return UtxoInterface[]
+     * @param BlockData $blockData
+     * @return \BitWasp\Bitcoin\Utxo\Utxo[]
      */
-    public function fetchView(array $required)
+    public function fetchView(BlockData $blockData)
     {
-        return $this->db->fetchUtxoDbList($this->outpointSerializer, $required);
+        return $this->db->fetchUtxoDbList($this->outpointSerializer, $blockData->requiredOutpoints);
     }
 }

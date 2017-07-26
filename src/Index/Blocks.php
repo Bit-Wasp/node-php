@@ -25,6 +25,7 @@ use BitWasp\Bitcoin\Node\Serializer\Transaction\CachingTransactionSerializer;
 use BitWasp\Bitcoin\Script\Interpreter\InterpreterInterface;
 use BitWasp\Bitcoin\Serializer\Block\BlockHeaderSerializer;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializer;
+use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionInputSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\TransactionSerializerInterface;
@@ -126,7 +127,7 @@ class Blocks extends EventEmitter
      * @param TransactionSerializerInterface $txSerializer
      * @return BlockData
      */
-    public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer)
+    public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer, OutPointSerializerInterface $oSerializer)
     {
         $blockData = new BlockData();
         $unknown = [];
@@ -140,7 +141,8 @@ class Blocks extends EventEmitter
 
             foreach ($tx->getInputs() as $in) {
                 $outpoint = $in->getOutPoint();
-                $unknown[$outpoint->getTxId()->getBinary() . $outpoint->getVout()] = $outpoint;
+                $outpointKey = $oSerializer->serialize($outpoint);
+                $unknown[$outpointKey->getBinary()] = $outpoint;
             }
         }
 
@@ -151,11 +153,12 @@ class Blocks extends EventEmitter
             $buffer = $txSerializer->serialize($tx);
             $bytesHashed += $buffer->getSize();
 
-            $hash = Hash::sha256d($buffer)->flip();
+            $hash = Hash::sha256d($buffer);
             $hashStorage->attach($tx, $hash);
             $hashBin = $hash->getBinary();
+
             foreach ($tx->getOutputs() as $i => $out) {
-                $lookup = $hashBin . $i;
+                $lookup = $hashBin . pack("V", $i);
                 if (isset($unknown[$lookup])) {
                     // Remove unknown outpoints which consume this output
                     $outpoint = $unknown[$lookup];
@@ -163,17 +166,17 @@ class Blocks extends EventEmitter
                     unset($unknown[$lookup]);
                 } else {
                     // Record new utxos which are not consumed in the same block
-                    $utxo = new Utxo(new OutPoint($hash, $i), $out);
-                    $blockData->remainingNew[] = $utxo;
+                    $utxo = new Utxo(new OutPoint($hash->flip(), $i), $out);
+                    $blockData->remainingNew[$lookup] = $utxo;
                 }
 
                 // All utxos produced are stored
-                $blockData->parsedUtxos[] = $utxo;
+                $blockData->parsedUtxos[$lookup] = $utxo;
             }
         }
 
         echo "Prepare: {$bytesHashed} bytes hashed\n";
-        $blockData->requiredOutpoints = array_values($unknown);
+        $blockData->requiredOutpoints = $unknown;
         $blockData->hashStorage = $hashStorage;
 
         return $blockData;
@@ -185,14 +188,14 @@ class Blocks extends EventEmitter
      * @param UtxoSet $utxoSet
      * @return BlockData
      */
-    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, UtxoSet $utxoSet)
+    public function prepareBatch(BlockInterface $block, TransactionSerializerInterface $txSerializer, OutPointSerializerInterface $oSerializer, UtxoSet $utxoSet)
     {
         $parseBegin = microtime(true);
-        $blockData = $this->parseUtxos($block, $txSerializer);
+        $blockData = $this->parseUtxos($block, $txSerializer, $oSerializer);
         $parseDiff = microtime(true)-$parseBegin;
         $selectBegin = microtime(true);
         $blockData->utxoView = new UtxoView(array_merge(
-            $utxoSet->fetchView($blockData->requiredOutpoints),
+            $utxoSet->fetchView($blockData),
             $blockData->parsedUtxos
         ));
         $selectDiff = microtime(true)-$selectBegin;
@@ -277,7 +280,7 @@ class Blocks extends EventEmitter
         $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
         $utxoSet = new UtxoSet($this->db, $outpointSerializer);
-        $blockData = $this->prepareBatch($block, $txSerializer, $utxoSet);
+        $blockData = $this->prepareBatch($block, $txSerializer, $outpointSerializer, $utxoSet);
         $init['end'] = microtime(true);
 
         $check = ['start' => microtime(true), 'end' => null];
@@ -298,6 +301,7 @@ class Blocks extends EventEmitter
             $this->db->insertBlock($hash, $block, $blockSerializer);
             $utxoSet->applyBlock($blockData);
         });
+
         $sql['end'] = microtime(true);
 
         $chainD = ['start' => microtime(true), 'end' => null];
