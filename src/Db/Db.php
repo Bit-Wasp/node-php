@@ -920,7 +920,6 @@ WHERE tip.header_id = (
             throw $e;
         }
 
-
         $rows = $query->fetchAll(\PDO::FETCH_ASSOC);
 
         $outputSet = [];
@@ -933,7 +932,7 @@ WHERE tip.header_id = (
 
             $outpoint = $outpoints[$utxo['hashKey']];
             $pDiff += (microtime(true)-$t);
-            $outputSet[] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
+            $outputSet[$utxo['hashKey']] = new DbUtxo($utxo['id'], $outpoint, new TransactionOutput($utxo['value'], new Script(new Buffer($utxo['scriptPubKey']))));
         }
 
         if (count($outputSet) !== $requiredCount) {
@@ -951,6 +950,7 @@ WHERE tip.header_id = (
      */
     private function insertUtxosToTable(OutPointSerializerInterface $serializer, array $utxos)
     {
+        $a= microtime(true);
         $utxoQuery = [];
         $utxoValues = [];
         $c = 0;
@@ -961,9 +961,13 @@ WHERE tip.header_id = (
             $utxoValues["s$c"] = $utxo->getOutput()->getScript()->getBinary();
             $c++;
         }
+        $at = microtime(true)-$a;
 
+        $b = microtime(true);
         $insertUtxos = $this->dbh->prepare('INSERT INTO utxo (hashKey, value, scriptPubKey) VALUES ' . implode(', ', $utxoQuery));
         $insertUtxos->execute($utxoValues);
+        $bt = microtime(true)-$b;
+        echo "[build query params: $at] [exec utxos $bt] ";
     }
 
     /**
@@ -998,22 +1002,36 @@ WHERE tip.header_id = (
      */
     public function updateUtxoSet(OutPointSerializerInterface $outSer, BlockData $blockData)
     {
+        $str = "";
         if (!empty($blockData->requiredOutpoints)) {
+
             $deleteIds = [];
             $c = 0;
+            $diff = 0;
             foreach ($blockData->requiredOutpoints as $outPoint) {
+                $a = microtime(true);
                 $utxo = $blockData->utxoView->fetch($outPoint);
+                $diff += microtime(true)-$a;
                 $deleteIds[] = $utxo->getId();
                 $c++;
             }
 
+            $b = microtime(true);
             $delete = $this->dbh->prepare($this->deleteUtxosByUtxo($c));
+            $diff2 = microtime(true) - $b;
+
             $delete->execute($deleteIds);
+
+            echo "[delete utxos fetch: $diff] [delete utxos query: $diff2] ";
         }
 
         if (!empty($blockData->remainingNew)) {
+            $a = microtime(true);
             $this->insertUtxosToTable($outSer, $blockData->remainingNew);
+            $diff = microtime(true)-$a;
+            echo "[insert: $diff] ";
         }
+
     }
 
     /**

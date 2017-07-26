@@ -14,14 +14,14 @@ class UtxoView implements \Countable
      * @var array
      */
     private $utxo = [];
-
+    private $v = [];
     /**
      * @param Utxo[] $utxos
      */
     public function __construct(array $utxos)
     {
-        foreach ($utxos as $output) {
-            $this->addUtxo($output);
+        foreach ($utxos as $utxoKey => $output) {
+            $this->addUtxo($utxoKey, $output);
         }
     }
 
@@ -36,9 +36,9 @@ class UtxoView implements \Countable
     /**
      * @param Utxo $utxo
      */
-    private function addUtxo(Utxo $utxo)
+    private function addUtxo($key, Utxo $utxo)
     {
-        $this->utxo[$utxo->getOutPoint()->getTxId()->getBinary() . $utxo->getOutPoint()->getVout()] = $utxo;
+        $this->utxo[$key] = $utxo;
     }
 
     /**
@@ -47,7 +47,23 @@ class UtxoView implements \Countable
      */
     public function have(OutPointInterface $outpoint)
     {
-        return array_key_exists($outpoint->getTxId()->getBinary() . $outpoint->getVout(), $this->utxo);
+        return array_key_exists($this->makeKey($outpoint), $this->utxo);
+    }
+
+    /**
+     * @param OutPointInterface $outpoint
+     * @return string
+     */
+    protected function makeKey(OutPointInterface $outpoint)
+    {
+        $n = $outpoint->getVout();
+        if (array_key_exists($n, $this->v)) {
+            $s = $this->v[$n];
+        } else {
+            $s = $this->v[$n] = pack("V", $n);
+        }
+
+        return "{$outpoint->getTxId()->getBinary()}{$s}";
     }
 
     /**
@@ -56,7 +72,7 @@ class UtxoView implements \Countable
      */
     public function fetch(OutPointInterface $outpoint)
     {
-        $key = $outpoint->getTxId()->getBinary() . $outpoint->getVout();
+        $key = $this->makeKey($outpoint);
         if (!isset($this->utxo[$key])) {
             throw new \RuntimeException('Utxo not found in this UtxoView');
         }

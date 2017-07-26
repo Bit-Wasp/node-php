@@ -129,6 +129,16 @@ class Blocks extends EventEmitter
      */
     public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer, OutPointSerializerInterface $oSerializer)
     {
+        $v = [];
+        $packV = function($n) use (&$v) {
+            if (array_key_exists($n, $v)) {
+                return $v[$n];
+            }
+            $s = pack("V", $n);
+            $v[$n]= $s;
+            return $s;
+        };
+
         $blockData = new BlockData();
         $unknown = [];
         $hashStorage = new HashStorage();
@@ -141,8 +151,8 @@ class Blocks extends EventEmitter
 
             foreach ($tx->getInputs() as $in) {
                 $outpoint = $in->getOutPoint();
-                $outpointKey = $oSerializer->serialize($outpoint);
-                $unknown[$outpointKey->getBinary()] = $outpoint;
+                $outpointKey = "{$outpoint->getTxId()->getBinary()}{$packV($outpoint->getVout())}";
+                $unknown[$outpointKey] = $outpoint;
             }
         }
 
@@ -153,12 +163,12 @@ class Blocks extends EventEmitter
             $buffer = $txSerializer->serialize($tx);
             $bytesHashed += $buffer->getSize();
 
-            $hash = Hash::sha256d($buffer);
-            $hashStorage->attach($tx, $hash);
-            $hashBin = $hash->getBinary();
+            $txid = Hash::sha256d($buffer)->flip();
+            $hashStorage->attach($tx, $txid);
+            $hashBin = $txid->getBinary();
 
             foreach ($tx->getOutputs() as $i => $out) {
-                $lookup = $hashBin . pack("V", $i);
+                $lookup = "{$hashBin}{$packV($i)}";
                 if (isset($unknown[$lookup])) {
                     // Remove unknown outpoints which consume this output
                     $outpoint = $unknown[$lookup];
@@ -166,7 +176,7 @@ class Blocks extends EventEmitter
                     unset($unknown[$lookup]);
                 } else {
                     // Record new utxos which are not consumed in the same block
-                    $utxo = new Utxo(new OutPoint($hash->flip(), $i), $out);
+                    $utxo = new Utxo(new OutPoint($txid, $i), $out);
                     $blockData->remainingNew[$lookup] = $utxo;
                 }
 
@@ -316,12 +326,20 @@ class Blocks extends EventEmitter
         $sql = $sql['end']-$sql['start'];
         $chainD = $chainD['end']-$chainD['start'];
 
-        echo "Init: {$init}\t";
-        echo "Check: {$check}\t";
-        echo "Validation: {$data}\t";
-        echo "Sql: {$sql}\t";
-        echo "Chain: {$chainD}\t";
         $total = microtime(true) - $start;
+
+        $tinit = $init / $total*100;
+        $tcheck = $check / $total*100;
+        $tvalidation = $data / $total*100;
+        $tsql = $sql / $total*100;
+        $tchain = $chainD / $total*100;
+
+        echo "Init: {$init} {$tinit}%\t";
+        echo "Check: {$check} {$tcheck}%\t";
+        echo "Validation: {$data} {$tvalidation}%\t";
+        echo "Sql: {$sql}  {$tsql}%\t";
+        echo "Chain: {$chainD}  {$tchain}%\t";
+
         echo "Full {$total}\n";
         echo PHP_EOL;
 
