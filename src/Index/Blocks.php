@@ -109,7 +109,7 @@ class Blocks extends EventEmitter
             $this->db->fetchBlock($hash);
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
-            $this->db->insertBlock($index->getHash(), $genesisBlock, new BlockSerializer(Bitcoin::getMath(), new BlockHeaderSerializer(), new TransactionSerializer()));
+            $this->db->insertBlock($index->getHash(), $genesisBlock, new BlockSerializer(Bitcoin::getMath(), new BlockHeaderSerializer(), new TransactionSerializer()), BlockStatus::VALIDATED);
         }
     }
 
@@ -308,7 +308,7 @@ class Blocks extends EventEmitter
 
         $sql = ['start' => microtime(true), 'end' => null];
         $this->db->transaction(function () use ($hash, $block, $blockSerializer, $utxoSet, $blockData) {
-            $this->db->insertBlock($hash, $block, $blockSerializer);
+            $this->db->insertBlock($hash, $block, $blockSerializer, BlockStatus::VALIDATED);
             $utxoSet->applyBlock($blockData);
         });
 

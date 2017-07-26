@@ -5,7 +5,6 @@ namespace BitWasp\Bitcoin\Node\Db;
 use BitWasp\Bitcoin\Block\Block;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
-use BitWasp\Bitcoin\Collection\Transaction\TransactionCollection;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
@@ -14,7 +13,6 @@ use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
-use BitWasp\Bitcoin\Transaction\OutPointInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -139,9 +137,10 @@ interface DbInterface
      * @param BufferInterface $hash
      * @param BlockInterface $block
      * @param BlockSerializerInterface $blockSerializer
+     * @param int $status
      * @return int
      */
-    public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer);
+    public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer, $status);
 
     /**
      * Here, we return max 2000 headers following $hash.

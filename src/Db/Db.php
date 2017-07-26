@@ -197,8 +197,7 @@ class Db implements DbInterface
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE FROM outpoi WHERE 1');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
-        $this->insertToBlockIndexStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash ) SELECT id FROM headerIndex WHERE hash = :refHash ');
-        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( hash , block ) SELECT h.id, :block FROM headerIndex h WHERE h.hash = :hash');
+        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( header_id , status, block ) SELECT h.id, :status, :block FROM headerIndex h WHERE h.hash = :hash');
         $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
                FROM       headerIndex  i
@@ -238,14 +237,6 @@ class Db implements DbInterface
                         iindex AS parent
                JOIN     headerIndex  h ON h.id = parent.header_id
                WHERE    node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt');
-        $this->loadLastBlockStmt = $this->dbh->prepare('
-            SELECT h.* FROM iindex AS node,
-                             iindex AS parent
-            INNER JOIN blockIndex b ON b.hash = parent.header_id
-            JOIN headerIndex h ON h.id = parent.header_id
-            WHERE node.header_id = :id AND node.lft BETWEEN parent.lft AND parent.rgt
-            ORDER BY parent.rgt
-            LIMIT 1');
         $this->loadLastBlockByCoord = $this->dbh->prepare('
             SELECT node.*, h.* FROM iindex node 
             JOIN blockIndex b ON (b.hash = node.header_id)
@@ -405,10 +396,14 @@ class Db implements DbInterface
      * @param BlockSerializerInterface $blockSerializer
      * @return int
      */
-    public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
+    public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer, $status)
     {
         // Insert the block header ID
-        $this->insertBlockStmt->execute(['hash' => $blockHash->getBinary(), 'block' => $blockSerializer->serialize($block)->getBinary()]);
+        $this->insertBlockStmt->execute([
+            'hash' => $blockHash->getBinary(),
+            'block' => $blockSerializer->serialize($block)->getBinary(),
+            'status' => $status,
+        ]);
         return $this->dbh->lastInsertId();
     }
 
@@ -534,7 +529,7 @@ class Db implements DbInterface
     }
 
     /**
-     * @param ChainSegment $history
+     * @param array $history
      * @return BlockIndexInterface
      */
     public function findSegmentBestBlock(array $history)
@@ -547,7 +542,7 @@ class Db implements DbInterface
         }
 
         $tail = implode(" OR ", $queryValues);
-        $query = "SELECT * from headerIndex where id = (SELECT MAX(b.hash) FROM blockIndex b JOIN headerIndex h on (b.hash = h.id) WHERE " . $tail . " LIMIT 1)";
+        $query = "SELECT * from headerIndex where id = (SELECT MAX(b.header_id) FROM blockIndex b JOIN headerIndex h on (b.header_id = h.id) WHERE " . $tail . " LIMIT 1)";
         $sql = $this->dbh->prepare($query);
         $sql->execute($queryBind);
         $result = $sql->fetch(\PDO::FETCH_ASSOC);
@@ -579,47 +574,44 @@ class Db implements DbInterface
 
         $index = $batch->getIndices();
         $segment = $batch->getTip()->getSegment()->getId();
-        $this->transaction(function () use ($index, $segment) {
 
-            $headerValues = [];
-            $headerQuery = [];
+        $headerValues = [];
+        $headerQuery = [];
 
-            foreach ($index as $c => $i) {
-                $headerQuery[] = "(:hash$c , :segment$c , :height$c , :work$c ,
-                :version$c , :prevBlock$c , :merkleRoot$c ,
-                :nBits$c , :nTimestamp$c , :nNonce$c  )";
+        foreach ($index as $c => $i) {
+            $headerQuery[] = "(:hash$c , :segment$c , :height$c , :work$c ,
+            :version$c , :prevBlock$c , :merkleRoot$c ,
+            :nBits$c , :nTimestamp$c , :nNonce$c  )";
 
-                $headerValues['hash' . $c] = $i->getHash()->getBinary();
-                $headerValues['height' . $c] = $i->getHeight();
-                $headerValues['segment' . $c] = $segment;
-                $headerValues['work' . $c] = $i->getWork();
+            $headerValues['hash' . $c] = $i->getHash()->getBinary();
+            $headerValues['height' . $c] = $i->getHeight();
+            $headerValues['segment' . $c] = $segment;
+            $headerValues['work' . $c] = $i->getWork();
 
-                $header = $i->getHeader();
-                $headerValues['version' . $c] = $header->getVersion();
-                $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
-                $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
-                $headerValues['nBits' . $c] = $header->getBits();
-                $headerValues['nTimestamp' . $c] = $header->getTimestamp();
-                $headerValues['nNonce' . $c] = $header->getNonce();
+            $header = $i->getHeader();
+            $headerValues['version' . $c] = $header->getVersion();
+            $headerValues['prevBlock' . $c] = $header->getPrevBlock()->getBinary();
+            $headerValues['merkleRoot' . $c] = $header->getMerkleRoot()->getBinary();
+            $headerValues['nBits' . $c] = $header->getBits();
+            $headerValues['nTimestamp' . $c] = $header->getTimestamp();
+            $headerValues['nNonce' . $c] = $header->getNonce();
 
-            }
+        }
 
-            $insertHeaders = $this->dbh->prepare('
-              INSERT INTO headerIndex  (hash, segment, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
-              VALUES ' . implode(', ', $headerQuery));
-            $insertHeaders->execute($headerValues);
+        $insertHeaders = $this->dbh->prepare('
+          INSERT INTO headerIndex  (hash, segment, height, work, version, prevBlock, merkleRoot, nBits, nTimestamp, nNonce)
+          VALUES ' . implode(', ', $headerQuery));
+        $insertHeaders->execute($headerValues);
 
-            $lastId = (int)$this->dbh->lastInsertId();
-            $count = count($index);
-            for ($i = 0; $i < $count; $i++) {
-                $rowId = $i + $lastId;
-                $indexValues['header_id' . $i] = $rowId;
-            }
+        $lastId = (int)$this->dbh->lastInsertId();
+        $count = count($index);
+        for ($i = 0; $i < $count; $i++) {
+            $rowId = $i + $lastId;
+            $indexValues['header_id' . $i] = $rowId;
+        }
 
-            return true;
-        });
+        return true;
 
-        echo "done\n";
     }
 
     /**
@@ -727,7 +719,7 @@ class Db implements DbInterface
         $stmt = $this->dbh->prepare('
            SELECT     h.id, h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
            FROM       blockIndex  b
-           JOIN       headerIndex  h ON b.hash = h.id
+           JOIN       headerIndex  h ON b.header_id = h.id
            WHERE      h.hash = :hash
         ');
 

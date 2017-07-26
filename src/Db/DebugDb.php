@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\BlockStatus;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -71,12 +72,13 @@ class DebugDb implements DbInterface
      * @param BufferInterface $hash
      * @param BlockInterface $block
      * @param BlockSerializerInterface $blockSerializer
+     * @param int $status
      * @return int
      */
-    public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer)
+    public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer, $status)
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->insertBlock($hash, $block, $blockSerializer);
+        return $this->db->insertBlock($hash, $block, $blockSerializer, $status);
     }
 
     /**

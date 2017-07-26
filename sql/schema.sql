@@ -52,8 +52,9 @@ ADD KEY `hkidx` (`hashKey`);
 
 CREATE TABLE IF NOT EXISTS `blockIndex` (
   `id` int(9) NOT NULL,
-  `hash` int(19) NOT NULL,
-  `block` longblob NOT NULL
+  `header_id` int(19) NOT NULL,
+  `status` int(8) NOT NULL,
+  `block` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -199,7 +200,7 @@ ADD PRIMARY KEY (`id`);
 --
 ALTER TABLE `blockIndex`
 ADD PRIMARY KEY (`id`),
-ADD KEY `hash` (`hash`);
+ADD KEY `header_id` (`header_id`);
 
 --
 -- Indexes for table `block_transactions`
@@ -313,6 +314,3 @@ MODIFY `id` int(15) NOT NULL AUTO_INCREMENT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
-ALTER TABLE `blockIndex`
-ADD COLUMN status int(1) NOT NULL;
