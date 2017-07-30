@@ -24,10 +24,13 @@ use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\CommandInterface;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetBlockHashCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetHeaderCommand;
+use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetRawBlockCommand;
+use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetScriptFlagsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\InfoCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ShutdownCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\UserControlServiceProvider;
+use BitWasp\Bitcoin\Node\Services\ValidationServiceProvider;
 use BitWasp\Bitcoin\Node\Services\WebSocket\WebSocketServiceProvider;
 use BitWasp\Bitcoin\Node\Services\ZmqServiceProvider;
 use Packaged\Config\ConfigProviderInterface;
@@ -105,6 +108,8 @@ class StartCommand extends AbstractCommand
             new GetTxCommand(),
             new GetHeaderCommand(),
             new GetBlockHashCommand(),
+            new GetRawBlockCommand(),
+            new GetScriptFlagsCommand(),
             new ChainsCommand()
         ];
 
@@ -118,6 +123,7 @@ class StartCommand extends AbstractCommand
             new NetworkServiceProvider(),
             new DbServiceProvider($db),
             new ZmqServiceProvider(),
+            new ValidationServiceProvider($node),
             new UserControlServiceProvider($node, $consoleCommands),
         ];
 

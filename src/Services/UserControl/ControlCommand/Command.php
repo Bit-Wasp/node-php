@@ -106,9 +106,9 @@ abstract class Command implements CommandInterface
      */
     public function run(NodeInterface $node, array $params = [])
     {
-        foreach ($this->getParams() as $param) {
+        foreach ($this->getParams() as $param => $description) {
             if (!isset($params[$param])) {
-                throw new \RuntimeException('Missing parameter, ' . $param);
+                return ['error' => "Missing parameter, `$param`"];
             }
         }
 

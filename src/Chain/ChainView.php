@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Chain;
 
 
 use BitWasp\Bitcoin\Chain\BlockLocator;
+use BitWasp\Bitcoin\Node\Index\BlockStatus;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
@@ -18,7 +19,12 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     /**
      * @var BlockIndexInterface
      */
-    private $block;
+    private $blockBestData;
+
+    /**
+     * @var BlockIndexInterface
+     */
+    private $blockBestValid;
 
     /**
      * @var ChainSegment
@@ -31,41 +37,41 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     private $segments;
 
     /**
-     * @var array
+     * @var GuidedChainView
      */
-    private $heightMap = [];
+    private $dataView;
 
     /**
      * @var GuidedChainView
      */
-    private $blockView;
-    
+    private $validView;
+
     /**
      * ChainView constructor.
      * @param ChainContainer $container
      * @param ChainSegment $segment
-     * @param BlockIndexInterface $block
+     * @param BlockIndexInterface $blockBestData
+     * @param BlockIndexInterface $blockBestValid
      */
-    public function __construct(ChainContainer $container, ChainSegment $segment, BlockIndexInterface $block)
+    public function __construct(ChainContainer $container, ChainSegment $segment, BlockIndexInterface $blockBestData, BlockIndexInterface $blockBestValid)
     {
         $this->container = $container;
         $this->segments = $this->container->getHistory($segment);
 
         $this->segment = $segment;
-        $this->block = $block;
+        $this->blockBestData = $blockBestData;
+        $this->blockBestValid = $blockBestValid;
 
-//        foreach ($this->segments as $segment) {
-//            $pre = memory_get_usage();
-//            $heights = $container->getHeights($segment);
-//            $post = memory_get_usage();
-//
-//            var_dump($pre, $post);
-//            echo "history " . ($post - $pre) / 1024 / 1024;
-//
-//            $this->heightMap = array_merge($this->heightMap, $heights);
-//        }
+        $this->dataView = new GuidedChainView($container, $this, $blockBestData, BlockStatus::ACCEPTED);
+        $this->validView = new GuidedChainView($container, $this, $blockBestValid, BlockStatus::VALIDATED);
+    }
 
-        $this->blockView = new GuidedChainView($container, $this, $block);
+    /**
+     * @return GuidedChainView
+     */
+    public function validBlocks()
+    {
+        return $this->validView;
     }
 
     /**
@@ -73,7 +79,7 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
      */
     public function blocks()
     {
-        return $this->blockView;
+        return $this->dataView;
     }
     
     /**
@@ -164,14 +170,6 @@ class ChainView extends EventEmitter implements HeaderChainViewInterface
     public function updateTip(BlockIndexInterface $index)
     {
         $this->container->updateSegment($this->latestSegment(), $index);
-    }
-
-    /**
-     * @return BlockIndexInterface
-     */
-    public function getLastBlock()
-    {
-        return $this->block;
     }
 
     /**

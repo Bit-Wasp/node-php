@@ -20,7 +20,7 @@ class InfoCommand extends Command
 
         return [
             'best_header' => $this->convertIndexToArray($best->getIndex()),
-            'best_block' => $this->convertIndexToArray($best->getLastBlock()),
+            'best_block' => $this->convertIndexToArray($best->blocks()->getIndex()),
             'nChain' => $nChain
         ];
     }

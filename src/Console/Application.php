@@ -13,6 +13,8 @@ use BitWasp\Bitcoin\Node\Console\Commands\WebSocketCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\ChainsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetBlockHashCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetHeaderCommand;
+use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetRawBlockCommand;
+use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetScriptFlagsCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\GetTxCommand;
 use BitWasp\Bitcoin\Node\Services\UserControl\ControlCommand\InfoCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
@@ -37,6 +39,8 @@ class Application extends ConsoleApplication
         $commands[] = new ControlCommand(new GetTxCommand());
         $commands[] = new ControlCommand(new GetHeaderCommand());
         $commands[] = new ControlCommand(new GetBlockHashCommand());
+        $commands[] = new ControlCommand(new GetRawBlockCommand());
+        $commands[] = new ControlCommand(new GetScriptFlagsCommand());
 
         $commands[] = new ConfigDefault();
         return $commands;

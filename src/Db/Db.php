@@ -4,6 +4,7 @@ namespace BitWasp\Bitcoin\Node\Db;
 
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\Block;
+use BitWasp\Bitcoin\Block\BlockFactory;
 use BitWasp\Bitcoin\Block\BlockHeader;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Block\BlockInterface;
@@ -13,6 +14,7 @@ use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\Chain\DbUtxo;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockAcceptData;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Script\Script;
@@ -25,7 +27,6 @@ use BitWasp\Bitcoin\Transaction\Transaction;
 use BitWasp\Bitcoin\Transaction\TransactionInput;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutput;
-use BitWasp\Bitcoin\Utxo\Utxo;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;
 use Packaged\Config\ConfigProviderInterface;
@@ -142,6 +143,11 @@ class Db implements DbInterface
     /**
      * @var \PDOStatement
      */
+    private $updateBlockStatusStmt;
+
+    /**
+     * @var \PDOStatement
+     */
     private $insertToBlockIndexStmt;
 
     /**
@@ -197,7 +203,11 @@ class Db implements DbInterface
         $this->deleteUtxosInView = $this->dbh->prepare('DELETE FROM outpoi WHERE 1');
 
         $this->dropDatabaseStmt = $this->dbh->prepare('DROP DATABASE ' . $this->database);
-        $this->insertBlockStmt = $this->dbh->prepare('INSERT INTO blockIndex ( header_id , status, block ) SELECT h.id, :status, :block FROM headerIndex h WHERE h.hash = :hash');
+        $this->insertBlockStmt = $this->dbh->prepare('
+INSERT INTO blockIndex (status, block, size_bytes, numtx, header_id) 
+values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WHERE h.hash = :hash))');
+        $this->updateBlockStatusStmt = $this->dbh->prepare('UPDATE blockIndex SET status = :status WHERE header_id=(SELECT h.id FROM headerIndex h WHERE h.hash = :hash)');
+
         $this->fetchIndexIdStmt = $this->dbh->prepare('
                SELECT     i.*
                FROM       headerIndex  i
@@ -390,21 +400,52 @@ class Db implements DbInterface
         throw new \RuntimeException('Failed to update insert Genesis block index!');
     }
 
+    public function updateBlockStatus(BlockIndexInterface $index, $status)
+    {
+        // Insert the block header ID
+        return $this->updateBlockStatusStmt->execute([
+            'hash' => $index->getHash()->getBinary(),
+            'status' => $status,
+        ]);
+    }
+
     /**
      * @param BufferInterface $blockHash
      * @param BlockInterface $block
      * @param BlockSerializerInterface $blockSerializer
+     * @param int $status
      * @return int
      */
     public function insertBlock(BufferInterface $blockHash, BlockInterface $block, BlockSerializerInterface $blockSerializer, $status)
     {
-        // Insert the block header ID
-        $this->insertBlockStmt->execute([
-            'hash' => $blockHash->getBinary(),
-            'block' => $blockSerializer->serialize($block)->getBinary(),
+        $serializedBlock = $blockSerializer->serialize($block);
+        $nTx = count($block->getTransactions());
+        $acceptData = new BlockAcceptData();
+        $acceptData->numTx = $nTx;
+        $acceptData->size = $serializedBlock->getSize();
+        return $this->insertBlockRaw($blockHash, $serializedBlock, $acceptData, $status);
+    }
+
+    /**
+     * @param BufferInterface $blockHash
+     * @param BufferInterface $block
+     * @param BlockAcceptData $acceptData
+     * @param int $status
+     * @return string
+     */
+    public function insertBlockRaw(BufferInterface $blockHash, BufferInterface $block, BlockAcceptData $acceptData, $status)
+    {
+        if ($this->insertBlockStmt->execute([
             'status' => $status,
-        ]);
-        return $this->dbh->lastInsertId();
+            'size_bytes' => $acceptData->size,
+            'numtx' => $acceptData->numTx,
+            'block' => $block->getHex(),
+            'hash' => $blockHash->getBinary(),
+        ])) {
+            return $this->dbh->lastInsertId();
+        }
+
+        throw new \RuntimeException("Failed to insert block to database");
     }
 
     /**
@@ -523,29 +564,30 @@ class Db implements DbInterface
         $append->execute($queryValues);
     }
 
-    private function deleteUtxosInView()
-    {
-        $this->deleteUtxosInView->execute();
-    }
-
     /**
-     * @param array $history
+     * @param ChainSegment[] $history
+     * @param int $status
      * @return BlockIndexInterface
      */
-    public function findSegmentBestBlock(array $history)
+    public function findSegmentBestBlock(array $history, $status)
     {
         $queryValues = [];
-        $queryBind = [];
+        $queryBind = ['status' => $status];
+        //$queryBind = [];
         foreach ($history as $c => $segment) {
             $queryValues[] = "h.segment = :seg$c";
             $queryBind['seg' . $c] = $segment->getId();
         }
 
         $tail = implode(" OR ", $queryValues);
-        $query = "SELECT * from headerIndex where id = (SELECT MAX(b.header_id) FROM blockIndex b JOIN headerIndex h on (b.header_id = h.id) WHERE " . $tail . " LIMIT 1)";
+        $query = "SELECT * from headerIndex where id = (SELECT MAX(b.header_id) FROM blockIndex b JOIN headerIndex h on (b.header_id = h.id) WHERE status >= :status AND " . $tail . " LIMIT 1)";
         $sql = $this->dbh->prepare($query);
         $sql->execute($queryBind);
         $result = $sql->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$result) {
+            throw new \RuntimeException("Not found");
+        }
 
         $index = new BlockIndex(
             new Buffer($result['hash'], 32),
@@ -715,9 +757,8 @@ class Db implements DbInterface
      */
     public function fetchBlock(BufferInterface $hash)
     {
-
         $stmt = $this->dbh->prepare('
-           SELECT     h.id, h.hash, h.version, h.prevBlock, h.merkleRoot, h.nBits, h.nNonce, h.nTimestamp
+           SELECT     b.block
            FROM       blockIndex  b
            JOIN       headerIndex  h ON b.header_id = h.id
            WHERE      h.hash = :hash
@@ -728,7 +769,8 @@ class Db implements DbInterface
             $r = $stmt->fetch();
             $stmt->closeCursor();
             if ($r) {
-                return new Block(
+                return BlockFactory::fromHex($r['block']);
+                /*return new Block(
                     Bitcoin::getMath(),
                     new BlockHeader(
                         $r['version'],
@@ -739,7 +781,7 @@ class Db implements DbInterface
                         $r['nNonce']
                     ),
                     $this->fetchBlockTransactions($r['id'])
-                );
+                );*/
             }
         }
 

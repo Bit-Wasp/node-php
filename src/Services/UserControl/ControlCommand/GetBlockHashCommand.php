@@ -15,7 +15,7 @@ class GetBlockHashCommand extends Command
      */
     public function execute(NodeInterface $node, array $params)
     {
-        if (!is_int($params[self::PARAM_HEIGHT])) {
+        if (is_int($params[self::PARAM_HEIGHT])) {
             throw new \RuntimeException('Invalid height');
         }
 

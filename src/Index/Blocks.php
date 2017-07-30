@@ -14,6 +14,7 @@ use BitWasp\Bitcoin\Node\Chain\UtxoView;
 use BitWasp\Bitcoin\Node\Consensus;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockAcceptData;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheck;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockCheckInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
@@ -217,18 +218,20 @@ class Blocks extends EventEmitter
     /**
      * @param HeaderChainViewInterface $headersView
      * @param BlockIndexInterface $index
-     * @return Forks
+     * @return array
      */
     public function prepareForks(HeaderChainViewInterface $headersView, BlockIndexInterface $index)
     {
         if ($this->forks instanceof Forks && $this->forks->isNext($index)) {
             $forks = $this->forks;
+            $wasNext = true;
         } else {
             $versionInfo = $this->db->findSuperMajorityInfoByHash($index->getHeader()->getPrevBlock());
-            $forks = $this->forks = new Forks($this->consensus->getParams(), $headersView->getLastBlock(), $versionInfo);
+            $forks = new Forks($this->consensus->getParams(), $headersView->validBlocks()->getIndex(), $versionInfo);
+            $wasNext = false;
         }
 
-        return $forks;
+        return [$wasNext, $forks];
     }
 
     /**
@@ -273,75 +276,116 @@ class Blocks extends EventEmitter
      * @param BlockInterface $block
      * @param HeaderChainViewInterface $chainView
      * @param Headers $headers
-     * @param bool $checkSignatures
      * @param bool $checkSize
      * @param bool $checkMerkleRoot
      * @return BlockIndexInterface
      */
-    public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSignatures = true, $checkSize = true, $checkMerkleRoot = true)
+    public function accept(BlockInterface $block, HeaderChainViewInterface $chainView, Headers $headers, $checkSize = true, $checkMerkleRoot = true)
     {
+
         $start = microtime(true);
         $init = ['start' => microtime(true), 'end' => null];
         $hash = $block->getHeader()->getHash();
         $index = $headers->accept($hash, $block->getHeader(), true);
-
-        $outpointSerializer = new CachingOutPointSerializer();
-        $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
-        $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
-
-        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
-        $blockData = $this->prepareBatch($block, $txSerializer, $outpointSerializer, $utxoSet);
         $init['end'] = microtime(true);
+
+        $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer(new CachingOutPointSerializer()));
+        $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
 
         $check = ['start' => microtime(true), 'end' => null];
         $this
             ->blockCheck
             ->check($block, $txSerializer, $blockSerializer, $checkSize, $checkMerkleRoot)
-            ->checkContextual($block, $chainView->getLastBlock());
+            ->checkContextual($block, $chainView->blocks()->getIndex());
         $check['end'] = microtime(true);
 
-        $forks = $this->prepareForks($chainView, $index);
+        $serializedBlock = $blockSerializer->serialize($block);
+        $acceptData = new BlockAcceptData();
+        $acceptData->numTx = count($block->getTransactions());
+        $acceptData->size = $serializedBlock->getSize();
 
-        $data = ['start' => microtime(true), 'end' => null];
-        $this->checkBlockData($block, $blockData, $checkSignatures, $forks->getFlags(), $index->getHeight(), $txSerializer);
-        $data['end'] = microtime(true);
-
-        $sql = ['start' => microtime(true), 'end' => null];
-        $this->db->transaction(function () use ($hash, $block, $blockSerializer, $utxoSet, $blockData) {
-            $this->db->insertBlock($hash, $block, $blockSerializer, BlockStatus::VALIDATED);
-            $utxoSet->applyBlock($blockData);
-        });
-
+        $sql = ['start'=> microtime(true)];
+        $this->db->insertBlockRaw($hash, $serializedBlock, $acceptData, BlockStatus::ACCEPTED);
         $sql['end'] = microtime(true);
 
         $chainD = ['start' => microtime(true), 'end' => null];
         $chainView->blocks()->updateTip($index);
+        $chainD['end'] = microtime(true);
+
+        $this->emit('block.accept', [$chainView, $index, $block, $acceptData]);
+
+        $total = microtime(true) - $start;
+        echo "Num txs: {$acceptData->numTx}; Size {$acceptData->size}; ";
+        $this->debugTime("Init", $init, $total);
+        $this->debugTime("Check", $check, $total);
+        $this->debugTime("SQL", $sql, $total);
+        $this->debugTime("Chain", $chainD, $total);
+        echo "Full {$total}\n";
+        echo PHP_EOL;
+
+        return $index;
+    }
+
+    private function debugTime($msg, array $time, $total) {
+        $t = number_format($time['end']-$time['start'], 4);
+        $pt = number_format($t / $total*100, 4);
+        echo " {$msg}: {$t} {$pt}%";
+    }
+
+    /**
+     * @param BlockIndexInterface $index
+     * @param BlockInterface $block
+     * @param HeaderChainViewInterface $chainView
+     * @return BlockIndexInterface
+     */
+    public function connect(BlockIndexInterface $index, BlockInterface $block, HeaderChainViewInterface $chainView, $checkOnly = false)
+    {
+        $start = microtime(true);
+        $init = ['start' => microtime(true), 'end' => null];
+        $outpointSerializer = new CachingOutPointSerializer();
+        $txSerializer = new CachingTransactionSerializer(new TransactionInputSerializer($outpointSerializer));
+        $blockSerializer = new CachingBlockSerializer($this->math, new BlockHeaderSerializer(), $txSerializer);
+
+        $init['end'] = microtime(true);
+
+        $check = ['start' => microtime(true), 'end' => null];
+        $this
+            ->blockCheck
+            ->check($block, $txSerializer, $blockSerializer, !$checkOnly, !$checkOnly);
+        $check['end'] = microtime(true);
+
+        $utxoSet = new UtxoSet($this->db, $outpointSerializer);
+        $blockData = $this->prepareBatch($block, $txSerializer, $outpointSerializer, $utxoSet);
+        list ($wasNext, $forks) = $this->prepareForks($chainView, $index);
+
+        $data = ['start' => microtime(true), 'end' => null];
+        $this->checkBlockData($block, $blockData, !$checkOnly, $forks->getFlags(), $index->getHeight(), $txSerializer);
+        $data['end'] = microtime(true);
+
+        $sql = ['start' => microtime(true), 'end' => null];
+        $this->db->transaction(function () use ($index, $utxoSet, $blockData) {
+            $utxoSet->applyBlock($blockData);
+            $this->db->updateBlockStatus($index, BlockStatus::VALIDATED);
+        });
+        $sql['end'] = microtime(true);
+
+        $chainD = ['start' => microtime(true), 'end' => null];
+        $chainView->validBlocks()->updateTip($index);
         $forks->next($index);
+        if (!$wasNext) {
+            $this->forks = $forks;
+        }
+
         $this->emit('block', [$index, $block, $blockData]);
         $chainD['end'] = microtime(true);
 
-        $init = $init['end']-$init['start'];
-        $check = $check['end']-$check['start'];
-        $data = $data['end']-$data['start'];
-        $sql = $sql['end']-$sql['start'];
-        $chainD = $chainD['end']-$chainD['start'];
-
         $total = microtime(true) - $start;
-
-        $tinit = $init / $total*100;
-        $tcheck = $check / $total*100;
-        $tvalidation = $data / $total*100;
-        $tsql = $sql / $total*100;
-        $tchain = $chainD / $total*100;
-
-        echo "Init: {$init} {$tinit}%\t";
-        echo "Check: {$check} {$tcheck}%\t";
-        echo "Validation: {$data} {$tvalidation}%\t";
-        echo "Sql: {$sql}  {$tsql}%\t";
-        echo "Chain: {$chainD}  {$tchain}%\t";
-
-        echo "Full {$total}\n";
-        echo PHP_EOL;
+        $this->debugTime("Init", $init, $total);
+        $this->debugTime("Check", $check, $total);
+        $this->debugTime("Validation", $data, $total);
+        $this->debugTime("SQL", $sql, $total);
+        $this->debugTime("Chain", $chainD, $total);
+        echo "Full ".number_format($total, 4).PHP_EOL;
 
         return $index;
     }

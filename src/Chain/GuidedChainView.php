@@ -31,17 +31,23 @@ class GuidedChainView extends EventEmitter implements ChainViewInterface
     private $position;
 
     /**
+     * @var int
+     */
+    private $status;
+
+    /**
      * GuidedChainView constructor.
      * @param ChainsInterface $container
      * @param ChainViewInterface $view
      * @param BlockIndexInterface $lead
      */
-    public function __construct(ChainsInterface $container, ChainViewInterface $view, BlockIndexInterface $lead)
+    public function __construct(ChainsInterface $container, ChainViewInterface $view, BlockIndexInterface $lead, $status)
     {
         $this->container = $container;
         $this->view = $view;
         $this->position = $lead->getHeight();
         $this->index = $lead;
+        $this->status = $status;
     }
 
     /**
@@ -49,7 +55,7 @@ class GuidedChainView extends EventEmitter implements ChainViewInterface
      */
     public function updateTip(BlockIndexInterface $index)
     {
-        $this->container->updateSegmentBlock($this->view->getSegment(), $index);
+        $this->container->updateSegmentBlock($this->view->getSegment(), $this->status, $index);
         $this->position++;
         $this->index = $index;
     }

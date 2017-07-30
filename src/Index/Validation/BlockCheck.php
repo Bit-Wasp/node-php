@@ -17,6 +17,7 @@ use BitWasp\Bitcoin\Transaction\TransactionInputInterface;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Bitcoin\Transaction\TransactionOutputInterface;
 use BitWasp\Buffertools\Buffer;
+use BitWasp\Buffertools\BufferInterface;
 use Pleo\Merkle\FixedSizeTree;
 
 class BlockCheck implements BlockCheckInterface
@@ -221,7 +222,7 @@ class BlockCheck implements BlockCheckInterface
     /**
      * @param BlockInterface $block
      * @param TransactionSerializerInterface $txSerializer
-     * @return Buffer
+     * @return BufferInterface
      * @throws MerkleTreeEmpty
      */
     public function calcMerkleRoot(BlockInterface $block, TransactionSerializerInterface $txSerializer)

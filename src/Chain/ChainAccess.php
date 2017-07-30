@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 
+use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\Index\Transactions;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
@@ -51,6 +52,19 @@ class ChainAccess implements ChainAccessInterface
         }
 
         return $this->db->fetchIndex($hash);
+    }
+
+    /**
+     * @param BufferInterface $hash
+     * @return BlockInterface
+     */
+    public function fetchBlock(BufferInterface $hash)
+    {
+        if (!$this->view->containsHash($hash)) {
+            throw new \RuntimeException('Index by this hash not known');
+        }
+
+        return $this->db->fetchBlock($hash);
     }
 
     /**

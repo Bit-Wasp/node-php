@@ -9,6 +9,7 @@ use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
 use BitWasp\Bitcoin\Node\HashStorage;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockAcceptData;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
@@ -47,7 +48,7 @@ interface DbInterface
      * @param array $history
      * @return BlockIndexInterface
      */
-    public function findSegmentBestBlock(array $history);
+    public function findSegmentBestBlock(array $history, $status);
     
     /**
      * @param int $segmentId
@@ -83,7 +84,7 @@ interface DbInterface
 
     /**
      * @param int $blockId
-     * @return TransactionCollection
+     * @return TransactionInterface[]
      */
     public function fetchBlockTransactions($blockId);
 
@@ -134,6 +135,15 @@ interface DbInterface
     public function insertHeaderBatch(HeadersBatch $batch);
 
     /**
+     * @param BufferInterface $blockHash
+     * @param BufferInterface $block
+     * @param BlockAcceptData $acceptData
+     * @param int $status
+     * @return mixed
+     */
+    public function insertBlockRaw(BufferInterface $blockHash, BufferInterface $block, BlockAcceptData $acceptData, $status);
+
+    /**
      * @param BufferInterface $hash
      * @param BlockInterface $block
      * @param BlockSerializerInterface $blockSerializer
@@ -141,6 +151,13 @@ interface DbInterface
      * @return int
      */
     public function insertBlock(BufferInterface $hash, BlockInterface $block, BlockSerializerInterface $blockSerializer, $status);
+
+    /**
+     * @param BlockIndexInterface $index
+     * @param $status
+     * @return mixed
+     */
+    public function updateBlockStatus(BlockIndexInterface $index, $status);
 
     /**
      * Here, we return max 2000 headers following $hash.

@@ -8,6 +8,7 @@ use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
 use BitWasp\Bitcoin\Math\Math;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
+use BitWasp\Bitcoin\Node\Index\BlockStatus;
 use BitWasp\Buffertools\BufferInterface;
 use Evenement\EventEmitter;
 
@@ -33,7 +34,12 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     /**
      * @var \SplObjectStorage
      */
-    private $segmentBlock;
+    private $segmentBlockValidated;
+
+    /**
+     * @var \SplObjectStorage
+     */
+    private $segmentBlockData;
 
     /**
      * Map of hash => height
@@ -71,6 +77,8 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     private $best;
 
+    private $viewTmp = [];
+
     /**
      * ChainContainer constructor.
      * @param Math $math
@@ -81,7 +89,8 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     {
         $this->math = $math;
         $this->params = $params;
-        $this->segmentBlock = new \SplObjectStorage();
+        $this->segmentBlockData = new \SplObjectStorage();
+        $this->segmentBlockValidated = new \SplObjectStorage();
         foreach ($segments as $segment) {
             $this->addSegment($segment);
         }
@@ -119,7 +128,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     private function processSegment(DbInterface $db, ChainSegment $segment)
     {
         $id = $segment->getId();
-        if (isset($this->segmentBlock[$segment])) {
+        if (isset($this->segmentBlockData[$segment])) {
             throw new \Exception('Already processed this segment');
         }
 
@@ -144,7 +153,11 @@ class ChainContainer extends EventEmitter implements ChainsInterface
             $this->chainLink[$id] = $ancestor;
         }
 
-        $this->segmentBlock[$segment] = $this->db->findSegmentBestBlock($this->getHistory($segment));
+        $dataBlock = $this->db->findSegmentBestBlock($this->getHistory($segment), BlockStatus::ACCEPTED);
+        $validBlock = $this->db->findSegmentBestBlock($this->getHistory($segment), BlockStatus::VALIDATED);
+
+        $this->segmentBlockData[$segment] = $dataBlock;
+        $this->segmentBlockValidated[$segment] = $validBlock;
     }
 
     /**
@@ -185,19 +198,32 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         }
     }
 
+    protected function getBlockStorage($status) {
+        switch($status) {
+            case BlockStatus::VALIDATED:
+                return $this->segmentBlockValidated;
+            case BlockStatus::ACCEPTED:
+                return $this->segmentBlockData;
+            default:
+                throw new \RuntimeException("invalid block status, don't have storage for this");
+        }
+    }
+
     /**
      * @param ChainSegment $segment
      * @param BlockIndexInterface $index
      */
-    public function updateSegmentBlock(ChainSegment $segment, BlockIndexInterface $index)
+    public function updateSegmentBlock(ChainSegment $segment, $status, BlockIndexInterface $index)
     {
+        $storage = $this->getBlockStorage($status);
+
         /** @var BlockIndexInterface $blockIndex */
-        $blockIndex = $this->segmentBlock[$segment];
+        $blockIndex = $storage[$segment];
         if (!$blockIndex->isNext($index)) {
             throw new \RuntimeException('BlockIndex does not follow this block');
         }
 
-        $this->segmentBlock[$segment] = $index;
+        $storage[$segment] = $index;
     }
 
     /**
@@ -258,12 +284,17 @@ class ChainContainer extends EventEmitter implements ChainsInterface
 
     /**
      * @param ChainSegment $segment
-     * @return ChainView
+     * @return HeaderChainViewInterface
      */
     public function view(ChainSegment $segment)
     {
-        $got = $this->segmentBlock->offsetGet($segment);
-        return new ChainView($this, $segment, $got);
+        if (!array_key_exists($segment->getId(), $this->viewTmp)) {
+            $bestBlockData = $this->segmentBlockData->offsetGet($segment);
+            $bestBlockValidated = $this->segmentBlockValidated->offsetGet($segment);
+            $this->viewTmp[$segment->getId()] = new ChainView($this, $segment, $bestBlockData, $bestBlockValidated);
+        }
+
+        return $this->viewTmp[$segment->getId()];
     }
 
     /**
@@ -281,7 +312,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
      */
     public function blocksView(ChainViewInterface $view)
     {
-        return new GuidedChainView($this, $view, $this->segmentBlock->offsetGet($view->getSegment()));
+        return new GuidedChainView($this, $view, $this->segmentBlockData->offsetGet($view->getSegment()), BlockStatus::ACCEPTED);
     }
 
     /**
@@ -341,7 +372,7 @@ class ChainContainer extends EventEmitter implements ChainsInterface
     {
         foreach ($this->segments as $segment) {
             /** @var BlockIndexInterface $segBlock */
-            $segBlock = $this->segmentBlock->offsetGet($segment);
+            $segBlock = $this->segmentBlockData->offsetGet($segment);
             if ($header->getPrevBlock()->equals($segBlock->getHash())) {
                 return $segBlock;
             }

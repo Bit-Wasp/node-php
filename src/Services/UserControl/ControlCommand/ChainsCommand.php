@@ -26,11 +26,13 @@ class ChainsCommand extends Command
         foreach ($nodeChains->getSegments() as $segment) {
             $bestHeaderIdx = $segment->getLast();
             $view = $nodeChains->view($segment);
-            $bestBlockIdx = $nodeChains->blocksView($view)->getIndex();
+            $bestData = $view->blocks()->getIndex();
+            $bestValid = $view->validBlocks()->getIndex();
 
             $chains[] = [
                 'best_header' => $this->convertIndexToArray($bestHeaderIdx),
-                'best_block' => $this->convertIndexToArray($bestBlockIdx)
+                'best_block_data' => $this->convertIndexToArray($bestData),
+                'best_block_valid' => $this->convertIndexToArray($bestValid),
             ];
         }
 

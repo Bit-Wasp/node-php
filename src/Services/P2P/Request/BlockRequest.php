@@ -5,6 +5,7 @@ namespace BitWasp\Bitcoin\Node\Services\P2P\Request;
 use BitWasp\Bitcoin\Networking\Peer\Peer;
 use BitWasp\Bitcoin\Networking\Structure\Inventory;
 use BitWasp\Bitcoin\Node\Chain\ChainViewInterface;
+use BitWasp\Bitcoin\Node\Chain\HeaderChainViewInterface;
 use BitWasp\Buffertools\BufferInterface;
 
 class BlockRequest
@@ -49,21 +50,21 @@ class BlockRequest
     }
 
     /**
-     * @param ChainViewInterface $state
+     * @param HeaderChainViewInterface $state
      * @return Inventory[]
      * @throws \RuntimeException
      * @throws \Exception
      */
-    public function nextInventory(ChainViewInterface $state)
+    public function nextInventory(HeaderChainViewInterface $state)
     {
-        return $this->relativeNextInventory($state, $state->getLastBlock()->getHash());
+        return $this->relativeNextInventory($state, $state->blocks()->getIndex()->getHash());
     }
 
     /**
-     * @param ChainViewInterface $headerChain
+     * @param HeaderChainViewInterface $headerChain
      * @param Peer $peer
      */
-    public function requestNextBlocks(ChainViewInterface $headerChain, Peer $peer)
+    public function requestNextBlocks(HeaderChainViewInterface $headerChain, Peer $peer)
     {
         if (null === $this->lastRequested) {
             $nextData = $this->nextInventory($headerChain);

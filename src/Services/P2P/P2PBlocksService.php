@@ -62,8 +62,8 @@ class P2PBlocksService extends EventEmitter
      */
     public function onHeaders(PeerState $state, Peer $peer, HeadersBatch $batch)
     {
+        echo "some headers\n";
         if (count($batch->getIndices()) < 2000) {
-            echo "less than max_headers, start downloading\n";
             $this->blockDownload->start($batch->getTip(), $peer);
         }
     }
@@ -88,17 +88,18 @@ class P2PBlocksService extends EventEmitter
      */
     public function onBlock(PeerState $state, Peer $peer, Block $blockMsg)
     {
+        echo "P2P BLOCK\n";
         $best = $this->node->chain();
         $headerIdx = $this->node->headers();
         $blockIndex = $this->node->blocks();
 
-        $checkSignatures = (bool)$this->config->getItem('config', 'check_signatures', true);
         $checkSize = (bool)$this->config->getItem('config', 'check_block_size', true);
         $checkMerkleRoot = (bool)$this->config->getItem('config', 'check_merkle_root', true);
 
         try {
-            $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSignatures, $checkSize, $checkMerkleRoot);
+            $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSize, $checkMerkleRoot);
             $this->blockDownload->received($best, $peer, $index->getHash());
+
 
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;

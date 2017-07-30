@@ -15,7 +15,7 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
 
     /**
      * @param ChainSegment $segment
-     * @return ChainViewInterface
+     * @return HeaderChainViewInterface
      */
     public function view(ChainSegment $segment);
 
@@ -29,7 +29,7 @@ interface ChainsInterface extends \Countable, EventEmitterInterface
      * @param ChainSegment $segment
      * @param BlockIndexInterface $index
      */
-    public function updateSegmentBlock(ChainSegment $segment, BlockIndexInterface $index);
+    public function updateSegmentBlock(ChainSegment $segment, $status, BlockIndexInterface $index);
     
     /**
      * @param ChainViewInterface $view

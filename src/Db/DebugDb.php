@@ -8,11 +8,12 @@ use BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
 use BitWasp\Bitcoin\Node\HashStorage;
-use BitWasp\Bitcoin\Node\Index\BlockStatus;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockAcceptData;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Serializer\Block\BlockSerializerInterface;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
+use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\BufferInterface;
 
 class DebugDb implements DbInterface
@@ -42,12 +43,13 @@ class DebugDb implements DbInterface
 
     /**
      * @param ChainSegment[] $history
+     * @param int $status
      * @return BlockIndexInterface
      */
-    public function findSegmentBestBlock(array $history)
+    public function findSegmentBestBlock(array $history, $status)
     {
         echo __FUNCTION__ . PHP_EOL;
-        return $this->db->findSegmentBestBlock($history);
+        return $this->db->findSegmentBestBlock($history, $status);
     }
 
     /**
@@ -66,6 +68,30 @@ class DebugDb implements DbInterface
     {
         echo __FUNCTION__ . PHP_EOL;
         return $this->db->wipe();
+    }
+
+    /**
+     * @param BlockIndexInterface $index
+     * @param int $status
+     * @return int
+     */
+    public function updateBlockStatus(BlockIndexInterface $index, $status)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->updateBlockStatus($index, $status);
+    }
+
+    /**
+     * @param BufferInterface $blockHash
+     * @param BufferInterface $block
+     * @param BlockAcceptData $acceptData
+     * @param int $status
+     * @return mixed
+     */
+    public function insertBlockRaw(BufferInterface $blockHash, BufferInterface $block, BlockAcceptData $acceptData, $status)
+    {
+        echo __FUNCTION__ . PHP_EOL;
+        return $this->db->insertBlockRaw($blockHash, $block, $acceptData, $status);
     }
 
     /**
@@ -169,7 +195,7 @@ class DebugDb implements DbInterface
 
     /**
      * @param int $blockId
-     * @return \BitWasp\Bitcoin\Collection\Transaction\TransactionCollection
+     * @return TransactionInterface[]
      */
     public function fetchBlockTransactions($blockId)
     {

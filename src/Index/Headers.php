@@ -130,6 +130,8 @@ class Headers extends EventEmitter
         $index = $batch->getIndices()[0];
         $this->applyBatch($batch);
 
+        $this->emit('tip', [$index]);
+
         return $index;
     }
 
@@ -223,7 +225,8 @@ class Headers extends EventEmitter
     public function applyBatch(HeadersBatch $batch)
     {
         $indices = $batch->getIndices();
-        if (count($indices) === 0) {
+        $count = count($indices);
+        if ($count === 0) {
             return $this;
         }
 
@@ -234,7 +237,7 @@ class Headers extends EventEmitter
             $tip->updateTip($index);
         }
 
-        $this->emit('tip', [$batch]);
+        $this->emit('tip', [$tip->getIndex()]);
 
         return $this;
     }

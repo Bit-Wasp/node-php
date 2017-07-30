@@ -5,6 +5,8 @@ namespace BitWasp\Bitcoin\Node\Services\Debug;
 use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
 use BitWasp\Bitcoin\Node\Chain\ChainSegment;
+use BitWasp\Bitcoin\Node\Chain\HeaderChainViewInterface;
+use BitWasp\Bitcoin\Node\Index\Validation\BlockAcceptData;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Node\Index\Validation\HeadersBatch;
 use BitWasp\Bitcoin\Node\NodeInterface;
@@ -33,6 +35,7 @@ class ZmqDebug implements DebugInterface
 
         $node->headers()->on('tip', [$this, 'logTip']);
         $node->blocks()->on('block', [$this, 'logBlock']);
+        $node->blocks()->on('block.accept', [$this, 'logBlockAccept']);
         $node->chains()->on('retarget', [$this, 'logRetarget']);
 
     }
@@ -49,6 +52,22 @@ class ZmqDebug implements DebugInterface
             'height' => $index->getHeight(),
             'prevBits' => $prevBits,
             'newBits' => $index->getHeader()->getBits(),
+        ]);
+    }
+
+    /**
+     * @param HeaderChainViewInterface $chainView
+     * @param BlockIndexInterface $index
+     * @param BlockInterface $block
+     * @param BlockAcceptData $acceptData
+     */
+    public function logBlockAccept(HeaderChainViewInterface $chainView, BlockIndexInterface $index, BlockInterface $block, BlockAcceptData $acceptData)
+    {
+        $this->log('block.accept', [
+            'hash' => $index->getHash()->getHex(),
+            'height' => $index->getHeight(),
+            'numtx' => $acceptData->numTx,
+            'size_bytes' => $acceptData->size,
         ]);
     }
 
@@ -74,13 +93,11 @@ class ZmqDebug implements DebugInterface
     }
 
     /**
-     * @param HeadersBatch $batch
+     * @param BlockIndexInterface $index
      */
-    public function logTip (HeadersBatch $batch)
+    public function logTip (BlockIndexInterface $index)
     {
-        $index = $batch->getTip()->getIndex();
         $this->log('tip', [
-            'count' => count($batch->getIndices()),
             'tip' => [
                 'hash' => $index->getHash()->getHex(),
                 'height' => $index->getHeight(),

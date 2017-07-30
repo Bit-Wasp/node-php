@@ -3,6 +3,7 @@
 namespace BitWasp\Bitcoin\Node\Chain;
 
 
+use BitWasp\Bitcoin\Block\BlockInterface;
 use BitWasp\Bitcoin\Node\Index\Transactions;
 use BitWasp\Bitcoin\Transaction\TransactionInterface;
 use BitWasp\Buffertools\BufferInterface;
@@ -15,6 +16,12 @@ interface ChainAccessInterface
      * @return BlockIndexInterface
      */
     public function fetchIndex(BufferInterface $hash);
+
+    /**
+     * @param BufferInterface $hash
+     * @return BlockInterface
+     */
+    public function fetchBlock(BufferInterface $hash);
 
     /**
      * @param Transactions $txIndex
