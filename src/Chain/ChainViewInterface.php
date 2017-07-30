@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Buffertools\BufferInterface;
 
@@ -54,5 +53,4 @@ interface ChainViewInterface
      * @return BlockLocator
      */
     public function getHeadersLocator(BufferInterface $hashStop = null);
-
 }

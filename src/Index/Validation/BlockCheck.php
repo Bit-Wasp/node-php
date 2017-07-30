@@ -242,7 +242,6 @@ class BlockCheck implements BlockCheckInterface
             $transaction = $block->getTransaction(0);
             $serialized = $txSerializer->serialize($transaction);
             $binary = $hashFxn($serialized->getBinary());
-
         } else {
             // Create a fixed size Merkle Tree
             $tree = new FixedSizeTree($txCount + ($txCount % 2), $hashFxn);

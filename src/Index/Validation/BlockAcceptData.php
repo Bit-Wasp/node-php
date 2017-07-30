@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
-
 class BlockAcceptData
 {
     /**

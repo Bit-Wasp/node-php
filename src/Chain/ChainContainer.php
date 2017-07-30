@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Bitcoin;
 use BitWasp\Bitcoin\Block\BlockHeaderInterface;
 use BitWasp\Bitcoin\Chain\ParamsInterface;
@@ -198,8 +197,9 @@ class ChainContainer extends EventEmitter implements ChainsInterface
         }
     }
 
-    protected function getBlockStorage($status) {
-        switch($status) {
+    protected function getBlockStorage($status)
+    {
+        switch ($status) {
             case BlockStatus::VALIDATED:
                 return $this->segmentBlockValidated;
             case BlockStatus::ACCEPTED:

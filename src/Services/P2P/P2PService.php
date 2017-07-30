@@ -135,7 +135,6 @@ class P2PService extends EventEmitter
 
         $this->manager->on('outbound', [$this, 'onOutBoundPeer']);
         $this->manager->on('inbound', [$this, 'onInboundPeer']);
-
     }
 
     /**
@@ -231,7 +230,6 @@ class P2PService extends EventEmitter
                         } else {
                             $goodPeer->resolve($peer);
                         }
-
                     }, function () use ($goodPeer) {
                         $goodPeer->reject();
                     });
@@ -243,7 +241,6 @@ class P2PService extends EventEmitter
             }, function () {
                 return $this->connectNextPeer();
             });
-
     }
 
     /**

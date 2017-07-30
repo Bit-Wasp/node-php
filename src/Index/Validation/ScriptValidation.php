@@ -56,7 +56,6 @@ class ScriptValidation implements ScriptValidationInterface
         } else {
             $this->consensus = new BitcoinConsensus($txSerializer);
         }
-
     }
 
     /**

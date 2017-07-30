@@ -131,7 +131,7 @@ class Blocks extends EventEmitter
     public function parseUtxos(BlockInterface $block, TransactionSerializerInterface $txSerializer, OutPointSerializerInterface $oSerializer)
     {
         $v = [];
-        $packV = function($n) use (&$v) {
+        $packV = function ($n) use (&$v) {
             if (array_key_exists($n, $v)) {
                 return $v[$n];
             }
@@ -326,7 +326,8 @@ class Blocks extends EventEmitter
         return $index;
     }
 
-    private function debugTime($msg, array $time, $total) {
+    private function debugTime($msg, array $time, $total)
+    {
         $t = number_format($time['end']-$time['start'], 4);
         $pt = number_format($t / $total*100, 4);
         echo " {$msg}: {$t} {$pt}%";

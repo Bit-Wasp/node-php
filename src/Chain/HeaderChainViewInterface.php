@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 interface HeaderChainViewInterface extends ChainViewInterface
 {
 

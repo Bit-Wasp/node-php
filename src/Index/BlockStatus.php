@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Index;
 
-
 class BlockStatus
 {
     const ACCEPTED = 0;

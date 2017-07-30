@@ -70,8 +70,6 @@ class ForksServiceProvider implements ServiceProviderInterface
                     $debug->log('fork.new', ['hash' => $index->getHash()->getHex(), 'height' => $index->getHeight(), 'old' => $first, 'features' => $features]);
                 }
             }
-
         });
-
     }
 }

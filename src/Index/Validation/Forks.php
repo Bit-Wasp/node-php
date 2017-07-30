@@ -187,7 +187,8 @@ class Forks
         return $this->index->isNext($index);
     }
 
-    public function getLatest() {
+    public function getLatest()
+    {
         return $this->index;
     }
 

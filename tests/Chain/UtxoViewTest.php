@@ -43,7 +43,6 @@ class UtxoViewTest extends BitcoinNodeTest
         $view = new UtxoView([$utxo]);
         $this->assertTrue($view->have($wantOutpoint));
         $this->assertFalse($view->have($differentOutpoint));
-
     }
 
     public function testFetchUtxo()

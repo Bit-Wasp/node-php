@@ -79,7 +79,6 @@ class P2PHeadersService extends EventEmitter
 
             echo "sending headers\n";
             $this->emit('headers', [$state, $peer, $batch]);
-            
         } catch (\Exception $e) {
             $this->debug->log('error.onHeaders', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }

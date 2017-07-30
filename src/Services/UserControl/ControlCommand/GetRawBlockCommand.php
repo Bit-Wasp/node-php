@@ -23,7 +23,7 @@ class GetRawBlockCommand extends Command
         }
 
         try {
-            $hash = Buffer::hex($params[self::PARAM_HASH],32);
+            $hash = Buffer::hex($params[self::PARAM_HASH], 32);
         } catch (\Exception $e) {
             throw new \RuntimeException("Invalid value for hash");
         }

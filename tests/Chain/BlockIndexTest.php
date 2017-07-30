@@ -24,7 +24,6 @@ class BlockIndexTest extends BitcoinNodeTest
         $this->assertEquals($height, $index->getHeight());
         $this->assertEquals($work, $index->getWork());
         $this->assertSame($header, $index->getHeader());
-
     }
 
     public function testIsNext()

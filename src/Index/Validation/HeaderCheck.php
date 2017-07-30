@@ -55,7 +55,6 @@ class HeaderCheck implements HeaderCheckInterface
             if ($checkPow) {
                 $this->pow->check($hash, $header->getBits());
             }
-
         } catch (\Exception $e) {
             throw new \RuntimeException('Headers::check() - failed validating header proof-of-work');
         }

@@ -44,7 +44,7 @@ class P2PServiceProvider implements ServiceProviderInterface
             return new Peers();
         };
 
-        $container['p2p.factory'] = function(Container $container) {
+        $container['p2p.factory'] = function (Container $container) {
             $factory = new NetworkFactory($container['loop'], $container['network.params.addr']);
             $factory->setSettings($container['network.params.p2p']);
             return $factory;

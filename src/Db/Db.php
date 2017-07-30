@@ -255,7 +255,6 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
             ORDER BY node.header_id DESC
             LIMIT 1
         ');
-
     }
 
     /**
@@ -510,7 +509,6 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
                 $outData["value" . $i . "n" . $k] = $output->getValue();
                 $outData["scriptPubKey" . $i . "n" . $k] = $output->getScript()->getBinary();
                 $outData["nOutput" . $i . "n" . $k] = $k;
-
             }
         }
 
@@ -545,7 +543,6 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
         $insertOutputs->execute($outData);
 
         return true;
-
     }
 
     /**
@@ -637,7 +634,6 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
             $headerValues['nBits' . $c] = $header->getBits();
             $headerValues['nTimestamp' . $c] = $header->getTimestamp();
             $headerValues['nNonce' . $c] = $header->getNonce();
-
         }
 
         $insertHeaders = $this->dbh->prepare('
@@ -653,7 +649,6 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
         }
 
         return true;
-
     }
 
     /**
@@ -1038,7 +1033,6 @@ WHERE tip.header_id = (
     {
         $str = "";
         if (!empty($blockData->requiredOutpoints)) {
-
             $deleteIds = [];
             $c = 0;
             $diff = 0;
@@ -1065,7 +1059,6 @@ WHERE tip.header_id = (
             $diff = microtime(true)-$a;
             echo "[insert: $diff] ";
         }
-
     }
 
     /**

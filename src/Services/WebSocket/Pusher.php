@@ -78,7 +78,6 @@ class Pusher implements WampServerInterface
         }
 
         $conn->callError($id, $topic, ['error' => 'Invalid call']);
-
     }
 
     /**

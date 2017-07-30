@@ -37,7 +37,6 @@ class ZmqDebug implements DebugInterface
         $node->blocks()->on('block', [$this, 'logBlock']);
         $node->blocks()->on('block.accept', [$this, 'logBlockAccept']);
         $node->chains()->on('retarget', [$this, 'logRetarget']);
-
     }
 
     /**
@@ -76,7 +75,7 @@ class ZmqDebug implements DebugInterface
      * @param BlockInterface $block
      * @param BlockData $blockData
      */
-    public function logBlock (BlockIndexInterface $index, BlockInterface $block, BlockData $blockData)
+    public function logBlock(BlockIndexInterface $index, BlockInterface $block, BlockData $blockData)
     {
         echo count($blockData->remainingNew) . "created and ".count($blockData->requiredOutpoints) . " destroyed\n";
         $this->log('block', [
@@ -95,7 +94,7 @@ class ZmqDebug implements DebugInterface
     /**
      * @param BlockIndexInterface $index
      */
-    public function logTip (BlockIndexInterface $index)
+    public function logTip(BlockIndexInterface $index)
     {
         $this->log('tip', [
             'tip' => [

@@ -34,7 +34,7 @@ class ValidationService extends EventEmitter
         $this->node = $node;
         $this->loop = $container['loop'];
 
-        $this->node->blocks()->on('block.accept', function($chain, $index, $block) {
+        $this->node->blocks()->on('block.accept', function ($chain, $index, $block) {
             $this->loop->futureTick(function () use ($chain, $index, $block) {
                 $this->connectBlock($chain, $index, $block);
             });
@@ -44,7 +44,6 @@ class ValidationService extends EventEmitter
             if (self::ENABLED) {
                 $this->catchUp($this->node->chain());
             }
-
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
             echo $e->getTraceAsString().PHP_EOL;
@@ -60,7 +59,7 @@ class ValidationService extends EventEmitter
         $validBlk = $chainView->validBlocks()->getIndex();
 
         if ($dataBlk->getHeight() != $validBlk->getHeight()) {
-            $this->loop->futureTick(function() use ($chainView, $validBlk) {
+            $this->loop->futureTick(function () use ($chainView, $validBlk) {
                 try {
                     $hash = $chainView->blocks()->getHashFromHeight($validBlk->getHeight() + 1);
                     $access = $this->node->chains()->access($chainView);
@@ -101,12 +100,10 @@ class ValidationService extends EventEmitter
             }
 
             $this->node->blocks()->connect($index, $block, $chainView);
-
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
             echo $e->getTraceAsString().PHP_EOL;
             die("EXCEPTION VAlidationSErvice connect block {$e->getMessage()}");
         }
-
     }
 }

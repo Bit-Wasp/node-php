@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use Evenement\EventEmitter;
 
 class ChainSegment extends EventEmitter

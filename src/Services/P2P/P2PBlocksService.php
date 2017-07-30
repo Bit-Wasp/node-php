@@ -99,8 +99,6 @@ class P2PBlocksService extends EventEmitter
         try {
             $index = $blockIndex->accept($blockMsg->getBlock(), $best, $headerIdx, $checkSize, $checkMerkleRoot);
             $this->blockDownload->received($best, $peer, $index->getHash());
-
-
         } catch (\Exception $e) {
             echo $e->getMessage().PHP_EOL;
             echo "Height was {$best->getIndex()->getHeight()}\n";

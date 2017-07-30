@@ -30,6 +30,5 @@ class InfoCommand extends Command
         $this
             ->setName('info')
             ->setDescription('Returns information about the running node');
-
     }
 }

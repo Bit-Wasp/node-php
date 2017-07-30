@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Chain;
 
-
 use BitWasp\Bitcoin\Chain\BlockLocator;
 use BitWasp\Buffertools\Buffer;
 use BitWasp\Buffertools\BufferInterface;

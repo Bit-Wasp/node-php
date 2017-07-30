@@ -27,7 +27,7 @@ class NetworkServiceProvider implements ServiceProviderInterface
             $network = 'bitcoin-mainnet';
         }
 
-        switch($network) {
+        switch ($network) {
             default:
                 throw new \RuntimeException("Unsupported network: {$network}");
             case 'bitcoin-mainnet':

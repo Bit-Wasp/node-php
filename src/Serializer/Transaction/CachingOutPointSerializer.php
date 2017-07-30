@@ -2,7 +2,6 @@
 
 namespace BitWasp\Bitcoin\Node\Serializer\Transaction;
 
-
 use BitWasp\Buffertools\Parser;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializer;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
@@ -35,7 +34,7 @@ class CachingOutPointSerializer implements OutPointSerializerInterface
     public function stats()
     {
         return [
-            'cached' => $this->cached, 'serialize' => $this->serialize, 'parse' => $this->parse 
+            'cached' => $this->cached, 'serialize' => $this->serialize, 'parse' => $this->parse
         ];
     }
     /**
