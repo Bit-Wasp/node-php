@@ -315,11 +315,10 @@ class Blocks extends EventEmitter
         $this->emit('block.accept', [$chainView, $index, $block, $acceptData]);
 
         $total = microtime(true) - $start;
-        echo "Num txs: {$acceptData->numTx}; Size {$acceptData->size}; ";
+        echo "height: {$index->getHeight()} Num txs: {$acceptData->numTx}; Size {$acceptData->size}; ";
         $this->debugTime("Init", $init, $total);
         $this->debugTime("Check", $check, $total);
         $this->debugTime("SQL", $sql, $total);
-        $this->debugTime("Chain", $chainD, $total);
         echo "Full {$total}\n";
         echo PHP_EOL;
 

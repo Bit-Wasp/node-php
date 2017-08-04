@@ -438,7 +438,7 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
             'status' => $status,
             'size_bytes' => $acceptData->size,
             'numtx' => $acceptData->numTx,
-            'block' => $block->getHex(),
+            'block' => $block->getBinary(),
             'hash' => $blockHash->getBinary(),
         ])) {
             return $this->dbh->lastInsertId();
@@ -764,7 +764,7 @@ values (:status, :block, :size_bytes, :numtx, (select h.id FROM headerIndex h WH
             $r = $stmt->fetch();
             $stmt->closeCursor();
             if ($r) {
-                return BlockFactory::fromHex($r['block']);
+                return BlockFactory::fromHex(new Buffer($r['block']));
                 /*return new Block(
                     Bitcoin::getMath(),
                     new BlockHeader(

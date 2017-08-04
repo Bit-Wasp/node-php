@@ -5,8 +5,6 @@ namespace BitWasp\Bitcoin\Node\Chain;
 use BitWasp\Bitcoin\Node\Db\DbInterface;
 use BitWasp\Bitcoin\Node\Index\Validation\BlockData;
 use BitWasp\Bitcoin\Serializer\Transaction\OutPointSerializerInterface;
-use BitWasp\Bitcoin\Transaction\OutPointInterface;
-use BitWasp\Bitcoin\Utxo\UtxoInterface;
 
 class UtxoSet
 {

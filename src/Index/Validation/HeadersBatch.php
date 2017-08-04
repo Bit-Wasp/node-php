@@ -3,12 +3,12 @@
 namespace BitWasp\Bitcoin\Node\Index\Validation;
 
 use BitWasp\Bitcoin\Node\Chain\BlockIndexInterface;
-use BitWasp\Bitcoin\Node\Chain\ChainView;
+use BitWasp\Bitcoin\Node\Chain\HeaderChainViewInterface;
 
 class HeadersBatch
 {
     /**
-     * @var ChainView
+     * @var HeaderChainViewInterface
      */
     private $chainState;
 
@@ -19,17 +19,17 @@ class HeadersBatch
 
     /**
      * HeadersBatch constructor.
-     * @param ChainView $chainState
+     * @param HeaderChainViewInterface $chainState
      * @param BlockIndexInterface[] $indices
      */
-    public function __construct(ChainView $chainState, array $indices)
+    public function __construct(HeaderChainViewInterface $chainState, array $indices)
     {
         $this->chainState = $chainState;
         $this->indices = $indices;
     }
 
     /**
-     * @return ChainView
+     * @return HeaderChainViewInterface
      */
     public function getTip()
     {
