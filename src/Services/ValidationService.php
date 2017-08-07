@@ -22,7 +22,7 @@ class ValidationService extends EventEmitter
      */
     private $loop;
 
-    const ENABLED = false;
+    const ENABLED = true;
 
     /**
      * P2PHeadersService constructor.
